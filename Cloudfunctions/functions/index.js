@@ -28,7 +28,7 @@ exports.stravaDeauth = functions.https.onRequest(async (req, res) => {
   };
   request(options, async (error, response, body) => {
     if (!error && response.statusCode) {
-      await userRef.set({"strava_connected": false});
+      await userRef.delete();
       // await sendDevSuccess(devId);
     } else {
       console.log(JSON.parse(body));
