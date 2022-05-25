@@ -6,6 +6,14 @@ const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 const Url = require("url");
 const request = require("request");
+const strava = require("strava-v3");
+
+strava.config({
+  "client_id": "72486",
+  "client_secret": "b0d500111e3d1774903da1f067b5b7adf38ca726",
+});
+
+
 admin.initializeApp();
 const db = admin.firestore();
 
@@ -112,6 +120,7 @@ exports.stravaWebhook = functions.https.onRequest((request, response) => {
       query: request.query,
       body: request.body,
     });
+    strava.activities.get({"id": request.body.}},done)
     response.status(200).send("EVENT_RECEIVED");
   } else if (request.method === "GET") {
     const VERIFY_TOKEN = "STRAVA";
