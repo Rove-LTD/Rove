@@ -20,7 +20,7 @@ new_standard_format = {
     "elevation_gain" : null,
     "elevation_loss" : null,
   }
-function writeStravaActivityToFirestore(activities) {
+function stravaSanitise(activities) {
 let summaryActivities = [{}];
 
 for (let i=0; i<activities.length; i++) {
@@ -48,7 +48,7 @@ for (let i=0; i<activities.length; i++) {
 return summaryActivities;
 }
 
-function writeGarminActivityToFirestore(activities) {
+function garminSanitise(activities) {
 
     let summaryActivities = [{}];
 
@@ -348,8 +348,8 @@ garmin_examplar_2 = {
   }
 
 // console.log(writeStravaActivityToFirestore(strava_examplar));
-x = writeStravaActivityToFirestore([strava_examplar_1]);
-y = writeGarminActivityToFirestore([garmin_examplar_2])
+x = stravaSanitise([strava_examplar_1]);
+y = garminSanitise([garmin_examplar_2])
 
 console.log("Strava Sanitised")
 console.log(x)
