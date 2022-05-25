@@ -1,7 +1,13 @@
+/* eslint-disable guard-for-in */
+/* eslint-disable require-jsdoc */
+/* eslint-disable max-len */
 const functions = require("firebase-functions");
 // The Firebase Admin SDK to access Firestore.
 const admin = require("firebase-admin");
+const Url = require("url");
+const request = require("request");
 admin.initializeApp();
+const db = admin.firestore();
 
 // INTEGRATION FOR APP:
 // get url response and go through onboarding flow.
@@ -10,6 +16,7 @@ admin.initializeApp();
 
 exports.authenticateStrava = functions.https.onRequest((req, res) => {
   // When dev calls this url with parameters: user-id, dev-id, and service to authenticate.
+  // TODO: create authorization with dev-secret keys and dev-id.
 
   // in form:  us-central1-rove.cloudfunctions.net/authenticateStrava?userId=***&devId=***.
 
@@ -19,15 +26,15 @@ exports.authenticateStrava = functions.https.onRequest((req, res) => {
   res.send(url);
 });
 
-//callback from strava with token in
+// callback from strava with token in
 exports.stravaCallback = functions.https.onRequest(async (req, res) => {
-  res.send("This goes back to the user.");
   // this comes from strava
   // create authorization for user completing oAuth flow.
-  const oAuthCallback = Url.parse(req.url, true).query;
-  const code = oAuthCallback["code"];
-  const userId = oAuthCallback["userId"];
-  const devId = oAuthCallback["devId"];
+  const oAuthCallback = (Url.parse(req.url, true).query)["userId"].split(":"); // little bit jank.
+  const code = (Url.parse(req.url, true).query)["code"];
+  const userId = oAuthCallback[0];
+  const devId = oAuthCallback[1];
+  res.send("This goes back to the user." + "\n devId: " + devId + "\n userId: " + userId);
   const dataString = "client_id=72486&client_secret=b0d500111e3d1774903da1f067b5b7adf38ca726&code="+code+"&grant_type=authorization_code"; // PV TODO: should this secret be in a config file and secret?
   const options = {
     url: "https://www.strava.com/api/v3/oauth/token",
@@ -35,18 +42,19 @@ exports.stravaCallback = functions.https.onRequest(async (req, res) => {
     body: dataString,
   };
   // make request to strava for tokens after auth flow and store credentials.
-  request(options, (error, response, body) => {
+  console.log(code);
+  request(options, async (error, response, body) => {
     if (!error && response.statusCode == 200) {
       // this is where the tokens come back.
       await stravaStoreTokens(userId, devId, JSON.parse(body), db);
       // send a response now to endpoint for devId confirming success
-      await sendDevSuccess(devId); //TODO: create dev success post.
-      userResponse = "Some good redirect.";
+      // await sendDevSuccess(devId); //TODO: create dev success post.
+      // userResponse = "Some good redirect.";
     } else {
       console.log(JSON.parse(body));
       // send an error response to dev.
       // TODO: create dev fail post.
-      userResponse = "Some bad redirect";
+      // userResponse = "Some bad redirect";
     }
   });
 });
@@ -58,6 +66,7 @@ async function stravaStoreTokens(userId, devId, data, db) {
     "strava_token_expires_at": data["expires_at"],
     "strava_token_expires_in": data["expires_in"],
     "strava_connected": true,
+    "devId": devId,
   };
   // set tokens for userId doc.
   const userRef = db.collection("users").doc(userId);
@@ -66,9 +75,9 @@ async function stravaStoreTokens(userId, devId, data, db) {
   const devRef = db.collection("developers").doc(devId);
   devRef.update({users: admin.firestore.FieldValue.arrayUnion(userId)});
   return;
-};
+}
 
-function stravaOauth (req) {
+function stravaOauth(req) {
   const clientId = 72486;
   const appQuery = Url.parse(req.url, true).query;
   const userId = appQuery["userId"];
@@ -77,7 +86,7 @@ function stravaOauth (req) {
   const parameters = {
     client_id: clientId,
     response_type: "code",
-    redirect_uri: "https://us-central1-base-pace.cloudfunctions.net/stravaCallback?userId="+userId + "&devId" + devId,
+    redirect_uri: "https://us-central1-rove-26.cloudfunctions.net/stravaCallback?userId="+userId + ":" + devId,
     approval_prompt: "force",
     scope: "profile:read_all,activity:read_all",
   };
@@ -94,4 +103,4 @@ function stravaOauth (req) {
   }
   const baseUrl = "https://www.strava.com/oauth/authorize?";
   return (baseUrl + encodedParameters);
-};
+}
