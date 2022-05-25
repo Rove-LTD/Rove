@@ -3,6 +3,4 @@ The APIs that simplify the development of apps integration to their user's healt
 
 There are 5 APIs for developers to use as follows:
 
-signUpApi
-signUpUserToRove( userDetails, devKey)
-response (userId)
+image.png

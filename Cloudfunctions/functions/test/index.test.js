@@ -9,7 +9,6 @@ const assert = chai.assert;
 
 // Sinon is a library used for mocking or verifying function calls in JavaScript.
 const sinon = require('sinon');
-//const admin = require('firebase-admin');
 // Require and initialize firebase-functions-test in "online mode" with your project's
 // credentials and service account key.
 
@@ -17,7 +16,7 @@ const test = require('firebase-functions-test')({
     databaseURL: "https://base-pace-default-rtdb.europe-west1.firebasedatabase.app",
     storageBucket: "base-pace.appspot.com",
     projectId:  "base-pace",
-  }, 'test/keys/base-pace-firebase-adminsdk-key.json');
+  }, 'test/keys/base-pace-firebase-adminsdk-key.json'); //PV TODO - make sure these point to the ROVE database and not the basepace database
 
   // Mock functions config values
 test.mockConfig({
@@ -31,47 +30,38 @@ const admin = require("firebase-admin");
 //------------------------Set Up of Test Data Project Complete ---------------//
 
 
-describe('Cloud Functions - Integration Test', () => {
+describe('ROVE Functions - Integration Tests', () => {
     let myFunctions;
-    let testUser = "testuser1Id";
+    let testUser = "put a test user ID in here";
+    let testDev = "put a test Developer ID in here";
   
     before(async() => {
         // Require index.js and save the exports inside a namespace called myFunctions.
         // This includes our cloud functions, which can now be accessed at eg. myFunctions.createPlan
 
         myFunctions = require('../index.js');
+        testDeveloperData = {}; //PV TODO put in developer data here
 
         //set up the database
-        //delete any existing sessions
+        //insert the developer ID and data
         await admin.firestore()
-            .collection("users")
-            .doc(testUser)
-            .collection("training_sessions")
-            .listDocuments().then((docs) => {
-                docs.map(async (doc) => {
-                    await admin.firestore().recursiveDelete(doc);
-            });
-        });
-        //delete any existing archives
-        await admin.firestore()
-            .collection("users")
-            .doc(testUser)
-            .collection("archive")
-            .listDocuments().then((docs) => {
-                docs.map(async (doc) => {
-                    await admin.firestore().recursiveDelete(doc);
-            });
-        });
+            .collection("developers")
+            .doc(testDev)
+            .set(testDeveloperData);
+                
     }); //end before
 
     after(async () => {
         // Do cleanup tasks.
+        // TODO: PV delete the test developer data
         test.cleanup();
     }); //end after
 
 //-------TEST 1------ Create a new Test User ------------
-    describe("Testing creating a user...", () => {
-        it('should create a user', async () => {
+    describe("Testing creating a user for the test developer...", () => {
+        it('should create a new user and return the userID', async () => {
+
+//-----------------------------PV GOT TO HERE BEFORE STOPPING -----------//
             await admin.firestore()
                 .collection('users')
                 .doc(testUser)
