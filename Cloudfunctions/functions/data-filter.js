@@ -4,6 +4,8 @@
 
 /* eslint-disable max-len */
 
+// const {Timestamp} = require("@google-cloud/firestore");
+
 new_standard_format = {
     "activity_id" : null,
     "activity_name" : null,
@@ -61,7 +63,7 @@ function writeGarminActivityToFirestore(activities) {
             "average_pace_in_meters_per_second" : activities[i]["averageSpeedInMetersPerSecond"],
             "activeKilocalories": activities[i]["activeKilocalories"],
             "activity_duration_in_seconds": activities[i]["durationInSeconds"],
-            "start_time": activities[i]["startTimeInSeconds"],
+            "start_time": new Date(activities[i]["startTimeInSeconds"]*1000),
             "averageHeartRate": activities[i]["averageHeartRateInBeatsPerMinute"],
             "average_cadence": activities[i]["averageRunCadenceInStepsPerMinute"],
             "elevation_gain": activities[i]["totalElevationGainInMeters"],
@@ -77,7 +79,7 @@ function writeGarminActivityToFirestore(activities) {
                 "average_pace_in_meters_per_second" : activities[i]["averageSpeedInMetersPerSecond"],
                 "activeKilocalories": activities[i]["activeKilocalories"],
                 "activity_duration_in_seconds": activities[i]["durationInSeconds"],
-                "start_time": activities[i]["startTimeInSeconds"],
+                "start_time": new Date(activities[i]["startTimeInSeconds"]*1000),
                 "averageHeartRate": activities[i][i]["averageHeartRateInBeatsPerMinute"],
                 "average_cadence": null,
                 "elevation_gain": activities[i]["totalElevationGainInMeters"],
@@ -93,7 +95,7 @@ function writeGarminActivityToFirestore(activities) {
                 "average_pace_in_meters_per_second" : activities[i]["averageSpeedInMetersPerSecond"],
                 "activeKilocalories": activities[i]["activeKilocalories"],
                 "activity_duration_in_seconds": activities[i]["durationInSeconds"],
-                "start_time": activities[i]["startTimeInSeconds"],
+                "start_time": new Date(activities[i]["startTimeInSeconds"]*1000),
                 "averageHeartRate": activities[i]["averageHeartRateInBeatsPerMinute"],
                 "average_cadence": activities[i]["averageSwimCadenceInStrokesPerMinute"],
                 "elevation_gain": null,
@@ -108,7 +110,7 @@ function writeGarminActivityToFirestore(activities) {
                 "average_pace_in_meters_per_second" : null,
                 "activeKilocalories": activities[i]["activeKilocalories"],
                 "activity_duration_in_seconds": activities[i]["durationInSeconds"],
-                "start_time": activities[i]["startTimeInSeconds"],
+                "start_time": new Date(activities[i]["startTimeInSeconds"]*1000),
                 "averageHeartRate": activities[i]["averageHeartRateInBeatsPerMinute"],
                 "average_cadence": null,
                 "elevation_gain": null,
@@ -354,4 +356,3 @@ console.log(x)
 console.log()
 console.log("Garmin Sanitised")
 console.log(y)
-
