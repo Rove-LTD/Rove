@@ -5,12 +5,16 @@ const functions = require("firebase-functions");
 // The Firebase Admin SDK to access Firestore.
 const admin = require("firebase-admin");
 const Url = require("url");
+const crypto = require("crypto");
+const encodeparams = require("./encodeparams");
+const got = require("got");
 const request = require("request");
 const strava = require("strava-v3");
 
 strava.config({
   "client_id": "72486",
   "client_secret": "b0d500111e3d1774903da1f067b5b7adf38ca726",
+  "redirect_uri": "https://us-central1-rove-26.cloudfunctions.net/stravaCallback",
 });
 
 
@@ -22,14 +26,20 @@ const db = admin.firestore();
 // we recieve auth token from strava to stravaCallBack.
 // tokens stored under userId
 
-exports.authenticateStrava = functions.https.onRequest((req, res) => {
+exports.authenticateStrava = functions.https.onRequest(async (req, res) => {
   // When dev calls this url with parameters: user-id, dev-id, and service to authenticate.
   // TODO: create authorization with dev-secret keys and dev-id.
 
-  // in form:  us-central1-rove.cloudfunctions.net/authenticateStrava?userId=***&devId=***.
-
+  // in form:  us-central1-rove.cloudfunctions.net/authenticateStrava?userId=***&devId=***&provider=***
+  const provider = (Url.parse(req.url, true).query)["provider"];
+  let url = "";
   // stravaOauth componses the request url for the user.
-  const url = stravaOauth(req);
+  if (provider == "strava") {
+    url = stravaOauth(req);
+  } else if (provider == "garmin") {
+    // TODO: Make the garmin request async and returnable.
+    url = await garminOauth(req);
+  }
   // send back URL to user device.
   res.send(url);
 });
@@ -50,11 +60,11 @@ exports.stravaCallback = functions.https.onRequest(async (req, res) => {
     body: dataString,
   };
   // make request to strava for tokens after auth flow and store credentials.
-  console.log(code);
-  request(options, async (error, response, body) => {
+  await request(options, async (error, response, body) => {
     if (!error && response.statusCode == 200) {
       // this is where the tokens come back.
-      await stravaStoreTokens(userId, devId, JSON.parse(body), db);
+      stravaStoreTokens(userId, devId, JSON.parse(body), db);
+      getStravaAthleteId(userId, JSON.parse(body), db);
       // send a response now to endpoint for devId confirming success
       // await sendDevSuccess(devId); //TODO: create dev success post.
       // userResponse = "Some good redirect.";
@@ -78,10 +88,21 @@ async function stravaStoreTokens(userId, devId, data, db) {
   };
   // set tokens for userId doc.
   const userRef = db.collection("users").doc(userId);
-  userRef.set(parameters, {merge: true});
+  await userRef.set(parameters, {merge: true});
   // assign userId for devId.
-  const devRef = db.collection("developers").doc(devId);
-  devRef.update({users: admin.firestore.FieldValue.arrayUnion(userId)});
+  // const devRef = db.collection("developers").doc(devId);
+  // write resultant message to dev endpoint.
+  return;
+}
+async function getStravaAthleteId(userId, data, db) {
+  // get athlete id from strava.
+  const parameters = {
+    "access_token": data["access_token"],
+  };
+  // set tokens for userId doc.
+  const athleteSummary = await strava.athlete.get(parameters);
+  const userRef = db.collection("users").doc(userId);
+  await userRef.set(athleteSummary, {merge: true});
   return;
 }
 
@@ -113,6 +134,53 @@ function stravaOauth(req) {
   return (baseUrl + encodedParameters);
 }
 
+async function garminOauth(req) {
+  const oauthNonce = crypto.randomBytes(10).toString("hex");
+  // console.log(oauth_nonce);
+  const oauthTimestamp = Math.round(new Date().getTime()/1000);
+  // console.log(oauth_timestamp);
+  const consumerSecret = "ffqgs2OxeJkFHUM0c3pGysdCp1Znt0tnc2s";
+  const parameters = {
+    oauth_nonce: oauthNonce,
+    oauth_consumer_key: "eb0a9a22-db68-4188-a913-77ee997924a8",
+    oauth_timestamp: oauthTimestamp,
+    oauth_signature_method: "HMAC-SHA1",
+    oauth_version: "1.0",
+  };
+  const encodedParameters = encodeparams.collectParams(parameters);
+  const baseUrl = "https://connectapi.garmin.com/oauth-service/oauth/request_token";
+  const baseString = encodeparams.baseStringGen(encodedParameters, "GET", baseUrl);
+  const encodingKey = consumerSecret + "&";
+  const signature = crypto.createHmac("sha1", encodingKey).update(baseString).digest().toString("base64");
+  const encodedSignature = encodeURIComponent(signature);
+  const url = "https://connectapi.garmin.com/oauth-service/oauth/request_token?oauth_consumer_key=eb0a9a22-db68-4188-a913-77ee997924a8&oauth_nonce="+oauthNonce.toString()+"&oauth_signature_method=HMAC-SHA1&oauth_timestamp="+oauthTimestamp.toString()+"&oauth_signature="+encodedSignature+"&oauth_version=1.0";
+  try {
+    const response = await got(url, {json: true});
+    console.log(response.body);
+    return response.body;
+  } catch (error) {
+    console.log(error.response.body);
+    return error.response.body;
+  }
+  /*
+  await fetchData(url, function(data) {
+    // this url should be returned
+    console.log(data);
+  });
+  async function fetchData(url, fn) {
+    request(
+        {method: "GET",
+          uri: url,
+          gzip: true,
+        }
+        , function decompressed(err, response, responseBody) {
+          fn(responseBody);
+        },
+    );
+  }
+  return;*/
+}
+
 
 exports.stravaWebhook = functions.https.onRequest((request, response) => {
   if (request.method === "POST") {
@@ -120,7 +188,11 @@ exports.stravaWebhook = functions.https.onRequest((request, response) => {
       query: request.query,
       body: request.body,
     });
-    strava.activities.get({"id": request.body.}},done)
+    // TODO: Get strava activity and sanatize
+    strava.activities.get({"id": request.body.object_id}, (result)=>{
+      console.log(result);
+    });
+    // TODO: Send the information to an endpoint specified by the dev registered to a user.
     response.status(200).send("EVENT_RECEIVED");
   } else if (request.method === "GET") {
     const VERIFY_TOKEN = "STRAVA";
