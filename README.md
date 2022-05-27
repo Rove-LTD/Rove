@@ -47,3 +47,18 @@ This API retrieves the users’ health data from all of the services they subscr
 	Response:  	Array<HealthMeasures/Activities>
 	Possible errors:	status 200 – success (response payload can be empty)
 				status xxx – unknown communication error
+
+# deAuthoriseUser()
+
+This API deauthorizes the user from the provided service and deletes the health data associated with that service.
+
+    Usage:  https://us-central1-rove-26.cloudfunctions.net/deAuthoriseUser?devId={devId}&userId={userId}&service={string}
+
+    Parameters: 	userId (ROVE userId received from the signUp API)
+            devId (ROVE developerId given to the developer when they up with ROVE technologies)
+            service – string (“strava” or “garmin”)
+    Response:  	serviceStatus (a JSON map of the current status - following the call - of each service) eg.
+            {garminConnected: “true”, stravaConnected: “false”}
+    Possible errors:	status 200 – success (response payload cannot be empty)
+                status xxx – unknown communication error
+
