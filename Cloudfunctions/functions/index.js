@@ -26,7 +26,7 @@ const db = admin.firestore();
 // we recieve auth token from strava to stravaCallBack.
 // tokens stored under userId
 
-exports.authenticateStrava = functions.https.onRequest(async (req, res) => {
+exports.connectService = functions.https.onRequest(async (req, res) => {
   // When dev calls this url with parameters: user-id, dev-id, and service to authenticate.
   // TODO: create authorization with dev-secret keys and dev-id.
 
@@ -39,6 +39,9 @@ exports.authenticateStrava = functions.https.onRequest(async (req, res) => {
   } else if (provider == "garmin") {
     // TODO: Make the garmin request async and returnable.
     url = await garminOauth(req);
+  } else {
+    //the request was badly formatted with incorrect provider parameter
+    url = "error: the provider was badly formatted, missing or not supported";
   }
   // send back URL to user device.
   res.send(url);
@@ -112,6 +115,7 @@ function stravaOauth(req) {
   const userId = appQuery["userId"];
   const devId = appQuery["devId"];
   // add parameters from user onto the callback redirect.
+  // PV: TOTO add check that parameters are valid
   const parameters = {
     client_id: clientId,
     response_type: "code",

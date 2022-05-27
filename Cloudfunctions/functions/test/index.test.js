@@ -56,22 +56,49 @@ describe('ROVE Functions - Integration Tests', () => {
     }); //end after
 
 //-------TEST 1------ Create a new Test User ------------
-    describe("Testing creating a user for the test developer...", () => {
-        it('should create a new user and return the userID', async () => {
-            // Set the request object, with the devId
-            const req = { query: {devid: testDev} };
+
+    describe("Testing that the developer can call API to get a strava authentication redirection URL: ", () => {
+        it('should get error if the provider is not correct...', async () => {
+            // set the request object with the correct provider, developerId and userId
+            const req = {url: 'https//test.com/?devId='+testDev+'&userId='+testUser+'&provider=badFormat'};
             // set the assertions for the expected response object
             const res = {
                 send: (url) => {
-                    assert.equal(url, 'Hello from Firebase!');
+                    assert.equal(url, "error: the provider was badly formatted, missing or not supported");
                 }
-            };
+            }
 
-            // Invoke addMessage with our fake request and response objects. This will cause the
-            // assertions in the response object to be evaluated.
-            myFunctions.helloWorld(req, res);
-           
-        });//end it
-    }); //End TEST 1
+            await myFunctions.connectService(req, res);
+
+        })
+        it('should get a properly formatted strava redirect url...', async () => {
+            // set the request object with the correct provider, developerId and userId
+            const req = {url: 'https//test.com/?devId='+testDev+'&userId='+testUser+'&provider=strava'};
+            // set the assertions for the expected response object
+            const res = {
+                send: (url) => {
+                    assert.equal(url, "https://www.strava.com/oauth/authorize?client_id=72486&response_type=code&redirect_uri=https://us-central1-rove-26.cloudfunctions.net/stravaCallback?userId="+testUser+":"+testDev+"&approval_prompt=force&scope=profile:read_all,activity:read_all");
+                }
+            }
+
+            await myFunctions.connectService(req, res);
+
+        })
+        it('should get a properly formatted garmin redirect url...', async () => {
+            // set the request object with the correct provider, developerId and userId
+            const req = {url: 'https//test.com/?devId='+testDev+'&userId='+testUser+'&provider=garmin'};
+            // set the assertions for the expected response object
+            const res = {
+                send: (url) => {
+                    assert.equal(url, "to work out the expected result");
+                    console.log(url);
+                }
+            }
+
+            await myFunctions.connectService(req, res);
+
+        })
+
+    }); //End Test 1
 }); //end Integration TEST
 
