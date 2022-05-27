@@ -3,7 +3,7 @@ The APIs that simplify the development of apps integration to their user's healt
 
 There are 5 APIs for developers to use as follows:
 
-signUpUser()
+# signUpUser()
 
 This API will create a user with the ROVE service and return the ROVE User ID.  The ROVE User ID is then used with all future calls to identify the user whose health data is being connected, requested or deauthorized.
 
@@ -17,7 +17,7 @@ Possible errors: 	status xxxx – user already exists
 			status xxxx – developerId is incorrect or authorization not 						granted
 			status xxxx – unknown communication error
 
-connectService()
+# connectService()
 
 This API will create a link between a user and their health data for the service selected in the call (eg, STRAVA, Garmin, Apple Health).  The API returns a link which is used by the developer to redirect the user to a web page asking the user to approve access of their health data to ROVE technologies.  This authorization will be used to store and forward this data to the requesting developer.
 
@@ -35,7 +35,7 @@ Possible errors: 	status xxxx – user is already connected to this service
 
 This API retrieves the users’ health data from all of the services they subscribe to.  The data is deduplicated and standardized into the ROVE format.  The API can be provided with optional dates that will limit the response to measurements valid during those specific dates (inclusive).
 
-getUserHealthData()
+# getUserHealthData()
 
 Usage:  https://us-central1-rove-26.cloudfunctions.net/getUserHealthData?devId={devId}&userId={userId}&datefrom={startDate}&dateto={endDate}
 
