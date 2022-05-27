@@ -33,9 +33,10 @@ This API will create a link between a user and their health data for the service
 				status xxxx – unknown communication error
 
 
+# getUserHealthData()
+
 This API retrieves the users’ health data from all of the services they subscribe to.  The data is deduplicated and standardized into the ROVE format.  The API can be provided with optional dates that will limit the response to measurements valid during those specific dates (inclusive).
 
-# getUserHealthData()
 
 	Usage:  https://us-central1-rove-26.cloudfunctions.net/getUserHealthData?devId={devId}&userId={userId}&datefrom={startDate}&dateto={endDate}
 
