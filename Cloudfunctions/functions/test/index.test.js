@@ -29,9 +29,10 @@ const admin = require("firebase-admin");
 
 describe('ROVE Functions - Integration Tests', () => {
     let myFunctions;
-    let testUser = "paulsTestDev";
-    let testDev = "paulsTestDevTestUser";
+    let testUser = "paulsTestDevUser";
+    let testDev = "paulsTestDev";
     let devTestData = {email: "paul.ventisei@gmail.com"}
+    let devUserData = {devId: testDev, email: "paul.ventisei@gmail.com"}
   
     before(async() => {
         // Require index.js and save the exports inside a namespace called myFunctions.
@@ -45,7 +46,12 @@ describe('ROVE Functions - Integration Tests', () => {
         await admin.firestore()
             .collection("developers")
             .doc(testDev)
-            .set(testDeveloperData);
+            .set(devTestData);
+        
+        await admin.firestore()
+            .collection("users")
+            .doc(testUser)
+            .set(devUserData);
                 
     }); //end before
 
@@ -90,8 +96,10 @@ describe('ROVE Functions - Integration Tests', () => {
             // set the assertions for the expected response object
             const res = {
                 send: (url) => {
-                    assert.equal(url, "https://connect.garmin.com/oauthConfirm?oauth_token=fdd90b17-61cc-4088-b3b3-6019c1c06121&oauth_callback=https://us-central1-rove-26.cloudfunctions.net/oauthCallbackHandlerGarmin?oauth_token_secret=o7BrpTuvkc2vNSk3A0UayRbyDrS9qT4Bn5Y-userId=paulsTestDevt");
-                } //PV TODO: regEx this
+                    assert.include(url, "https://connect.garmin.com/oauthConfirm?oauth_token=");
+                    assert.include(url, "&oauth_callback=https://us-central1-rove-26.cloudfunctions.net/oauthCallbackHandlerGarmin?oauth_token_secret=");
+                    assert.include(url, "userId="+testUser);
+                }
             }
 
             await myFunctions.connectService(req, res);
