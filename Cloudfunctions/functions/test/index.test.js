@@ -76,7 +76,34 @@ describe('ROVE Functions - Integration Tests', () => {
 
             await myFunctions.connectService(req, res);
 
-        })
+        });
+
+        it("Should get an error if the devID is not correctly formatted or missing", async () => {
+            // set the request object with the correct provider, developerId and userId
+            const req = {url: 'https//test.com/?devId='+"incorrectDev"+'&userId='+testUser+'&provider=strava'};
+            // set the assertions for the expected response object
+            const res = {
+                send: (url) => {
+                    assert.equal(url, "error: the developerId was badly formatted, missing or not authorised");
+                }
+            }
+
+            await myFunctions.connectService(req, res);
+        });
+
+        it("Should get an error if the developer is not correctly authorised", async () => {
+            // set the request object with the correct provider, developerId and userId
+            const req = {url: 'https//test.com/?devId='+"notAuthorisedDev"+'&userId='+testUser+'&provider=strava'};
+            // set the assertions for the expected response object
+            const res = {
+                send: (url) => {
+                    assert.equal(url, "error: the developerId was badly formatted, missing or not authorised");
+                }
+            }
+
+            await myFunctions.connectService(req, res);
+        });
+        
         it('should get a properly formatted strava redirect url...', async () => {
             // set the request object with the correct provider, developerId and userId
             const req = {url: 'https//test.com/?devId='+testDev+'&userId='+testUser+'&provider=strava'};
