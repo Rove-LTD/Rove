@@ -26,7 +26,7 @@ const db = admin.firestore();
 // we recieve auth token from strava to stravaCallBack.
 // tokens stored under userId
 
-exports.authenticateStrava = functions.https.onRequest(async (req, res) => {
+exports.connectService = functions.https.onRequest(async (req, res) => {
   // When dev calls this url with parameters: user-id, dev-id, and service to authenticate.
   // TODO: create authorization with dev-secret keys and dev-id.
 
@@ -43,6 +43,12 @@ exports.authenticateStrava = functions.https.onRequest(async (req, res) => {
   // send back URL to user device.
   res.send(url);
 });
+
+exports.oauthCallbackHandlerGarmin = functions.https.onRequest(async (req, res) => {
+  const oAuthCallback = Url.parse(req.url, true).query;
+  await oauthCallbackHandlerGarmin(oAuthCallback, db);
+  res.send("THANKS, YOU CAN NOW CLOSE THIS WINDOW");
+}),
 
 // callback from strava with token in
 exports.stravaCallback = functions.https.onRequest(async (req, res) => {
@@ -136,6 +142,7 @@ function stravaOauth(req) {
 
 async function garminOauth(req) {
   const oauthNonce = crypto.randomBytes(10).toString("hex");
+  const userId = (Url.parse(req.url, true).query)["userId"];
   // console.log(oauth_nonce);
   const oauthTimestamp = Math.round(new Date().getTime()/1000);
   // console.log(oauth_timestamp);
@@ -154,31 +161,28 @@ async function garminOauth(req) {
   const signature = crypto.createHmac("sha1", encodingKey).update(baseString).digest().toString("base64");
   const encodedSignature = encodeURIComponent(signature);
   const url = "https://connectapi.garmin.com/oauth-service/oauth/request_token?oauth_consumer_key=eb0a9a22-db68-4188-a913-77ee997924a8&oauth_nonce="+oauthNonce.toString()+"&oauth_signature_method=HMAC-SHA1&oauth_timestamp="+oauthTimestamp.toString()+"&oauth_signature="+encodedSignature+"&oauth_version=1.0";
+  let response = "";
   try {
-    const response = await got(url, {json: true});
-    console.log(response.body);
-    return response.body;
+    // get OAuth tokens from garmin
+    response = await got(url);
+    console.log("got garmin tokens");
   } catch (error) {
     console.log(error.response.body);
     return error.response.body;
   }
-  /*
-  await fetchData(url, function(data) {
-    // this url should be returned
-    console.log(data);
-  });
-  async function fetchData(url, fn) {
-    request(
-        {method: "GET",
-          uri: url,
-          gzip: true,
-        }
-        , function decompressed(err, response, responseBody) {
-          fn(responseBody);
-        },
-    );
-  }
-  return;*/
+  const oauthTokens = response.body.split("&");
+  // set callbackURL for garmin Oauth with token and userId
+  const callbackURL =
+    "oauth_callback=https://us-central1-rove-26.cloudfunctions.net/oauthCallbackHandlerGarmin?" +
+    oauthTokens[1] +
+        "-userId=" + userId;
+  // append to oauth garmin url.
+  const _url = "https://connect.garmin.com/oauthConfirm?" +
+  oauthTokens[0] +
+        "&" +
+        callbackURL;
+  console.log(_url);
+  return _url;
 }
 
 
@@ -188,6 +192,7 @@ exports.stravaWebhook = functions.https.onRequest((request, response) => {
       query: request.query,
       body: request.body,
     });
+    // get userbased on userid. (.where("id" == request.body.id)).
     // TODO: Get strava activity and sanatize
     strava.activities.get({"id": request.body.object_id}, (result)=>{
       console.log(result);
@@ -212,3 +217,47 @@ exports.stravaWebhook = functions.https.onRequest((request, response) => {
     }
   }
 });
+
+async function oauthCallbackHandlerGarmin(oAuthCallback, db) {
+  const oauthNonce = crypto.randomBytes(10).toString("hex");
+  // console.log(oauth_nonce);
+  const oauthTimestamp = Math.round(new Date().getTime()/1000);
+  // console.log(oauth_timestamp);
+  const consumerSecret = "ffqgs2OxeJkFHUM0c3pGysdCp1Znt0tnc2s";
+  let oauthTokenSecret = oAuthCallback["oauth_token_secret"].split("-");
+  const userId = oauthTokenSecret[1];
+  oauthTokenSecret = oauthTokenSecret[0];
+  const parameters = {
+    oauth_nonce: oauthNonce,
+    oauth_verifier: oAuthCallback["oauth_verifier"],
+    oauth_token: oAuthCallback["oauth_token"],
+    oauth_consumer_key: "eb0a9a22-db68-4188-a913-77ee997924a8",
+    oauth_timestamp: oauthTimestamp,
+    oauth_signature_method: "HMAC-SHA1",
+    oauth_version: "1.0",
+  };
+  const encodedParameters = encodeparams.collectParams(parameters);
+  const baseUrl = "https://connectapi.garmin.com/oauth-service/oauth/access_token";
+  const baseString = encodeparams.baseStringGen(encodedParameters, "POST", baseUrl);
+  const encodingKey = consumerSecret + "&" + oauthTokenSecret;
+  const signature = crypto.createHmac("sha1", encodingKey).update(baseString).digest().toString("base64");
+  const encodedSignature = encodeURIComponent(signature);
+  const url = "https://connectapi.garmin.com/oauth-service/oauth/access_token?oauth_consumer_key=eb0a9a22-db68-4188-a913-77ee997924a8&oauth_nonce="+oauthNonce.toString()+"&oauth_signature_method=HMAC-SHA1&oauth_timestamp="+oauthTimestamp.toString()+"&oauth_signature="+encodedSignature+"&oauth_verifier="+oAuthCallback["oauth_verifier"]+"&oauth_token="+oAuthCallback["oauth_token"]+"&oauth_version=1.0";
+  const response = await got.post(url);
+  console.log(response.body);
+  await firestoreData(response.body, userId);
+  async function firestoreData(data, userId) {
+    data = data.split("=");
+    // console.log(data);
+    const garminAccessToken = (data[1].split("&"))[0];
+    const garminAccessTokenSecret = data[2];
+    const firestoreParameters = {
+      "garmin_access_token": garminAccessToken,
+      "garmin_access_token_secret": garminAccessTokenSecret,
+      "garmin_connected": Boolean(1),
+    };
+    userId = userId.split("=")[1];
+    await db.collection("users").doc(userId.toString()).set(firestoreParameters, {merge: true});
+    return true;
+  }
+}
