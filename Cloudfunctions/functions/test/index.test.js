@@ -90,9 +90,8 @@ describe('ROVE Functions - Integration Tests', () => {
             // set the assertions for the expected response object
             const res = {
                 send: (url) => {
-                    assert.equal(url, "to work out the expected result");
-                    console.log(url);
-                }
+                    assert.equal(url, "https://connect.garmin.com/oauthConfirm?oauth_token=fdd90b17-61cc-4088-b3b3-6019c1c06121&oauth_callback=https://us-central1-rove-26.cloudfunctions.net/oauthCallbackHandlerGarmin?oauth_token_secret=o7BrpTuvkc2vNSk3A0UayRbyDrS9qT4Bn5Y-userId=paulsTestDevt");
+                } //PV TODO: regEx this
             }
 
             await myFunctions.connectService(req, res);
