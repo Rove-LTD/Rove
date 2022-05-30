@@ -4,7 +4,7 @@
 
 /* eslint-disable max-len */
 
-// const {Timestamp} = require("@google-cloud/firestore");
+
 
 new_standard_format = {
     "activity_id" : null,
@@ -19,7 +19,9 @@ new_standard_format = {
     "average_cadence" : null,
     "elevation_gain" : null,
     "elevation_loss" : null,
+    "data_source" : null,
   }
+
 function stravaSanitise(activities) {
 let summaryActivities = [{}];
 
@@ -28,15 +30,16 @@ for (let i=0; i<activities.length; i++) {
     "activity_id" : activities[i]["id"],
     "activity_name" : activities[i]["name"],
     "activity_type" : activities[i]["type"],
-    "distance_in_meters" : (activities[i]["distance"]),
-    "average_pace_in_meters_per_second" : activities[i]["average_speed"],
-    "active_calories" : activities[i]["kilojoules"],
+    "distance_in_meters" : Math.round(activities[i]["distance"]),
+    "average_pace_in_meters_per_second" : parseFloat(activities[i]["average_speed"]).toFixed(1),
+    "active_calories" : Math.round(activities[i]["kilojoules"]),
     "activity_duration_in_seconds" : activities[i]["moving_time"],
     "start_time" : new Date(activities[i]["start_date_local"]),
     "average_heart_rate_bpm" : activities[i]["average_heartrate"],
-    "average_cadence" : activities[i]["average_cadence"],
-    "elevation_gain" : activities[i]["elev_high"],
-    "elevation_loss" : activities[i]["elev_low"],
+    "average_cadence" : parseFloat(activities[i]["average_cadence"]).toFixed(1),
+    "elevation_gain" : parseFloat(activities[i]["elev_high"]).toFixed(1),
+    "elevation_loss" : parseFloat(activities[i]["elev_low"]).toFixed(1),
+    "data_source" : "strava",
     };
     for (const property in summaryActivity) {
         if (typeof summaryActivity[property] == "undefined") {
@@ -47,27 +50,24 @@ for (let i=0; i<activities.length; i++) {
 }
 return summaryActivities;
 }
-
 function garminSanitise(activities) {
-
     let summaryActivities = [{}];
-
     for (let i=0; i<activities.length; i++) {
-
         if (activities[i]["activityType"] == "RUNNING") {
             summaryActivity = {
             "activity_id" : activities[i]["activityId"],
             "activity_name": activities[i]["activityName"],
             "activity_type": activities[i]["activityType"],
-            "distance_in_meters" : activities[i]["distanceInMeters"],
-            "average_pace_in_meters_per_second" : activities[i]["averageSpeedInMetersPerSecond"],
-            "activeKilocalories": activities[i]["activeKilocalories"],
+            "distance_in_meters" : Math.round(activities[i]["distanceInMeters"]),
+            "average_pace_in_meters_per_second" : parseFloat(activities[i]["averageSpeedInMetersPerSecond"]).toFixed(1),
+            "activeKilocalories": Math.round(activities[i]["activeKilocalories"]),
             "activity_duration_in_seconds": activities[i]["durationInSeconds"],
             "start_time": new Date(activities[i]["startTimeInSeconds"]*1000),
             "averageHeartRate": activities[i]["averageHeartRateInBeatsPerMinute"],
-            "average_cadence": activities[i]["averageRunCadenceInStepsPerMinute"],
-            "elevation_gain": activities[i]["totalElevationGainInMeters"],
-            "elevation_loss" : activities[i]["totalElevationLossInMeters"],
+            "average_cadence": parseFloat(activities[i]["averageRunCadenceInStepsPerMinute"]).toFixed(1),
+            "elevation_gain": parseFloat(activities[i]["totalElevationGainInMeters"]).toFixed(1),
+            "elevation_loss" : parseFloat(activities[i]["totalElevationLossInMeters"]).toFixed(1),
+            "data_source" : "garmin",
             };
         }
         else if (activities[i]["activityType"] == "CYCLING") {
@@ -75,15 +75,16 @@ function garminSanitise(activities) {
                 "activity_id" : activities[i]["activityId"],
                 "activity_name": activities[i]["activityName"],
                 "activity_type": activities[i]["activityType"],
-                "distance_in_meters" : activities[i]["distanceInMeters"],
-                "average_pace_in_meters_per_second" : activities[i]["averageSpeedInMetersPerSecond"],
-                "activeKilocalories": activities[i]["activeKilocalories"],
+                "distance_in_meters" : Math.round(activities[i]["distanceInMeters"]),
+                "average_pace_in_meters_per_second" : parseFloat(activities[i]["averageSpeedInMetersPerSecond"]).toFixed(1),
+                "activeKilocalories": Math.round(activities[i]["activeKilocalories"]),
                 "activity_duration_in_seconds": activities[i]["durationInSeconds"],
                 "start_time": new Date(activities[i]["startTimeInSeconds"]*1000),
                 "averageHeartRate": activities[i][i]["averageHeartRateInBeatsPerMinute"],
                 "average_cadence": null,
-                "elevation_gain": activities[i]["totalElevationGainInMeters"],
-                "elevation_loss" : activities[i]["totalElevationLossInMeters"],
+                "elevation_gain": parseFloat(activities[i]["totalElevationGainInMeters"]).toFixed(1),
+                "elevation_loss" : parseFloat(activities[i]["totalElevationLossInMeters"]).toFixed(1),
+                "data_source" : "garmin",
                 };
         }
         else if (activities[i]["activityType"] == "LAP_SWIMMING") {
@@ -91,30 +92,32 @@ function garminSanitise(activities) {
                 "activity_id" : activities[i]["activityId"],
                 "activity_name": activities[i]["activityName"],
                 "activity_type": activities[i]["activityType"],
-                "distance_in_meters" : activities[i]["distanceInMeters"],
-                "average_pace_in_meters_per_second" : activities[i]["averageSpeedInMetersPerSecond"],
-                "activeKilocalories": activities[i]["activeKilocalories"],
+                "distance_in_meters" : Math.round(activities[i]["distanceInMeters"]),
+                "average_pace_in_meters_per_second" : parseFloat(activities[i]["averageSpeedInMetersPerSecond"]).toFixed(1),
+                "activeKilocalories": Math.round(activities[i]["activeKilocalories"]),
                 "activity_duration_in_seconds": activities[i]["durationInSeconds"],
                 "start_time": new Date(activities[i]["startTimeInSeconds"]*1000),
                 "averageHeartRate": activities[i]["averageHeartRateInBeatsPerMinute"],
-                "average_cadence": activities[i]["averageSwimCadenceInStrokesPerMinute"],
+                "average_cadence": parseFloat(activities[i]["averageSwimCadenceInStrokesPerMinute"]).toFixed(1),
                 "elevation_gain": null,
                 "elevation_loss" : null,
+                "data_source" : "garmin",
                 };
         } else {
             summaryActivity = {
                 "activity_id" : activities[i]["activityId"],
                 "activity_name": activities[i]["activityName"],
                 "activity_type": activities[i]["activityType"],
-                "distance_in_meters" : null,
+                "distance_in_meters" : Math.round(activities[i]["distanceInMeters"]),
                 "average_pace_in_meters_per_second" : null,
-                "activeKilocalories": activities[i]["activeKilocalories"],
+                "activeKilocalories": Math.round(activities[i]["activeKilocalories"]),
                 "activity_duration_in_seconds": activities[i]["durationInSeconds"],
                 "start_time": new Date(activities[i]["startTimeInSeconds"]*1000),
                 "averageHeartRate": activities[i]["averageHeartRateInBeatsPerMinute"],
                 "average_cadence": null,
                 "elevation_gain": null,
                 "elevation_loss" : null,
+                "data_source" : "garmin",
                 };
         }
         for (const property in summaryActivity) {
@@ -302,7 +305,6 @@ strava_examplar_1 = {
     "segment_leaderboard_opt_out" : false,
     "leaderboard_opt_out" : false
   }
-
 garmin_examplar_1 = {
     "activeKilocalories": 391,
     "activityId": 7698241609,
@@ -318,7 +320,6 @@ garmin_examplar_1 = {
     "userAccessToken": "32ada6ab-e5fe-46a7-bd82-5bad6158d6eb",
     "userId": "eb24e8e5-110d-4a87-b976-444f40ca27d4"
   }
-
 garmin_examplar_2 = {
     "activeKilocalories": 809,
     "activityId": 7654562055,
@@ -346,8 +347,6 @@ garmin_examplar_2 = {
     "userAccessToken": "715a21a5-d9ae-4139-8ed7-d3ad4a833da4",
     "userId": "8e1ec0b4-7fa9-4a1c-be14-d8f6dee46bf7"
   }
-
-// console.log(writeStravaActivityToFirestore(strava_examplar));
 x = stravaSanitise([strava_examplar_1]);
 y = garminSanitise([garmin_examplar_2])
 
