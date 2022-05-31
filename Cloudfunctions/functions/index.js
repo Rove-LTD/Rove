@@ -182,7 +182,6 @@ function stravaOauth(req) {
   const userId = appQuery["userId"];
   const devId = appQuery["devId"];
   // add parameters from user onto the callback redirect.
-  // PV: TOTO add check that parameters are valid
   const parameters = {
     client_id: clientId,
     response_type: "code",
@@ -246,7 +245,6 @@ async function garminOauth(req) {
   oauthTokens[0] +
         "&" +
         callbackURL;
-  console.log(_url);
   return _url;
 }
 
