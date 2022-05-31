@@ -34,8 +34,8 @@ describe('ROVE Functions - Integration Tests', () => {
     let myFunctions;
     let testUser = "paulsTestDevUser";
     let testDev = "paulsTestDev";
-    let devTestData = {email: "paul.testDev@gmail.com"}
-    let devUserData = {devId: testDev, email: "paul.userTest@gmail.com"}
+    let devTestData = {email: "paul.testDev@gmail.com", devKey: "test-key"};
+    let devUserData = {devId: testDev, email: "paul.userTest@gmail.com"};
     let recievedGarminUrl = "";
     let recievedStravaUrl = "";
 
@@ -70,8 +70,8 @@ describe('ROVE Functions - Integration Tests', () => {
 
     describe("Testing that the developer can call API to connectService() and receive redirection URL: ", () => {
         it('should get error if the provider is not correct...', async () => {
-            // set the request object with the correct provider, developerId and userId
-            const req = {url: 'https//test.com/?devId='+testDev+'&userId='+testUser+'&provider=badFormat'};
+            // set the request object with the incorrect provider, correct developerId, devKey and userId
+            const req = {url: 'https//test.com/?devId='+testDev+'&userId='+testUser+'&devKey=test-key&provider=badFormat'};
             // set the assertions for the expected response object
             const res = {
                 send: (url) => {
@@ -84,7 +84,7 @@ describe('ROVE Functions - Integration Tests', () => {
         });
 
         it("Should get an error if the devID is not correctly formatted or missing", async () => {
-            // set the request object with the correct provider, developerId and userId
+            // set the request object with the correct provider, incorrect developerId and correct userId
             const req = {url: 'https//test.com/?devId='+"incorrectDev"+'&userId='+testUser+'&provider=strava'};
             // set the assertions for the expected response object
             const res = {
@@ -98,7 +98,7 @@ describe('ROVE Functions - Integration Tests', () => {
 
         it("Should get an error if the developer is not correctly authorised", async () => {
             // set the request object with the correct provider, developerId and userId
-            const req = {url: 'https//test.com/?devId='+"notAuthorisedDev"+'&userId='+testUser+'&provider=strava'};
+            const req = {url: 'https//test.com/?devId='+testDev+'&userId='+testUser+'&devKey=wrong-key&provider=strava'};
             // set the assertions for the expected response object
             const res = {
                 send: (url) => {
@@ -109,9 +109,22 @@ describe('ROVE Functions - Integration Tests', () => {
             await myFunctions.connectService(req, res);
         });
 
+        it("Should get an error if the userId is not provided", async () => {
+            // set the request object with the correct provider, developerId and userId
+            const req = {url: 'https//test.com/?devId='+testDev+'&devKey=test-key&provider=strava'};
+            // set the assertions for the expected response object
+            const res = {
+                send: (url) => {
+                    assert.equal(url, "error: the userId parameter is missing");
+                }
+            }
+
+            await myFunctions.connectService(req, res);
+        });
+        
         it('should get a properly formatted strava redirect url...', async () => {
             // set the request object with the correct provider, developerId and userId
-            const req = {url: 'https//test.com/?devId='+testDev+'&userId='+testUser+'&provider=strava'};
+            const req = {url: 'https//test.com/?devId='+testDev+'&userId='+testUser+'&devKey=test-key&provider=strava'};
             // set the assertions for the expected response object
             const res = {
                 send: (url) => {
@@ -125,7 +138,7 @@ describe('ROVE Functions - Integration Tests', () => {
         })
         it('should get a properly formatted garmin redirect url...', async () => {
             // set the request object with the correct provider, developerId and userId
-            const req = {url: 'https//test.com/?devId='+testDev+'&userId='+testUser+'&provider=garmin'};
+            const req = {url: 'https//test.com/?devId='+testDev+'&userId='+testUser+'&devKey=test-key&provider=garmin'};
             // set the assertions for the expected response object
             const res = {
                 send: (url) => {

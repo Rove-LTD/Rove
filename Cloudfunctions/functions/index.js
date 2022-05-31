@@ -31,8 +31,41 @@ exports.connectService = functions.https.onRequest(async (req, res) => {
   // TODO: create authorization with dev-secret keys and dev-id.
 
   // in form:  us-central1-rove.cloudfunctions.net/authenticateStrava?userId=***&devId=***&provider=***
-  const provider = (Url.parse(req.url, true).query)["provider"];
   let url = "";
+
+  //parameter checks
+  //first check developer exists and the devKey matches
+  if (devId != null) {
+    devDoc = await admin.firestore()
+    .collection("developers")
+    .doc(devId)
+    .get();
+
+    if (!devDoc.exists) {
+      url = "error: the developerId was badly formatted, missing or not authorised";
+      res.send(url);
+      return;
+    }
+    if (devDoc.data().devKey != devKey|| devKey == null) {
+      url = "error: the developerId was badly formatted, missing or not authorised";
+      res.send(url);
+      return;
+    }
+
+  } else {
+    url = "error: the developerId parameter is missing";
+    res.send(url);
+    return;
+  }
+
+  //now check the userId has been given
+  if (userId == null) {
+    url = "error: the userId parameter is missing";
+    res.send(url);
+    return;
+  }
+
+
   // stravaOauth componses the request url for the user.
   if (provider == "strava") {
     url = stravaOauth(req);
@@ -45,6 +78,7 @@ exports.connectService = functions.https.onRequest(async (req, res) => {
   }
   // send back URL to user device.
   res.send(url);
+  return;
 });
 
 exports.oauthCallbackHandlerGarmin = functions.https.onRequest(async (req, res) => {
