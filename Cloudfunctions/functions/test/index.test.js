@@ -144,8 +144,9 @@ describe('ROVE Functions - Integration Tests', () => {
 
     //-------------TEST 2--- Test Callbacks from Strava and Garmin----
     describe("Testing that the strava and garmin callbacks work: ", () => {
-        it('strava callback should...', async () => {
-            // set the request object with the correct provider, developerId and userId
+        it('strava callback should check userId and DevId and write the access tokens to the database...', async () => {
+            //set up the stubbed response to mimic strava's response when called with the
+            //code to get the token
             const responseObject = {
                 statusCode: 200,
                 headers: {
@@ -162,16 +163,18 @@ describe('ROVE Functions - Integration Tests', () => {
             const expectedTestUserDoc = {
                 devId: devUserData.devId,
                 email: devUserData.email,
-                id: 12345679,
+                id: 12345678,
                 strava_access_token: 'test-long-access-token',
                 strava_refresh_token: 'test-refresh_token',
                 strava_token_expires_at: 1654014114,
                 strava_token_expires_in: 21600,
                 strava_connected: true,
             }
+
             sinon.stub(request, "post").yields(null, responseObject, JSON.stringify(responseBody));
             sinon.stub(strava.athlete, "get").returns({id: 12345678});
 
+            // set the request object with the correct provider, developerId and userId
             const req = {url: "https://us-central1-rove-26.cloudfunctions.net/stravaCallback?userId="+testUser+":"+testDev+"&code=testcode&approval_prompt=force&scope=profile:read_all,activity:read_all"};
             const res = {
                 send: (text) => {

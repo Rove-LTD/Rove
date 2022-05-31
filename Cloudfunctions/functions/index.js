@@ -62,10 +62,9 @@ exports.stravaCallback = functions.https.onRequest(async (req, res) => {
   const userId = oAuthCallback[0];
   const devId = oAuthCallback[1];
   if (userId == null || devId == null || code == null) {
-    res.send("an unexpected error has occurred please close this window and try again");
+    res.send("Error: missing userId of DevId in callback: an unexpected error has occurred please close this window and try again");
     return;
   }
-  res.send("your authorization was successful please close this window");
   const dataString = "client_id=72486&client_secret=b0d500111e3d1774903da1f067b5b7adf38ca726&code="+code+"&grant_type=authorization_code"; // PV TODO: should this secret be in a config file and secret?
   const options = {
     url: "https://www.strava.com/api/v3/oauth/token",
@@ -81,7 +80,9 @@ exports.stravaCallback = functions.https.onRequest(async (req, res) => {
       // send a response now to endpoint for devId confirming success
       // await sendDevSuccess(devId); //TODO: create dev success post.
       // userResponse = "Some good redirect.";
+      res.send("your authorization was successful please close this window");
     } else {
+      res.send("Error: "+response.statusCode+" please close this window and try again");
       console.log(JSON.parse(body));
       // send an error response to dev.
       // TODO: create dev fail post.
@@ -115,8 +116,6 @@ async function stravaStoreTokens(userId, devId, data, db) {
     "strava_connected": true,
     "devId": devId,
   };
-  console.log(parameters);
-  console.log(data);
   // set tokens for userId doc.
   const userRef = db.collection("users").doc(userId);
   await userRef.set(parameters, {merge: true});
