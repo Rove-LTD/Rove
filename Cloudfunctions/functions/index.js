@@ -90,6 +90,22 @@ exports.stravaCallback = functions.https.onRequest(async (req, res) => {
   });
 });
 
+exports.garminWebhook = functions.https.onRequest(async (req, res) => {
+  if (req.method === "POST") {
+    functions.logger.info("garmin webhook event received!", {
+      query: req.query,
+      body: req.body,
+    });
+    // get userbased on userid. (.where("id" == request.body.id)).
+    // TODO: Get strava activity and sanatize
+    // TODO: Send the information to an endpoint specified by the dev registered to a user.
+    res.status(200).send("EVENT_RECEIVED");
+  } else if (req.method === "GET") {
+    console.log("garmin not authorized");
+    res.status(400).send("Not Authorized");
+  }
+});
+
 async function stravaStoreTokens(userId, devId, data, db) {
   const parameters = {
     "strava_access_token": data["access_token"],
@@ -117,7 +133,7 @@ async function getStravaAthleteId(userId, data, db) {
   // set tokens for userId doc.
   const athleteSummary = await strava.athlete.get(parameters);
   const userRef = db.collection("users").doc(userId);
-  await userRef.set(athleteSummary, {merge: true});
+  await userRef.set({"id": athleteSummary["id"]}, {merge: true});
   return;
 }
 
@@ -153,6 +169,7 @@ function stravaOauth(req) {
 async function garminOauth(req) {
   const oauthNonce = crypto.randomBytes(10).toString("hex");
   const userId = (Url.parse(req.url, true).query)["userId"];
+  const devId = (Url.parse(req.url, true).query)["devId"];
   // console.log(oauth_nonce);
   const oauthTimestamp = Math.round(new Date().getTime()/1000);
   // console.log(oauth_timestamp);
@@ -175,17 +192,16 @@ async function garminOauth(req) {
   try {
     // get OAuth tokens from garmin
     response = await got(url);
-    console.log("got garmin tokens");
   } catch (error) {
     console.log(error.response.body);
     return error.response.body;
   }
   const oauthTokens = response.body.split("&");
-  // set callbackURL for garmin Oauth with token and userId
+  // set callbackURL for garmin Oauth with token and userId and devId.
   const callbackURL =
     "oauth_callback=https://us-central1-rove-26.cloudfunctions.net/oauthCallbackHandlerGarmin?" +
     oauthTokens[1] +
-        "-userId=" + userId;
+        "-userId=" + userId + "-devId=" + devId;
   // append to oauth garmin url.
   const _url = "https://connect.garmin.com/oauthConfirm?" +
   oauthTokens[0] +
@@ -236,6 +252,7 @@ async function oauthCallbackHandlerGarmin(oAuthCallback, db) {
   const consumerSecret = "ffqgs2OxeJkFHUM0c3pGysdCp1Znt0tnc2s";
   let oauthTokenSecret = oAuthCallback["oauth_token_secret"].split("-");
   const userId = oauthTokenSecret[1];
+  const devId = oauthTokenSecret[2];
   oauthTokenSecret = oauthTokenSecret[0];
   const parameters = {
     oauth_nonce: oauthNonce,
@@ -255,16 +272,17 @@ async function oauthCallbackHandlerGarmin(oAuthCallback, db) {
   const url = "https://connectapi.garmin.com/oauth-service/oauth/access_token?oauth_consumer_key=eb0a9a22-db68-4188-a913-77ee997924a8&oauth_nonce="+oauthNonce.toString()+"&oauth_signature_method=HMAC-SHA1&oauth_timestamp="+oauthTimestamp.toString()+"&oauth_signature="+encodedSignature+"&oauth_verifier="+oAuthCallback["oauth_verifier"]+"&oauth_token="+oAuthCallback["oauth_token"]+"&oauth_version=1.0";
   const response = await got.post(url);
   console.log(response.body);
-  await firestoreData(response.body, userId);
-  async function firestoreData(data, userId) {
+  await firestoreData(response.body, userId, devId);
+  async function firestoreData(data, userId, devId) {
     data = data.split("=");
     // console.log(data);
     const garminAccessToken = (data[1].split("&"))[0];
     const garminAccessTokenSecret = data[2];
+    devId = devId.split("=")[1];
     const firestoreParameters = {
+      "devId": devId,
       "garmin_access_token": garminAccessToken,
       "garmin_access_token_secret": garminAccessTokenSecret,
-      "garmin_connected": Boolean(1),
     };
     userId = userId.split("=")[1];
     await db.collection("users").doc(userId.toString()).set(firestoreParameters, {merge: true});
