@@ -61,7 +61,11 @@ exports.stravaCallback = functions.https.onRequest(async (req, res) => {
   const code = (Url.parse(req.url, true).query)["code"];
   const userId = oAuthCallback[0];
   const devId = oAuthCallback[1];
-  res.send("This goes back to the user." + "\n devId: " + devId + "\n userId: " + userId);
+  if (userId == null || devId == null || code == null) {
+    res.send("an unexpected error has occurred please close this window and try again");
+    return;
+  }
+  res.send("your authorization was successful please close this window");
   const dataString = "client_id=72486&client_secret=b0d500111e3d1774903da1f067b5b7adf38ca726&code="+code+"&grant_type=authorization_code"; // PV TODO: should this secret be in a config file and secret?
   const options = {
     url: "https://www.strava.com/api/v3/oauth/token",
@@ -69,11 +73,11 @@ exports.stravaCallback = functions.https.onRequest(async (req, res) => {
     body: dataString,
   };
   // make request to strava for tokens after auth flow and store credentials.
-  await request(options, async (error, response, body) => {
+  await request.post(options, async (error, response, body) => {
     if (!error && response.statusCode == 200) {
       // this is where the tokens come back.
       stravaStoreTokens(userId, devId, JSON.parse(body), db);
-      getStravaAthleteId(userId, JSON.parse(body), db);
+      await getStravaAthleteId(userId, JSON.parse(body), db);
       // send a response now to endpoint for devId confirming success
       // await sendDevSuccess(devId); //TODO: create dev success post.
       // userResponse = "Some good redirect.";
@@ -95,6 +99,8 @@ async function stravaStoreTokens(userId, devId, data, db) {
     "strava_connected": true,
     "devId": devId,
   };
+  console.log(parameters);
+  console.log(data);
   // set tokens for userId doc.
   const userRef = db.collection("users").doc(userId);
   await userRef.set(parameters, {merge: true});
