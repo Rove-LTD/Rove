@@ -30,7 +30,13 @@ exports.connectService = functions.https.onRequest(async (req, res) => {
   // When dev calls this url with parameters: user-id, dev-id, and service to authenticate.
   // TODO: create authorization with dev-secret keys and dev-id.
 
-  // in form:  us-central1-rove.cloudfunctions.net/authenticateStrava?userId=***&devId=***&provider=***
+  // in form:  us-central1-rove.cloudfunctions.net/authenticateStrava?userId=***&devId=***&devKey=***&provider=***
+
+  const provider = (Url.parse(req.url, true).query)["provider"];
+  const devId = (Url.parse(req.url, true).query)["devId"];
+  const userId = (Url.parse(req.url, true).query)["userId"];
+  const devKey = (Url.parse(req.url, true).query)["devKey"];
+
   let url = "";
 
   //parameter checks
