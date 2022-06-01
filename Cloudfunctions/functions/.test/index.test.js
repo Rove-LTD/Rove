@@ -156,7 +156,7 @@ describe('ROVE Functions - Integration Tests', () => {
     }); //End Test 1
 
     //-------------TEST 2--- Test Callbacks from Strava and Garmin----
-    describe("Testing that the strava and garmin callbacks work: ", () => {
+    describe("Testing that the strava callbacks work: ", () => {
         it('strava callback should check userId and DevId and write the access tokens to the database...', async () => {
             //set up the stubbed response to mimic strava's response when called with the
             //code to get the token
@@ -208,6 +208,66 @@ describe('ROVE Functions - Integration Tests', () => {
 
         })
     });//end TEST 2
+
+    //---------TEST 3 ------------
+
+    describe("Testing that the polar callbacks work: ", () => {
+        it('polar callback should check userId and DevId and write the access tokens to the database...', async () => {
+            //set up the stubbed response to mimic polar's response when called with the
+            //code to get the token
+            const responseObject = {
+                statusCode: 200,
+                headers: {
+                  'content-type': 'application/json'
+                }
+              };
+              const responseBody = {
+                access_token: 'test-polar-access-token',
+                token_type: 'bearer',
+                expires_in: 21600,
+                x_user_id: '123456polar',
+              };
+            
+            const expectedTestUserDoc = {
+                devId: devUserData.devId,
+                email: devUserData.email,
+                id: 12345678,
+                polar_access_token: 'test-polar-access-token',
+                polar_token_type: 'bearer',
+                polar_token_expires_in: 21600,
+                polar_connected: true,
+                polar_user_id: '123456polar',
+                strava_access_token: 'test-long-access-token',
+                strava_refresh_token: 'test-refresh_token',
+                strava_token_expires_at: 1654014114,
+                strava_token_expires_in: 21600,
+                strava_connected: true,
+            }
+
+            sinon.stub(request, "post").yields(null, responseObject, JSON.stringify(responseBody));
+            //sinon.stub(polar.athlete, "get").returns({id: 12345678});
+
+            // set the request object with the correct provider, developerId and userId
+            const req = {url: "https://us-central1-rove-26.cloudfunctions.net/polarCallback?state="+testUser+":"+testDev+"&code=testcode"};
+            const res = {
+                send: (text) => {
+                    assert.equal(text, "your authorization was successful please close this window")
+                },
+            }
+            await myFunctions.polarCallback(req, res);
+
+            //now check the database was updated correctly
+            testUserDoc = await admin.firestore()
+            .collection("users")
+            .doc(testUser)
+            .get();
+
+            assert.deepEqual(testUserDoc.data(), expectedTestUserDoc);
+
+            sinon.restore();
+
+        })
+    });
 
 }); //end Integration TEST
 

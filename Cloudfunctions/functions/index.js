@@ -16,7 +16,9 @@ const contentsOfDotEnvFile = { // convert to using a .env file for this or secre
       "clientId": 72486,
       "client_secret": "b0d500111e3d1774903da1f067b5b7adf38ca726",
       "consumerSecret": "ffqgs2OxeJkFHUM0c3pGysdCp1Znt0tnc2s",
-      "oauth_consumer_key": "eb0a9a22-db68-4188-a913-77ee997924a8"
+      "oauth_consumer_key": "eb0a9a22-db68-4188-a913-77ee997924a8",
+      "polarClientId":"put-polar-client-id-here",
+      "polarSecret":"pola-secret",
     },
     "anotherDeveloper": {
       "clientId": "a different id",
@@ -86,6 +88,8 @@ exports.connectService = functions.https.onRequest(async (req, res) => {
   } else if (provider == "garmin") {
     // TODO: Make the garmin request async and returnable.
     url = await garminOauth(req);
+  } else if (provider == "polar") {
+    url = await polarOauth(req);
   } else {
     // the request was badly formatted with incorrect provider parameter
     url = "error: the provider was badly formatted, missing or not supported";
@@ -275,6 +279,106 @@ async function garminOauth(req) {
   return _url;
 }
 
+function polarOauth(req) {
+  const appQuery = Url.parse(req.url, true).query;
+  const userId = appQuery["userId"];
+  const devId = appQuery["devId"];
+  // add parameters from user onto the callback redirect.
+  const parameters = {
+    client_id: configurations[devId]["polarClientId"],
+    response_type: "code",
+    redirect_uri: "https://us-central1-rove-26.cloudfunctions.net/polarCallback",
+    scope: "accessLink.read_all",
+    state: userId+":"+devId
+  };
+  "response_type=code&scope={SCOPE}&client_id={CLIENT_ID}&state={STATE}"
+
+
+  let encodedParameters = "";
+  let k = 0;
+  for (k in parameters) {
+    const encodedValue = parameters[k];
+    const encodedKey = k;
+    if (encodedParameters === "") {
+      encodedParameters += `${encodedKey}=${encodedValue}`;
+    } else {
+      encodedParameters += `&${encodedKey}=${encodedValue}`;
+    }
+  }
+  const baseUrl = "https://flow.polar.com/oauth2/authorization?";
+  return (baseUrl + encodedParameters);
+}
+
+// callback from polar with token in
+exports.polarCallback = functions.https.onRequest(async (req, res) => {
+  // this comes from polar
+  // create authorization for user completing oAuth flow.
+  const oAuthCallback = (Url.parse(req.url, true).query)["state"].split(":"); // little bit jank.
+  const code = (Url.parse(req.url, true).query)["code"];
+  const error = (Url.parse(req.url, true).query)["error"];
+  const userId = oAuthCallback[0];
+  const devId = oAuthCallback[1];
+  if (userId == null || devId == null || code == null) {
+    res.send("Error: missing userId of DevId in callback: an unexpected error has occurred please close this window and try again");
+    return;
+  } else if (error != null) {
+    res.send("Error: "+error+" please try again");
+  }
+  const clientIdClientSecret = configurations[devId]["client_id"]+":"+configurations[devId]["polarSecret"]
+  const buffer = new Buffer.from(clientIdClientSecret);
+  const base64String = buffer.toString('base64');
+
+
+  const dataString =  "&code="+
+    code+
+    "&grant_type=authorization_code";
+  const options = {
+    url: "https://polarremote.com/v2/oauth2/token",
+    method: "POST",
+    headers: {
+      'Content-Type': 'aapplication/x-www-form-urlencoded',
+      'Accept': 'application/json;charset=UTF-8',
+      'Authorization':"Basic "+base64String,
+    },
+    body: dataString,
+  };
+
+  // make request to polar for tokens after auth flow and store credentials.
+  await request.post(options, async (error, response, body) => {
+    if (!error && response.statusCode == 200) {
+      // this is where the tokens come back.
+      polarStoreTokens(userId, devId, JSON.parse(body), db);
+      // send a response now to endpoint for devId confirming success
+      // await sendDevSuccess(devId); //TODO: create dev success post.
+      // userResponse = "Some good redirect.";
+      res.send("your authorization was successful please close this window");
+    } else {
+      res.send("Error: "+response.statusCode+" please close this window and try again");
+      console.log(JSON.parse(body));
+      // send an error response to dev.
+      // TODO: create dev fail post.
+      // userResponse = "Some bad redirect";
+    }
+  });
+});
+
+async function polarStoreTokens(userId, devId, data, db) {
+  const parameters = {
+    "polar_access_token": data["access_token"],
+    "polar_token_type": data["token_type"],
+    //"polar_token_expires_at": data["expires_at"], PVTODO: need to calculate from the expires in which is in seconds from now.
+    "polar_token_expires_in": data["expires_in"],
+    "polar_connected": true,
+    "polar_user_id": data['x_user_id'],
+  };
+  // set tokens for userId doc.
+  const userRef = db.collection("users").doc(userId);
+  await userRef.set(parameters, {merge: true});
+  // assign userId for devId.
+  // const devRef = db.collection("developers").doc(devId);
+  // write resultant message to dev endpoint.
+  return;
+}
 
 exports.stravaWebhook = functions.https.onRequest((request, response) => {
   if (request.method === "POST") {
