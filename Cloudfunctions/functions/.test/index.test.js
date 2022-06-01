@@ -20,7 +20,7 @@ const firebaseConfig = {
     appId: "1:945964823577:web:11b548bf6c322bf6d5a688",
     measurementId: "G-ESZ9SQS6ZX"
 };
-const test = require('firebase-functions-test')(firebaseConfig, 'test/keys/rove-26-firebase-adminsdk-key.json');
+const test = require('firebase-functions-test')(firebaseConfig, '.test/keys/rove-26-firebase-adminsdk-key.json');
 
 
 const admin = require("firebase-admin");
