@@ -13,16 +13,20 @@ const strava = require("strava-v3");
 const contentsOfDotEnvFile = { // convert to using a .env file for this or secrets
   "config": {
     "paulsTestDev": {
-        "clientId": 72486,
-        "client_secret": "b0d500111e3d1774903da1f067b5b7adf38ca726"
-        },
-        "anotherDeveloper": {
-        "clientId": "a different id",
-        "client_secret": "another secret"
-    }
-  }
+      "clientId": 72486,
+      "client_secret": "b0d500111e3d1774903da1f067b5b7adf38ca726",
+      "consumerSecret": "ffqgs2OxeJkFHUM0c3pGysdCp1Znt0tnc2s",
+      "oauth_consumer_key": "eb0a9a22-db68-4188-a913-77ee997924a8"
+    },
+    "anotherDeveloper": {
+      "clientId": "a different id",
+      "client_secret": "another secret",
+    },
+  },
 };
+
 const configurations = contentsOfDotEnvFile["config"];
+// change to configurations = process.env["config"] when environment variables set up properly
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -48,9 +52,9 @@ exports.connectService = functions.https.onRequest(async (req, res) => {
   // first check developer exists and the devKey matches
   if (devId != null) {
     const devDoc = await admin.firestore()
-      .collection("developers")
-      .doc(devId)
-      .get();
+        .collection("developers")
+        .doc(devId)
+        .get();
 
     if (!devDoc.exists) {
       url = "error: the developerId was badly formatted, missing or not authorised";
@@ -109,13 +113,13 @@ exports.stravaCallback = functions.https.onRequest(async (req, res) => {
     res.send("Error: missing userId of DevId in callback: an unexpected error has occurred please close this window and try again");
     return;
   }
-  const dataString = "client_id="
-    +configurations[devId]["client_id"]
-    +"&client_secret="
-    +configurations[devId]["client_secret"]
-    +"&code="
-    +code
-    +"&grant_type=authorization_code";
+  const dataString = "client_id="+
+    configurations[devId]["client_id"]+
+    "&client_secret="+
+    configurations[devId]["client_secret"]+
+    "&code="+
+    code+
+    "&grant_type=authorization_code";
   const options = {
     url: "https://www.strava.com/api/v3/oauth/token",
     method: "POST",
@@ -226,10 +230,10 @@ async function garminOauth(req) {
   // console.log(oauth_nonce);
   const oauthTimestamp = Math.round(new Date().getTime()/1000);
   // console.log(oauth_timestamp);
-  const consumerSecret = "ffqgs2OxeJkFHUM0c3pGysdCp1Znt0tnc2s";
+  const consumerSecret = configurations[devId]["consumerSecret"];
   const parameters = {
     oauth_nonce: oauthNonce,
-    oauth_consumer_key: "eb0a9a22-db68-4188-a913-77ee997924a8",
+    oauth_consumer_key: configurations[devId]["oauth_consumer_key"],
     oauth_timestamp: oauthTimestamp,
     oauth_signature_method: "HMAC-SHA1",
     oauth_version: "1.0",
@@ -240,7 +244,15 @@ async function garminOauth(req) {
   const encodingKey = consumerSecret + "&";
   const signature = crypto.createHmac("sha1", encodingKey).update(baseString).digest().toString("base64");
   const encodedSignature = encodeURIComponent(signature);
-  const url = "https://connectapi.garmin.com/oauth-service/oauth/request_token?oauth_consumer_key=eb0a9a22-db68-4188-a913-77ee997924a8&oauth_nonce="+oauthNonce.toString()+"&oauth_signature_method=HMAC-SHA1&oauth_timestamp="+oauthTimestamp.toString()+"&oauth_signature="+encodedSignature+"&oauth_version=1.0";
+  const url = "https://connectapi.garmin.com/oauth-service/oauth/request_token?oauth_consumer_key="+
+    configurations[devId]["oauth_consumer_key"]+
+    "&oauth_nonce="+
+    oauthNonce.toString()+
+    "&oauth_signature_method=HMAC-SHA1&oauth_timestamp="+
+    oauthTimestamp.toString()+
+    "&oauth_signature="+
+    encodedSignature+
+    "&oauth_version=1.0";
   let response = "";
   try {
     // get OAuth tokens from garmin
@@ -301,7 +313,7 @@ async function oauthCallbackHandlerGarmin(oAuthCallback, db) {
   // console.log(oauth_nonce);
   const oauthTimestamp = Math.round(new Date().getTime()/1000);
   // console.log(oauth_timestamp);
-  const consumerSecret = "ffqgs2OxeJkFHUM0c3pGysdCp1Znt0tnc2s";
+  const consumerSecret = configurations[devId]["consumerSecret"];
   let oauthTokenSecret = oAuthCallback["oauth_token_secret"].split("-");
   const userId = oauthTokenSecret[1];
   const devId = oauthTokenSecret[2];
@@ -310,7 +322,7 @@ async function oauthCallbackHandlerGarmin(oAuthCallback, db) {
     oauth_nonce: oauthNonce,
     oauth_verifier: oAuthCallback["oauth_verifier"],
     oauth_token: oAuthCallback["oauth_token"],
-    oauth_consumer_key: "eb0a9a22-db68-4188-a913-77ee997924a8",
+    oauth_consumer_key: configurations[devId]["oauth_consumer_key"],
     oauth_timestamp: oauthTimestamp,
     oauth_signature_method: "HMAC-SHA1",
     oauth_version: "1.0",
@@ -321,7 +333,18 @@ async function oauthCallbackHandlerGarmin(oAuthCallback, db) {
   const encodingKey = consumerSecret + "&" + oauthTokenSecret;
   const signature = crypto.createHmac("sha1", encodingKey).update(baseString).digest().toString("base64");
   const encodedSignature = encodeURIComponent(signature);
-  const url = "https://connectapi.garmin.com/oauth-service/oauth/access_token?oauth_consumer_key=eb0a9a22-db68-4188-a913-77ee997924a8&oauth_nonce="+oauthNonce.toString()+"&oauth_signature_method=HMAC-SHA1&oauth_timestamp="+oauthTimestamp.toString()+"&oauth_signature="+encodedSignature+"&oauth_verifier="+oAuthCallback["oauth_verifier"]+"&oauth_token="+oAuthCallback["oauth_token"]+"&oauth_version=1.0";
+  const url = "https://connectapi.garmin.com/oauth-service/oauth/access_token?oauth_consumer_key="+
+    configurations[devId]["oauth_consumer_key"]+
+    "&oauth_nonce="+
+    oauthNonce.toString()+
+    "&oauth_signature_method=HMAC-SHA1&oauth_timestamp="+
+    oauthTimestamp.toString()+
+    "&oauth_signature="+encodedSignature+
+    "&oauth_verifier="+
+    oAuthCallback["oauth_verifier"]
+    +"&oauth_token="+
+    oAuthCallback["oauth_token"]+
+    "&oauth_version=1.0";
   const response = await got.post(url);
   console.log(response.body);
   await firestoreData(response.body, userId, devId);
