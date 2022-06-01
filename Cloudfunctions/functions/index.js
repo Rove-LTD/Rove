@@ -10,7 +10,19 @@ const encodeparams = require("./encodeparams");
 const got = require("got");
 const request = require("request");
 const strava = require("strava-v3");
-const configurations = process.env["config"];
+const contentsOfDotEnvFile = { // convert to using a .env file for this or secrets
+  "config": {
+    "paulsTestDev": {
+        "clientId": 72486,
+        "client_secret": "b0d500111e3d1774903da1f067b5b7adf38ca726"
+        },
+        "anotherDeveloper": {
+        "clientId": "a different id",
+        "client_secret": "another secret"
+    }
+  }
+};
+const configurations = contentsOfDotEnvFile["config"];
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -30,16 +42,15 @@ exports.connectService = functions.https.onRequest(async (req, res) => {
   const userId = (Url.parse(req.url, true).query)["userId"];
   const devKey = (Url.parse(req.url, true).query)["devKey"];
 
-  console.log(configurations);
   let url = "";
 
   // parameter checks
   // first check developer exists and the devKey matches
   if (devId != null) {
-    let devDoc = await admin.firestore()
-    .collection("developers")
-    .doc(devId)
-    .get();
+    const devDoc = await admin.firestore()
+      .collection("developers")
+      .doc(devId)
+      .get();
 
     if (!devDoc.exists) {
       url = "error: the developerId was badly formatted, missing or not authorised";
@@ -51,14 +62,13 @@ exports.connectService = functions.https.onRequest(async (req, res) => {
       res.send(url);
       return;
     }
-
   } else {
     url = "error: the developerId parameter is missing";
     res.send(url);
     return;
   }
 
-  //now check the userId has been given
+  // now check the userId has been given
   if (userId == null) {
     url = "error: the userId parameter is missing";
     res.send(url);
@@ -73,7 +83,7 @@ exports.connectService = functions.https.onRequest(async (req, res) => {
     // TODO: Make the garmin request async and returnable.
     url = await garminOauth(req);
   } else {
-    //the request was badly formatted with incorrect provider parameter
+    // the request was badly formatted with incorrect provider parameter
     url = "error: the provider was badly formatted, missing or not supported";
   }
   // send back URL to user device.
@@ -99,7 +109,13 @@ exports.stravaCallback = functions.https.onRequest(async (req, res) => {
     res.send("Error: missing userId of DevId in callback: an unexpected error has occurred please close this window and try again");
     return;
   }
-  const dataString = "client_id=72486&client_secret=b0d500111e3d1774903da1f067b5b7adf38ca726&code="+code+"&grant_type=authorization_code"; // PV TODO: should this secret be in a config file and secret?
+  const dataString = "client_id="
+    +configurations[devId]["client_id"]
+    +"&client_secret="
+    +configurations[devId]["client_secret"]
+    +"&code="
+    +code
+    +"&grant_type=authorization_code";
   const options = {
     url: "https://www.strava.com/api/v3/oauth/token",
     method: "POST",
@@ -111,7 +127,7 @@ exports.stravaCallback = functions.https.onRequest(async (req, res) => {
     if (!error && response.statusCode == 200) {
       // this is where the tokens come back.
       stravaStoreTokens(userId, devId, JSON.parse(body), db);
-      await getStravaAthleteId(userId, JSON.parse(body), db);
+      await getStravaAthleteId(userId, devId, JSON.parse(body), db);
       // send a response now to endpoint for devId confirming success
       // await sendDevSuccess(devId); //TODO: create dev success post.
       // userResponse = "Some good redirect.";
@@ -159,11 +175,11 @@ async function stravaStoreTokens(userId, devId, data, db) {
   // write resultant message to dev endpoint.
   return;
 }
-async function getStravaAthleteId(userId, data, db) {
+async function getStravaAthleteId(userId, devId, data, db) {
   // get athlete id from strava.
   strava.config({
-    "client_id": "72486",
-    "client_secret": "b0d500111e3d1774903da1f067b5b7adf38ca726",
+    "client_id": configurations[devId]["client_id"],
+    "client_secret": configurations[devId]["client_secret"],
     "redirect_uri": "https://us-central1-rove-26.cloudfunctions.net/stravaCallback",
   });
   const parameters = {
@@ -177,13 +193,12 @@ async function getStravaAthleteId(userId, data, db) {
 }
 
 function stravaOauth(req) {
-  //const clientId = 72486;
   const appQuery = Url.parse(req.url, true).query;
   const userId = appQuery["userId"];
   const devId = appQuery["devId"];
   // add parameters from user onto the callback redirect.
   const parameters = {
-    client_id: configurations[devId]['clientId'],
+    client_id: configurations[devId]["clientId"],
     response_type: "code",
     redirect_uri: "https://us-central1-rove-26.cloudfunctions.net/stravaCallback?userId="+userId + ":" + devId,
     approval_prompt: "force",
