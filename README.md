@@ -1,44 +1,29 @@
 # Rove
-The APIs that simplify the development of apps integration to their user's health data on Strava, Garmin and Apple Health.
+The Rove microservice simplifies the development of apps that need to integrate to their user's health data on Strava, Garmin and PolarFlow.
 
-There are 5 APIs for developers to use as follows:
-
-# signUpUser() - OPTION should this be incorporated into connectService()
-
-This API will create a user with the ROVE service and return the ROVE User ID.  The ROVE User ID is then used with all future calls to identify the user whose health data is being connected, requested or deauthorized.
-
-Calls to connect data, request data and deauthorize services MUST contain a valid userId and a valid developerId 
-
-	Usage: https://us-central1-rove-26.cloudfunctions.net/signUpUser?devId={devId}&userData={userJasonMap}
-	Authorization: TBD
-	Response: {userId: String} status 200
-	Possible errors: 	status xxxx – user already exists
-				status xxxx – user data is incomplete or has errors
-				status xxxx – developerId is incorrect or authorization not granted
-				status xxxx – unknown communication error
+The service is exposed through 2 APIs for developers to use as follows:
 
 # connectService()
 
-This API will create a link between a user and their health data for the service selected in the call (eg, STRAVA, Garmin, Apple Health).  The API returns a link which is used by the developer to redirect the user to a web page asking the user to approve access of their health data to ROVE technologies.  This authorization will be used to store and forward this data to the requesting developer.
+This API will create a link between a user and their fitness data for the service selected in the call (eg, STRAVA, Garmin, PolarFlow).  The API returns a link which is used to redirect the user to a web page asking.  There the user is asked to approve access for their fitness data to the developer's company.  The developer also supplies a destination for the users fitness data.  
 
-OPTION - If the user being connected does not exist the user will be created, replacing signUpUser() above. Therefore, it will be very important that the developer does not send through the wrong userId as a new user will be created if the wrong id is sent.
+The user authorization is used by Rove's microservice to forward the users fitness data to the destination the developer has specified.  This must be a WebHook and more destination types may be added as needed in the future.
 
 	Usage: https://us-central1-rove-26.cloudfunctions.net/connectService?devId={devId}&userId={userId}&service={String}
-			userId = the users ROVE userId, this is the ID that was returned in the signUpUser API call. OPTION: could this be provided by the developer and they can choose any ID that is unique for them?
-	Parameters: 	devId = the developers ROVE devId
-			provider = “strava” or “garmin”, more will be added
-	Authorization: TBD
+			userId = the userId provided by the developer.  This must be unique within the developers context.
+	Parameters: 	devId = the developers ROVE devId supplied to the developer when they sign-up to the Rove microservice
+			provider = “strava”, “garmin”, "polarFlow' more will be added where there is demand
+            destination = url of the WebHook where the users fitness data will be forwarded by Rove for processing by the developer
+	Authorization: devKey = the developers secret key added to the parameters
 	Response: redirect HTTPS address
-	Possible errors: 	error xxxx – user is already connected to this service
-    			OPTION: error xxxx – user does not exist for this developer
-
+	Possible errors: 	
 				error xxxx – the provider is badly formatted, missing or not supported
+                error xxxx - the developerId is badly formatted, missing or not Authorised
+                error xxxx - the userId is parameter is missing
 				error xxxx – unknown communication error
-                error xxxx - user Authorisation failed
-                error xxxx - Developer Id does not exist or is not authorized
 
 
-# getUserHealthData()
+# getUserHealthData() - Under discussion
 
 This API retrieves the users’ health data from all of the services they subscribe to.  The data is deduplicated and standardized into the ROVE format.  The API can be provided with optional dates that will limit the response to measurements valid during those specific dates (inclusive).
 
@@ -50,19 +35,22 @@ This API retrieves the users’ health data from all of the services they subscr
 			optional – dateFrom (UTC date as integer, milleseconds from epoch)
 			optional – dateTo (UTC date as integer, milleseconds from epoch)
 	Response:  	Array<HealthMeasures/Activities>
-	Possible errors:	status 200 – success (response payload can be empty)
-				status xxx – unknown communication error
+	Possible errors:
+				error xxx – unknown communication error
 
 # deAuthoriseUser()
 
-This API deauthorizes the user from the provided service and deletes the health data associated with that service.
+This API deauthorizes the user from the provided service and deletes any fitness or configuration data associated with the service for that user. It returns the status of the user's connection to all the available service following the deAuthorisation
 
     Usage:  https://us-central1-rove-26.cloudfunctions.net/deAuthoriseUser?devId={devId}&userId={userId}&service={string}
 
-    Parameters: userId (ROVE userId received from the signUp API)
+    Parameters: userId = the developers unique userId for this user
             	devId (ROVE developerId given to the developer when they up with ROVE technologies)
-            	service – string (“strava” or “garmin”)
+            	service – string (“strava”, “garmin”, "polarFlow")
+    Authorisation: devKey = the developers secret key added to the parameters
     Response:  	serviceStatus (a JSON map of the current status - following the call - of each service) eg.{garminConnected: “true”, stravaConnected: “false”}
-    Possible errors:	status 200 – success (response payload cannot be empty)
-                	status xxx – unknown communication error
+    Possible errors:
+                error xxxx - userId does not exist or missing
+                error xxxx - devId missing, or not authorized
+                error xxxx – unknown communication error
 
