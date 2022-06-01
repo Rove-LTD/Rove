@@ -10,13 +10,7 @@ const encodeparams = require("./encodeparams");
 const got = require("got");
 const request = require("request");
 const strava = require("strava-v3");
-
-strava.config({
-  "client_id": "72486",
-  "client_secret": "b0d500111e3d1774903da1f067b5b7adf38ca726",
-  "redirect_uri": "https://us-central1-rove-26.cloudfunctions.net/stravaCallback",
-});
-
+const configurations = process.env["config"];
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -31,18 +25,18 @@ exports.connectService = functions.https.onRequest(async (req, res) => {
   // TODO: create authorization with dev-secret keys and dev-id.
 
   // in form:  us-central1-rove.cloudfunctions.net/authenticateStrava?userId=***&devId=***&devKey=***&provider=***
-
   const provider = (Url.parse(req.url, true).query)["provider"];
   const devId = (Url.parse(req.url, true).query)["devId"];
   const userId = (Url.parse(req.url, true).query)["userId"];
   const devKey = (Url.parse(req.url, true).query)["devKey"];
 
+  console.log(configurations);
   let url = "";
 
-  //parameter checks
-  //first check developer exists and the devKey matches
+  // parameter checks
+  // first check developer exists and the devKey matches
   if (devId != null) {
-    devDoc = await admin.firestore()
+    let devDoc = await admin.firestore()
     .collection("developers")
     .doc(devId)
     .get();
@@ -111,6 +105,7 @@ exports.stravaCallback = functions.https.onRequest(async (req, res) => {
     method: "POST",
     body: dataString,
   };
+
   // make request to strava for tokens after auth flow and store credentials.
   await request.post(options, async (error, response, body) => {
     if (!error && response.statusCode == 200) {
@@ -166,6 +161,11 @@ async function stravaStoreTokens(userId, devId, data, db) {
 }
 async function getStravaAthleteId(userId, data, db) {
   // get athlete id from strava.
+  strava.config({
+    "client_id": "72486",
+    "client_secret": "b0d500111e3d1774903da1f067b5b7adf38ca726",
+    "redirect_uri": "https://us-central1-rove-26.cloudfunctions.net/stravaCallback",
+  });
   const parameters = {
     "access_token": data["access_token"],
   };
@@ -177,13 +177,13 @@ async function getStravaAthleteId(userId, data, db) {
 }
 
 function stravaOauth(req) {
-  const clientId = 72486;
+  //const clientId = 72486;
   const appQuery = Url.parse(req.url, true).query;
   const userId = appQuery["userId"];
   const devId = appQuery["devId"];
   // add parameters from user onto the callback redirect.
   const parameters = {
-    client_id: clientId,
+    client_id: configurations[devId]['clientId'],
     response_type: "code",
     redirect_uri: "https://us-central1-rove-26.cloudfunctions.net/stravaCallback?userId="+userId + ":" + devId,
     approval_prompt: "force",
