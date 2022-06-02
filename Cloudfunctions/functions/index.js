@@ -346,12 +346,13 @@ exports.polarCallback = functions.https.onRequest(async (req, res) => {
   await request.post(options, async (error, response, body) => {
     if (!error && response.statusCode == 200) {
     // this is where the tokens come back.
-      await registerUserWithPolar(userId, devId, JSON.parse(body), db);
+      let message ="";
+      message = await registerUserWithPolar(userId, devId, JSON.parse(body), db);
       await polarStoreTokens(userId, devId, JSON.parse(body), db);
       // send a response now to endpoint for devId confirming success
       // await sendDevSuccess(devId); //TODO: create dev success post.
       // userResponse = "Some good redirect.";
-      res.send("your authorization was successful please close this window");
+      res.send("your authorization was successful please close this window: "+message);
     } else {
       res.send("Error: "+response.statusCode+":"+body.toString()+" please close this window and try again");
       console.log(JSON.parse(body));
@@ -364,6 +365,7 @@ exports.polarCallback = functions.https.onRequest(async (req, res) => {
 });
 
 async function registerUserWithPolar(userId, devId, data, db) {
+  let message = "";
   const dataString = "<register><member-id>"+userId+"</member-id></register>";
   const options = {
     url: "https://www.polaraccesslink.com/v3/users",
@@ -383,13 +385,14 @@ async function registerUserWithPolar(userId, devId, data, db) {
       };
       const userRef = db.collection("users").doc(userId);
       await userRef.set(updates, {merge: true});
+    } else if (response.statusCode == 409) {
+      // user already registered
+      message = "you are already registered with Polar - there is no need to re-register";
     } else {
-      console.log(JSON.parse(body));
-      // send an error response to dev.
-      // TODO: create dev fail post.
-      // userResponse = "Some bad redirect";
+      console.log("error registering polar user: "+response.statusCode);
     }
   });
+  return message;
 }
 
 async function polarStoreTokens(userId, devId, data, db) {
