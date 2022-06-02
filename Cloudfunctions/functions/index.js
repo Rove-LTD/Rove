@@ -17,8 +17,8 @@ const contentsOfDotEnvFile = { // convert to using a .env file for this or secre
       "client_secret": "b0d500111e3d1774903da1f067b5b7adf38ca726",
       "consumerSecret": "ffqgs2OxeJkFHUM0c3pGysdCp1Znt0tnc2s",
       "oauth_consumer_key": "eb0a9a22-db68-4188-a913-77ee997924a8",
-      "polarClientId":"put-polar-client-id-here",
-      "polarSecret":"pola-secret",
+      "polarClientId": "654623e7-7191-4cfe-aab5-0bc24785fdee",
+      "polarSecret": "376aae03-9990-4f69-a5a3-704594403bd9",
     },
     "anotherDeveloper": {
       "clientId": "a different id",
@@ -289,10 +289,8 @@ function polarOauth(req) {
     response_type: "code",
     redirect_uri: "https://us-central1-rove-26.cloudfunctions.net/polarCallback",
     scope: "accessLink.read_all",
-    state: userId+":"+devId
+    state: userId+":"+devId,
   };
-  "response_type=code&scope={SCOPE}&client_id={CLIENT_ID}&state={STATE}"
-
 
   let encodedParameters = "";
   let k = 0;
@@ -313,7 +311,7 @@ function polarOauth(req) {
 exports.polarCallback = functions.https.onRequest(async (req, res) => {
   // this comes from polar
   // create authorization for user completing oAuth flow.
-  const oAuthCallback = (Url.parse(req.url, true).query)["state"].split(":"); // little bit jank.
+  const oAuthCallback = (Url.parse(req.url, true).query)["state"].split(":");
   const code = (Url.parse(req.url, true).query)["code"];
   const error = (Url.parse(req.url, true).query)["error"];
   const userId = oAuthCallback[0];
@@ -324,21 +322,21 @@ exports.polarCallback = functions.https.onRequest(async (req, res) => {
   } else if (error != null) {
     res.send("Error: "+error+" please try again");
   }
-  const clientIdClientSecret = configurations[devId]["client_id"]+":"+configurations[devId]["polarSecret"]
-  const buffer = new Buffer.from(clientIdClientSecret);
-  const base64String = buffer.toString('base64');
+  const clientIdClientSecret = configurations[devId]["client_id"]+":"+configurations[devId]["polarSecret"];
+  //
+  const buffer = new Buffer.from(clientIdClientSecret); // eslint-disable-line
+  const base64String = buffer.toString("base64");
 
-
-  const dataString =  "&code="+
+  const dataString = "&code="+
     code+
     "&grant_type=authorization_code";
   const options = {
     url: "https://polarremote.com/v2/oauth2/token",
     method: "POST",
     headers: {
-      'Content-Type': 'aapplication/x-www-form-urlencoded',
-      'Accept': 'application/json;charset=UTF-8',
-      'Authorization':"Basic "+base64String,
+      "Content-Type": "application/x-www-form-urlencoded",
+      "Accept": "application/json;charset=UTF-8",
+      "Authorization": "Basic "+base64String,
     },
     body: dataString,
   };
@@ -366,10 +364,10 @@ async function polarStoreTokens(userId, devId, data, db) {
   const parameters = {
     "polar_access_token": data["access_token"],
     "polar_token_type": data["token_type"],
-    //"polar_token_expires_at": data["expires_at"], PVTODO: need to calculate from the expires in which is in seconds from now.
+    // "polar_token_expires_at": data["expires_at"], PVTODO: need to calculate from the expires in which is in seconds from now.
     "polar_token_expires_in": data["expires_in"],
     "polar_connected": true,
-    "polar_user_id": data['x_user_id'],
+    "polar_user_id": data["x_user_id"],
   };
   // set tokens for userId doc.
   const userRef = db.collection("users").doc(userId);
@@ -445,8 +443,8 @@ async function oauthCallbackHandlerGarmin(oAuthCallback, db) {
     oauthTimestamp.toString()+
     "&oauth_signature="+encodedSignature+
     "&oauth_verifier="+
-    oAuthCallback["oauth_verifier"]
-    +"&oauth_token="+
+    oAuthCallback["oauth_verifier"]+
+    "&oauth_token="+
     oAuthCallback["oauth_token"]+
     "&oauth_version=1.0";
   const response = await got.post(url);
