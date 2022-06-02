@@ -7,3 +7,4 @@ Cloudfunctions/.DS_Store
 .DS_Store
 Cloudfunctions/functions/package-lock.json
 Cloudfunctions/functions/.env.yml
+.DS_Store

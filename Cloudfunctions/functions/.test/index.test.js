@@ -227,17 +227,41 @@ describe('ROVE Functions - Integration Tests', () => {
         it('polar callback should check userId and DevId and write the access tokens to the database...', async () => {
             //set up the stubbed response to mimic polar's response when called with the
             //code to get the token
-            const responseObject = {
+            const responseObject1 = {
                 statusCode: 200,
                 headers: {
                   'content-type': 'application/json'
                 }
               };
-              const responseBody = {
+            const responseBody1 = {
                 access_token: 'test-polar-access-token',
                 token_type: 'bearer',
                 expires_in: 21600,
                 x_user_id: '123456polar',
+              };
+            const responseObject2 = {
+                statusCode: 200,
+                headers: {
+                  'content-type': 'application/json'
+                }
+              };
+            const responseBody2 = {
+                "polar-user-id": "123456polar",
+                "member-id": testUser,
+                "registration-date": "2011-10-14T12:50:37.000Z",
+                "first-name": "Eka",
+                "last-name": "Toka",
+                "birthdate": "1985-09-06",
+                "gender": "MALE",
+                "weight": 66,
+                "height": 170,
+                "extra-info": [
+                  {
+                    "value": "2",
+                    "index": 0,
+                    "name": "number-of-children"
+                  }
+                ]
               };
             
             const expectedTestUserDoc = {
@@ -248,6 +272,7 @@ describe('ROVE Functions - Integration Tests', () => {
                 polar_token_type: 'bearer',
                 polar_token_expires_in: 21600,
                 polar_connected: true,
+                polar_registration_date: "2011-10-14T12:50:37.000Z",
                 polar_user_id: '123456polar',
                 strava_access_token: 'test-long-access-token',
                 strava_refresh_token: 'test-refresh_token',
@@ -256,7 +281,9 @@ describe('ROVE Functions - Integration Tests', () => {
                 strava_connected: true,
             }
 
-            sinon.stub(request, "post").yields(null, responseObject, JSON.stringify(responseBody));
+            const stubbedcall = sinon.stub(request, "post")
+            stubbedcall.onFirstCall().yields(null, responseObject1, JSON.stringify(responseBody1));
+            stubbedcall.onSecondCall().yields(null, responseObject2, JSON.stringify(responseBody2));
             //sinon.stub(polar.athlete, "get").returns({id: 12345678});
 
             // set the request object with the correct provider, developerId and userId

@@ -346,6 +346,7 @@ exports.polarCallback = functions.https.onRequest(async (req, res) => {
   await request.post(options, async (error, response, body) => {
     if (!error && response.statusCode == 200) {
     // this is where the tokens come back.
+      await registerUserWithPolar(userId, devId, JSON.parse(body), db);
       await polarStoreTokens(userId, devId, JSON.parse(body), db);
       // send a response now to endpoint for devId confirming success
       // await sendDevSuccess(devId); //TODO: create dev success post.
@@ -361,6 +362,35 @@ exports.polarCallback = functions.https.onRequest(async (req, res) => {
   });
   return;
 });
+
+async function registerUserWithPolar(userId, devId, data, db) {
+  const dataString = "<register><member-id>"+userId+"</member-id></register>";
+  const options = {
+    url: "https://www.polaraccesslink.com/v3/users",
+    method: "POST",
+    headers: {
+      "Content-Type": "application/xml",
+      "Accept": "application/json",
+      "Authorization": "Bearer "+data["access_token"],
+    },
+    body: dataString,
+  };
+    // make request to polar to register the user.
+  await request.post(options, async (error, response, body) => {
+    if (!error && response.statusCode == 200) {
+      const updates = {
+        "polar_registration_date": JSON.parse(body)["registration-date"],
+      };
+      const userRef = db.collection("users").doc(userId);
+      await userRef.set(updates, {merge: true});
+    } else {
+      console.log(JSON.parse(body));
+      // send an error response to dev.
+      // TODO: create dev fail post.
+      // userResponse = "Some bad redirect";
+    }
+  });
+}
 
 async function polarStoreTokens(userId, devId, data, db) {
   const parameters = {
