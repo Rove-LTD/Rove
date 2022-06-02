@@ -6,6 +6,7 @@ const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 const Url = require("url");
 const crypto = require("crypto");
+const FitbitApiClient = require("fitbit-node");
 const encodeparams = require("./encodeparams");
 const got = require("got");
 const request = require("request");
@@ -32,7 +33,7 @@ const configurations = contentsOfDotEnvFile["config"];
 
 admin.initializeApp();
 const db = admin.firestore();
-
+let fitbitclient = null;
 // INTEGRATION FOR APP:
 // get url response and go through onboarding flow.
 // we recieve auth token from strava to stravaCallBack.
@@ -90,6 +91,8 @@ exports.connectService = functions.https.onRequest(async (req, res) => {
     url = await garminOauth(req);
   } else if (provider == "polar") {
     url = await polarOauth(req);
+  } else if (provider == "fitbit") {
+    url = fitbitOauth(req);
   } else {
     // the request was badly formatted with incorrect provider parameter
     url = "error: the provider was badly formatted, missing or not supported";
@@ -306,7 +309,33 @@ function polarOauth(req) {
   const baseUrl = "https://flow.polar.com/oauth2/authorization?";
   return (baseUrl + encodedParameters);
 }
-
+// Authenticate with fitbit
+function fitbitOauth(req) {
+  const appQuery = Url.parse(req.url, true).query;
+  const userId = appQuery["userId"];
+  const devId = appQuery["devId"];
+  // Set up Client
+  fitbitclient = new FitbitApiClient({
+    clientId: configurations[devId]["fitbitClientId"],
+    clientSecret: configurations[devId]["fitbitClientSecret"],
+    apiVersion: "1.2", // 1.2 is the default
+  });
+  return fitbitclient.getAuthorizeUrl("activity heartrate location nutrition profile settings sleep social weight", "https://us-central1-rove-26.cloudfunctions.net/fitbitCallback", "login", userId+":"+devId);
+}
+// callback from Fitbit
+exports.fitbitCallback = functions.https.onRequest(async (req, res) => {
+  const oAuthCallback = (Url.parse(req.url, true).query)["state"].split(":");
+  const userId = oAuthCallback[0];
+  // const devId = oAuthCallback[1];
+  // exchange the authorization code we just received for an access token
+  fitbitclient.getAccessToken(req.query.code, "https://us-central1-rove-26.cloudfunctions.net/fitbitCallback").then( (result) => {
+  // use the access token to fetch the user's profile information
+    fitbitStoreTokens(userId, result);
+    res.send("your authorization was successful please close this window");
+  }).catch( (err) => {
+    res.status(err.status).send(err);
+  });
+});
 // callback from polar with token in
 exports.polarCallback = functions.https.onRequest(async (req, res) => {
   // this comes from polar
@@ -359,6 +388,24 @@ exports.polarCallback = functions.https.onRequest(async (req, res) => {
     }
   });
 });
+
+async function fitbitStoreTokens(userId, data) {
+  const parameters = {
+    "fitbit_access_token": data["access_token"],
+    "fitbit_token_type": data["token_type"],
+    // "polar_token_expires_at": data["expires_at"], PVTODO: need to calculate from the expires in which is in seconds from now.
+    "fitbit_token_expires_in": data["expires_in"],
+    "fitbit_connected": true,
+    "fitbit_user_id": data["user_id"],
+  };
+  // set tokens for userId doc.
+  const userRef = db.collection("users").doc(userId);
+  await userRef.set(parameters, {merge: true});
+  // assign userId for devId.
+  // const devRef = db.collection("developers").doc(devId);
+  // write resultant message to dev endpoint.
+  return;
+}
 
 async function polarStoreTokens(userId, devId, data, db) {
   const parameters = {
