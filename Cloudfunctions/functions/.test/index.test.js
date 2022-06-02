@@ -29,7 +29,6 @@ const strava = require("strava-v3");
 
 //------------------------Set Up of Test Data Project Complete ---------------//
 
-
 describe('ROVE Functions - Integration Tests', () => {
     let myFunctions;
     let testUser = "paulsTestDevUser";
@@ -38,6 +37,7 @@ describe('ROVE Functions - Integration Tests', () => {
     let devUserData = {devId: testDev, email: "paul.userTest@gmail.com"};
     let recievedGarminUrl = "";
     let recievedStravaUrl = "";
+    let recievedPolarUrl = "";
 
     before(async() => {
         // Require index.js and save the exports inside a namespace called myFunctions.
@@ -67,7 +67,6 @@ describe('ROVE Functions - Integration Tests', () => {
     }); //end after
 
 //-------TEST 1------ test connectService() ------------
-
     describe("Testing that the developer can call API to connectService() and receive redirection URL: ", () => {
         it('should get error if the provider is not correct...', async () => {
             // set the request object with the incorrect provider, correct developerId, devKey and userId
@@ -152,10 +151,24 @@ describe('ROVE Functions - Integration Tests', () => {
             await myFunctions.connectService(req, res);
 
         })
+        it('should get a properly formatted polar redirect url...', async () => {
+            // set the request object with the correct provider, developerId and userId
+            const req = {url: 'https//test.com/?devId='+testDev+'&userId='+testUser+'&devKey=test-key&provider=polar'};
+            // set the assertions for the expected response object
+            const res = {
+                send: (url) => {
+                    assert.equal(url, "https://flow.polar.com/oauth2/authorization?client_id=654623e7-7191-4cfe-aab5-0bc24785fdee&response_type=code&redirect_uri=https://us-central1-rove-26.cloudfunctions.net/polarCallback&scope=accesslink.read_all&state=paulsTestDevUser:paulsTestDev");
+                    recievedPolarUrl = url;
+                }
+            }
 
-    }); //End Test 1
+            await myFunctions.connectService(req, res);
 
-    //-------------TEST 2--- Test Callbacks from Strava and Garmin----
+        })
+
+    }); // End TEST 1------ test connectService() ------------
+
+    //-------------TEST 2--- Test Callbacks from Strava-------
     describe("Testing that the strava callbacks work: ", () => {
         it('strava callback should check userId and DevId and write the access tokens to the database...', async () => {
             //set up the stubbed response to mimic strava's response when called with the
@@ -176,7 +189,7 @@ describe('ROVE Functions - Integration Tests', () => {
             const expectedTestUserDoc = {
                 devId: devUserData.devId,
                 email: devUserData.email,
-                id: 12345678,
+                strava_id: 12345678,
                 strava_access_token: 'test-long-access-token',
                 strava_refresh_token: 'test-refresh_token',
                 strava_token_expires_at: 1654014114,
@@ -207,10 +220,9 @@ describe('ROVE Functions - Integration Tests', () => {
             sinon.restore();
 
         })
-    });//end TEST 2
+    });//End TEST 2--- Test Callbacks for Strava--------------
 
-    //---------TEST 3 ------------
-
+    //-------------TEST 2--- Test Callbacks for Polar-------
     describe("Testing that the polar callbacks work: ", () => {
         it('polar callback should check userId and DevId and write the access tokens to the database...', async () => {
             //set up the stubbed response to mimic polar's response when called with the
@@ -231,7 +243,7 @@ describe('ROVE Functions - Integration Tests', () => {
             const expectedTestUserDoc = {
                 devId: devUserData.devId,
                 email: devUserData.email,
-                id: 12345678,
+                strava_id: 12345678,
                 polar_access_token: 'test-polar-access-token',
                 polar_token_type: 'bearer',
                 polar_token_expires_in: 21600,
@@ -267,7 +279,7 @@ describe('ROVE Functions - Integration Tests', () => {
             sinon.restore();
 
         })
-    });
+    });//End TEST 2--- Test Callbacks for Polar--------------
 
 }); //end Integration TEST
 
