@@ -10,6 +10,7 @@ const encodeparams = require("./encodeparams");
 const got = require("got");
 const request = require("request");
 const strava = require("strava-v3");
+const Oauth = require("./oauth")
 const contentsOfDotEnvFile = { // convert to using a .env file for this or secrets
   "config": {
     "paulsTestDev": {
@@ -19,6 +20,8 @@ const contentsOfDotEnvFile = { // convert to using a .env file for this or secre
       "oauth_consumer_key": "eb0a9a22-db68-4188-a913-77ee997924a8",
       "polarClientId": "654623e7-7191-4cfe-aab5-0bc24785fdee",
       "polarSecret": "376aae03-9990-4f69-a5a3-704594403bd9",
+      "whaooClientId": "test-wahoo-client-id",
+      "wahooSecret": "test-wahoo-secret",
     },
     "anotherDeveloper": {
       "clientId": "a different id",
@@ -90,6 +93,8 @@ exports.connectService = functions.https.onRequest(async (req, res) => {
     url = await garminOauth(req);
   } else if (provider == "polar") {
     url = await polarOauth(req);
+  } else if (provider == "wahoo") {
+    url = await wahooOauth(req);
   } else {
     // the request was badly formatted with incorrect provider parameter
     url = "error: the provider was badly formatted, missing or not supported";
@@ -322,7 +327,7 @@ exports.polarCallback = functions.https.onRequest(async (req, res) => {
   } else if (error != null) {
     res.send("Error: "+error+" please try again");
   }
-  const clientIdClientSecret = configurations[devId]["client_id"]+":"+configurations[devId]["polarSecret"];
+  const clientIdClientSecret = configurations[devId]["polarClientId"]+":"+configurations[devId]["polarSecret"];
   //
   const buffer = new Buffer.from(clientIdClientSecret); // eslint-disable-line
   const base64String = buffer.toString("base64");
@@ -376,6 +381,16 @@ async function polarStoreTokens(userId, devId, data, db) {
   // const devRef = db.collection("developers").doc(devId);
   // write resultant message to dev endpoint.
   return;
+}
+
+function wahooOauth(req) {
+  const appQuery = Url.parse(req.url, true).query;
+  const userId = appQuery["userId"];
+  const devId = appQuery["devId"];
+  const provider = appQuery["provider"];
+  // add parameters from user onto the callback redirect.
+  const oauth = new Oauth(devId, userId, configurations, provider);
+  return oauth.redirectUrl;
 }
 
 exports.stravaWebhook = functions.https.onRequest((request, response) => {
