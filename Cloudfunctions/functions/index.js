@@ -201,7 +201,7 @@ async function getStravaAthleteId(userId, devId, data, db) {
   // set tokens for userId doc.
   const athleteSummary = await strava.athlete.get(parameters);
   const userRef = db.collection("users").doc(userId);
-  await userRef.set({"id": athleteSummary["id"]}, {merge: true});
+  await userRef.set({"strava_id": athleteSummary["id"]}, {merge: true});
   return;
 }
 
@@ -293,7 +293,7 @@ function polarOauth(req) {
     client_id: configurations[devId]["polarClientId"],
     response_type: "code",
     redirect_uri: "https://us-central1-rove-26.cloudfunctions.net/polarCallback",
-    scope: "accessLink.read_all",
+    scope: "accesslink.read_all",
     state: userId+":"+devId,
   };
 
@@ -321,20 +321,21 @@ exports.polarCallback = functions.https.onRequest(async (req, res) => {
   const error = (Url.parse(req.url, true).query)["error"];
   const userId = oAuthCallback[0];
   const devId = oAuthCallback[1];
-  if (userId == null || devId == null || code == null) {
-    res.send("Error: missing userId of DevId in callback: an unexpected error has occurred please close this window and try again");
-    return;
-  } else if (error != null) {
+  if (error != null) {
     res.send("Error: "+error+" please try again");
+    return;
+  } else if (userId == null || devId == null || code == null) {
+    res.send("Error: missing userId or DevId in callback: an unexpected error has occurred please close this window and try again");
+    return;
   }
   const clientIdClientSecret = configurations[devId]["polarClientId"]+":"+configurations[devId]["polarSecret"];
-  //
   const buffer = new Buffer.from(clientIdClientSecret); // eslint-disable-line
   const base64String = buffer.toString("base64");
 
-  const dataString = "&code="+
+  const dataString = "code="+
     code+
-    "&grant_type=authorization_code";
+    "&grant_type=authorization_code"+
+    "&redirect_uri=https://us-central1-rove-26.cloudfunctions.net/polarCallback";
   const options = {
     url: "https://polarremote.com/v2/oauth2/token",
     method: "POST",
@@ -349,21 +350,55 @@ exports.polarCallback = functions.https.onRequest(async (req, res) => {
   // make request to polar for tokens after auth flow and store credentials.
   await request.post(options, async (error, response, body) => {
     if (!error && response.statusCode == 200) {
-      // this is where the tokens come back.
-      polarStoreTokens(userId, devId, JSON.parse(body), db);
+    // this is where the tokens come back.
+      let message ="";
+      message = await registerUserWithPolar(userId, devId, JSON.parse(body), db);
+      await polarStoreTokens(userId, devId, JSON.parse(body), db);
       // send a response now to endpoint for devId confirming success
       // await sendDevSuccess(devId); //TODO: create dev success post.
       // userResponse = "Some good redirect.";
-      res.send("your authorization was successful please close this window");
+      res.send("your authorization was successful please close this window: "+message);
     } else {
-      res.send("Error: "+response.statusCode+" please close this window and try again");
+      res.send("Error: "+response.statusCode+":"+body.toString()+" please close this window and try again");
       console.log(JSON.parse(body));
       // send an error response to dev.
       // TODO: create dev fail post.
       // userResponse = "Some bad redirect";
     }
   });
+  return;
 });
+
+async function registerUserWithPolar(userId, devId, data, db) {
+  let message = "";
+  const dataString = "<register><member-id>"+userId+"</member-id></register>";
+  const options = {
+    url: "https://www.polaraccesslink.com/v3/users",
+    method: "POST",
+    headers: {
+      "Content-Type": "application/xml",
+      "Accept": "application/json",
+      "Authorization": "Bearer "+data["access_token"],
+    },
+    body: dataString,
+  };
+    // make request to polar to register the user.
+  await request.post(options, async (error, response, body) => {
+    if (!error && response.statusCode == 200) {
+      const updates = {
+        "polar_registration_date": JSON.parse(body)["registration-date"],
+      };
+      const userRef = db.collection("users").doc(userId);
+      await userRef.set(updates, {merge: true});
+    } else if (response.statusCode == 409) {
+      // user already registered
+      message = "you are already registered with Polar - there is no need to re-register";
+    } else {
+      console.log("error registering polar user: "+response.statusCode);
+    }
+  });
+  return message;
+}
 
 async function polarStoreTokens(userId, devId, data, db) {
   const parameters = {
