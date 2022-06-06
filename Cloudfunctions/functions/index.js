@@ -1,4 +1,3 @@
-/* eslint-disable new-cap */
 /* eslint-disable guard-for-in */
 /* eslint-disable require-jsdoc */
 /* eslint-disable max-len */
@@ -9,6 +8,7 @@ const Url = require("url");
 const crypto = require("crypto");
 const encodeparams = require("./encodeparams");
 const got = require("got");
+const request = require("request");
 const strava = require("strava-v3");
 const contentsOfDotEnvFile = { // convert to using a .env file for this or secrets
   "config": {
@@ -147,7 +147,7 @@ exports.stravaCallback = functions.https.onRequest(async (req, res) => {
       // TODO: create dev fail post.
       // userResponse = "Some bad redirect";
     }
-  });*/
+  });
 });
 
 exports.garminWebhook = functions.https.onRequest(async (req, res) => {
