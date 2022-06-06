@@ -1,4 +1,3 @@
-/* eslint-disable new-cap */
 /* eslint-disable guard-for-in */
 /* eslint-disable require-jsdoc */
 /* eslint-disable max-len */
@@ -9,7 +8,9 @@ const Url = require("url");
 const crypto = require("crypto");
 const encodeparams = require("./encodeparams");
 const got = require("got");
+const request = require("request");
 const strava = require("strava-v3");
+const filters = require("./data-filter");
 const contentsOfDotEnvFile = { // convert to using a .env file for this or secrets
   "config": {
     "paulsTestDev": {
@@ -147,7 +148,7 @@ exports.stravaCallback = functions.https.onRequest(async (req, res) => {
       // TODO: create dev fail post.
       // userResponse = "Some bad redirect";
     }
-  });*/
+  });
 });
 
 exports.garminWebhook = functions.https.onRequest(async (req, res) => {
@@ -421,7 +422,7 @@ exports.stravaWebhook = functions.https.onRequest(async (request, response) => {
     });
     let stravaAccessToken;
     // get userbased on userid. (.where("id" == request.body.owner_id)).
-    const userDoc = await db.collection("users").where("id", "==", request.body.owner_id).get();
+    const userDoc = await db.collection("users").where("strava_id", "==", request.body.owner_id).get();
     const userDocRef = userDoc.docs.at(0);
     if (userDoc.docs.length == 1) {
       stravaAccessToken = userDocRef.data()["strava_access_token"];
@@ -434,6 +435,8 @@ exports.stravaWebhook = functions.https.onRequest(async (request, response) => {
     // TODO: Get strava activity and sanatize
     const activity = await strava.activities.get({"access_token": stravaAccessToken, "id": request.body.object_id});
     console.log(activity);
+    const sanitisedActivity = filters.stravaSanitise([activity]);
+    console.log(sanitisedActivity);
     // TODO: Send the information to an endpoint specified by the dev registered to a user.
     response.status(200).send("EVENT_RECEIVED");
   } else if (request.method === "GET") {
