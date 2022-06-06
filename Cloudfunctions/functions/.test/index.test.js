@@ -63,6 +63,7 @@ describe('ROVE Functions - Integration Tests', () => {
     after(async () => {
         // Do cleanup tasks.
         // TODO: PV delete the test developer data
+        await sinon.restore();
         test.cleanup();
     }); //end after
 
@@ -213,8 +214,8 @@ describe('ROVE Functions - Integration Tests', () => {
                 strava_token_expires_in: 21600,
                 strava_connected: true,
             }
-
-            sinon.stub(request, "post").yields(null, responseObject, JSON.stringify(responseBody));
+            const stubbedcall = sinon.stub(request, "post");
+            stubbedcall.yields(null, responseObject, JSON.stringify(responseBody));
             sinon.stub(strava.athlete, "get").returns({id: 12345678});
 
             // set the request object with the correct provider, developerId and userId
@@ -234,13 +235,13 @@ describe('ROVE Functions - Integration Tests', () => {
 
             assert.deepEqual(testUserDoc.data(), expectedTestUserDoc);
 
-            sinon.restore();
+            await sinon.restore();
 
         })
     });//End TEST 2--- Test Callbacks for Strava--------------
 
     //-------------TEST 2--- Test Callbacks for Polar-------
-    describe("Testing that the polar callbacks work: ", () => {
+    describe("Testing the polar callback...", async () => {
         it('polar callback should report error if user already registered', async () => {
             //set up the stubbed response to mimic polar's response when called with the
             //code to get the token
@@ -280,10 +281,29 @@ describe('ROVE Functions - Integration Tests', () => {
                 strava_connected: true,
             }
 
+            const clientIdClientSecret =
+                "654623e7-7191-4cfe-aab5-0bc24785fdee"+
+                ":"+
+                "376aae03-9990-4f69-a5a3-704594403bd9";
+            const buffer = new Buffer.from(clientIdClientSecret); // eslint-disable-line
+            const base64String = buffer.toString("base64");
+            const dataString = "code=testcode"+
+            "&grant_type=authorization_code"+
+            "&redirect_uri=https://us-central1-rove-26.cloudfunctions.net/polarCallback";
+            options = {
+                url: "https://polarremote.com/v2/oauth2/token",
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/x-www-form-urlencoded",
+                  "Accept": "application/json;charset=UTF-8",
+                  "Authorization": "Basic "+base64String,
+                },
+                body: dataString,
+              };
+
             const stubbedcall = sinon.stub(request, "post")
             stubbedcall.onFirstCall().yields(null, responseObject1, JSON.stringify(responseBody1));
             stubbedcall.onSecondCall().yields(null, responseObject2, JSON.stringify(responseBody2));
-            //sinon.stub(polar.athlete, "get").returns({id: 12345678});
 
             // set the request object with the correct provider, developerId and userId
             const req = {url: "https://us-central1-rove-26.cloudfunctions.net/polarCallback?state="+testUser+":"+testDev+"&code=testcode"};
@@ -301,6 +321,7 @@ describe('ROVE Functions - Integration Tests', () => {
             .get();
 
             assert.deepEqual(testUserDoc.data(), expectedTestUserDoc);
+            assert(stubbedcall.calledWith(options), "the call to polar had the wrong arguments");
 
             await sinon.restore();
 
@@ -365,7 +386,6 @@ describe('ROVE Functions - Integration Tests', () => {
             const stubbedcall = sinon.stub(request, "post")
             stubbedcall.onFirstCall().yields(null, responseObject1, JSON.stringify(responseBody1));
             stubbedcall.onSecondCall().yields(null, responseObject2, JSON.stringify(responseBody2));
-            //sinon.stub(polar.athlete, "get").returns({id: 12345678});
 
             // set the request object with the correct provider, developerId and userId
             const req = {url: "https://us-central1-rove-26.cloudfunctions.net/polarCallback?state="+testUser+":"+testDev+"&code=testcode"};

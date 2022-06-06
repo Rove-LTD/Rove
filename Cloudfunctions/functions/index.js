@@ -15,8 +15,8 @@ const Oauth = require("./oauth");
 const contentsOfDotEnvFile = { // convert to using a .env file for this or secrets
   "config": {
     "paulsTestDev": {
-      "clientId": 72486,
-      "client_secret": "b0d500111e3d1774903da1f067b5b7adf38ca726",
+      "stravaClientId": 72486,
+      "stravaClientSecret": "b0d500111e3d1774903da1f067b5b7adf38ca726",
       "consumerSecret": "ffqgs2OxeJkFHUM0c3pGysdCp1Znt0tnc2s",
       "oauth_consumer_key": "eb0a9a22-db68-4188-a913-77ee997924a8",
       "polarClientId": "654623e7-7191-4cfe-aab5-0bc24785fdee",
@@ -125,9 +125,9 @@ exports.stravaCallback = functions.https.onRequest(async (req, res) => {
     return;
   }
   const dataString = "client_id="+
-    configurations[devId]["clientId"]+
+    configurations[devId]["stravaClientId"]+
     "&client_secret="+
-    configurations[devId]["client_secret"]+
+    configurations[devId]["stravaClientSecret"]+
     "&code="+
     code+
     "&grant_type=authorization_code";
@@ -193,8 +193,8 @@ async function stravaStoreTokens(userId, devId, data, db) {
 async function getStravaAthleteId(userId, devId, data, db) {
   // get athlete id from strava.
   strava.config({
-    "client_id": configurations[devId]["clientId"],
-    "client_secret": configurations[devId]["client_secret"],
+    "client_id": configurations[devId]["stravaClientId"],
+    "client_secret": configurations[devId]["stravaClientSecret"],
     "redirect_uri": "https://us-central1-rove-26.cloudfunctions.net/stravaCallback",
   });
   const parameters = {
@@ -213,7 +213,7 @@ function stravaOauth(req) {
   const devId = appQuery["devId"];
   // add parameters from user onto the callback redirect.
   const parameters = {
-    client_id: configurations[devId]["clientId"],
+    client_id: configurations[devId]["stravaClientId"],
     response_type: "code",
     redirect_uri: "https://us-central1-rove-26.cloudfunctions.net/stravaCallback?userId="+userId + ":" + devId,
     approval_prompt: "force",
