@@ -10,7 +10,8 @@ const encodeparams = require("./encodeparams");
 const got = require("got");
 const request = require("request");
 const strava = require("strava-v3");
-const Oauth = require("./oauth")
+const Oauth = require("./oauth");
+
 const contentsOfDotEnvFile = { // convert to using a .env file for this or secrets
   "config": {
     "paulsTestDev": {
@@ -22,6 +23,7 @@ const contentsOfDotEnvFile = { // convert to using a .env file for this or secre
       "polarSecret": "376aae03-9990-4f69-a5a3-704594403bd9",
       "whaooClientId": "test-wahoo-client-id",
       "wahooSecret": "test-wahoo-secret",
+      "wahooWebhookToken": "97661c16-6359-4854-9498-a49c07b6ec11",
     },
     "anotherDeveloper": {
       "clientId": "a different id",
@@ -123,7 +125,7 @@ exports.stravaCallback = functions.https.onRequest(async (req, res) => {
     return;
   }
   const dataString = "client_id="+
-    configurations[devId]["client_id"]+
+    configurations[devId]["clientId"]+
     "&client_secret="+
     configurations[devId]["client_secret"]+
     "&code="+

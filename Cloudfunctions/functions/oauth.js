@@ -1,13 +1,4 @@
 class Oauth {
-    devId;
-    userId;
-    roveUserId;
-    provider;
-    redirectUrl;
-    status;
-    error;
-    errorMessage;
-    redurectUrl;
 
     constructor (devId, devsUserTag, config, provider) {
         this.devId = devId;
@@ -21,10 +12,9 @@ class Oauth {
             tokenExpired: false};
         this.error = false;
         this.errorMessage = "";
-        this.redirectUrl = this.getRedirect();
-        
+        this.redirectUrl = this.getRedirect();    
     }
-    
+
     fromCallbackData(provider, data) {
         this.devId = data["devId"];
         this.userId = data['userId'];
@@ -72,17 +62,18 @@ class Oauth {
                 this.error = true;
                 this.errorMessage = "error: the provider was badly formatted, missing or not supported";
                 return "";
-        } 
+        }
+        
         const parameters = {
             client_id: this.clientId,
             response_type: "code",
             redirect_uri: this.callbackBaseUrl+"?state="+this.state,
             scope: this.scope,
-          };
+            };
         
-          let encodedParameters = "";
-          let k = 0;
-          for (k in parameters) {
+            let encodedParameters = "";
+            let k = 0;
+            for (k in parameters) {
             const encodedValue = parameters[k];
             const encodedKey = k;
             if (encodedValue != undefined) {
@@ -92,8 +83,8 @@ class Oauth {
                 encodedParameters += `&${encodedKey}=${encodedValue}`;
                 }         
             }
-          }
-          return (this.baseUrl + encodedParameters);
+            }
+            return (this.baseUrl + encodedParameters);
     }
 }
 
