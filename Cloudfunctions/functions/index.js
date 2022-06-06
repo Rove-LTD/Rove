@@ -1,3 +1,4 @@
+/* eslint-disable new-cap */
 /* eslint-disable guard-for-in */
 /* eslint-disable require-jsdoc */
 /* eslint-disable max-len */
@@ -8,7 +9,6 @@ const Url = require("url");
 const crypto = require("crypto");
 const encodeparams = require("./encodeparams");
 const got = require("got");
-const request = require("request");
 const strava = require("strava-v3");
 
 strava.config({
@@ -65,8 +65,23 @@ exports.stravaCallback = functions.https.onRequest(async (req, res) => {
     method: "POST",
     body: dataString,
   };
+  const response = await got.post(options.url, {body: dataString});
+  if (response.statusCode == 200) {
+    // this is where the tokens come back.
+    await stravaStoreTokens(userId, devId, response.body, db);
+    await getStravaAthleteId(userId, response.body, db);
+    // send a response now to endpoint for devId confirming success
+    // await sendDevSuccess(devId); //TODO: create dev success post.
+    // userResponse = "Some good redirect.";
+  } else {
+    console.log(response.body);
+    // send an error response to dev.
+    // TODO: create dev fail post.
+    // userResponse = "Some bad redirect";
+  }
   // make request to strava for tokens after auth flow and store credentials.
-  await request(options, async (error, response, body) => {
+  /*
+  request(options, async (error, response, body) => {
     if (!error && response.statusCode == 200) {
       // this is where the tokens come back.
       stravaStoreTokens(userId, devId, JSON.parse(body), db);
@@ -80,7 +95,7 @@ exports.stravaCallback = functions.https.onRequest(async (req, res) => {
       // TODO: create dev fail post.
       // userResponse = "Some bad redirect";
     }
-  });
+  });*/
 });
 
 exports.garminWebhook = functions.https.onRequest(async (req, res) => {
@@ -202,17 +217,27 @@ async function garminOauth(req) {
 }
 
 
-exports.stravaWebhook = functions.https.onRequest((request, response) => {
+exports.stravaWebhook = functions.https.onRequest(async (request, response) => {
   if (request.method === "POST") {
     functions.logger.info("webhook event received!", {
       query: request.query,
       body: request.body,
     });
-    // get userbased on userid. (.where("id" == request.body.id)).
+    let stravaAccessToken;
+    // get userbased on userid. (.where("id" == request.body.owner_id)).
+    const userDoc = await db.collection("users").where("id", "==", request.body.owner_id).get();
+    const userDocRef = userDoc.docs.at(0);
+    if (userDoc.docs.length == 1) {
+      stravaAccessToken = userDocRef.data()["strava_access_token"];
+    } else {
+      // there is an issue if there is more than one user with a userId in the DB.
+      console.log("error in number of users registered to strava webhook: " + request.body.owner_id);
+      return;
+    }
+    console.log(stravaAccessToken);
     // TODO: Get strava activity and sanatize
-    strava.activities.get({"id": request.body.object_id}, (result)=>{
-      console.log(result);
-    });
+    const activity = await strava.activities.get({"access_token": stravaAccessToken, "id": request.body.object_id});
+    console.log(activity);
     // TODO: Send the information to an endpoint specified by the dev registered to a user.
     response.status(200).send("EVENT_RECEIVED");
   } else if (request.method === "GET") {
