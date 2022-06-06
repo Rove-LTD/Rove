@@ -44,7 +44,7 @@ module.exports = {
         "data_source" : "strava",
         };
         for (const property in summaryActivity) {
-            if (typeof summaryActivity[property] == "undefined") {
+            if (typeof summaryActivity[property] == "undefined" || Number.isNaN(summaryActivity[property])) {
                 summaryActivity[property] = null;
             }
         }
