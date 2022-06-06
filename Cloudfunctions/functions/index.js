@@ -193,7 +193,7 @@ async function stravaStoreTokens(userId, devId, data, db) {
 async function getStravaAthleteId(userId, devId, data, db) {
   // get athlete id from strava.
   strava.config({
-    "client_id": configurations[devId]["client_id"],
+    "client_id": configurations[devId]["clientId"],
     "client_secret": configurations[devId]["client_secret"],
     "redirect_uri": "https://us-central1-rove-26.cloudfunctions.net/stravaCallback",
   });
