@@ -1,6 +1,8 @@
-/* eslint-disable guard-for-in */
 /* eslint-disable require-jsdoc */
-/* eslint-disable max-len */
+/**
+ * Index.js contains the main functions and callbacks for Oauth
+ * and webHook management
+ */
 const functions = require("firebase-functions");
 // The Firebase Admin SDK to access Firestore.
 const admin = require("firebase-admin");
