@@ -21,6 +21,8 @@
 //     "data_source" : null,
 //   }
 
+
+// Fix NaN fields.....to make them null instead
 module.exports = {
 
   stravaSanitise: function(activities) {
