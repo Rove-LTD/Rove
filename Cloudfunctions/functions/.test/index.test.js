@@ -285,7 +285,7 @@ describe('ROVE Functions - Integration Tests', () => {
             const clientIdClientSecret =
                 "654623e7-7191-4cfe-aab5-0bc24785fdee"+
                 ":"+
-                "376aae03-9990-4f69-a5a3-704594403bd9";
+                "f797c0e1-a39d-4b48-a2d9-89c2baea9005";
             const buffer = new Buffer.from(clientIdClientSecret); // eslint-disable-line
             const base64String = buffer.toString("base64");
             const dataString = "code=testcode"+
@@ -465,9 +465,18 @@ describe('ROVE Functions - Integration Tests', () => {
             .collection("users")
             .doc(testUser)
             .get();
+            // check called with the right arguments
+            accessCodeOptions =  {
+                url: 'https://api.wahooligan.com/oauth/token?code=testcode&client_id=iA2JRS_dBkikcb0uEnHPtb6IDt1vDYNbityEEhp801I&client_secret=w4FvDllcO0zYrnV1-VKR-T2gJ4mYUOiFJuwx-8C-C2I&grant_type=authorization_code&redirect_uri=https://api.wahooligan.com/oauth/authorize?client_id=iA2JRS_dBkikcb0uEnHPtb6IDt1vDYNbityEEhp801I&response_type=code&redirect_uri=https://us-central1-rove-26.cloudfunctions.net/wahooCallback?state=paulsTestDevUser:paulsTestDev&scope=email%20user_read%20workouts_read%20offline_data',
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  Accept: 'application/json;charset=UTF-8'
+                }
+              }
 
             assert.deepEqual(testUserDoc.data(), expectedTestUserDoc);
-
+            assert(stubbedcall.calledWith(options), "the call to wahoo had the wrong arguments");
             sinon.restore();
 
         })

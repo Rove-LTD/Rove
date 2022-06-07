@@ -133,8 +133,12 @@ class Oauth {
   */
   async getAndSaveAccessCodes() {
     await request.post(this.accessCodeOptions, async (error, response, body) => {
+      console.log("accessCodeOptions: ", this.accessCodeOptions);
+
       if (!error && response.statusCode == 200) {
       // this is where the tokens come back.
+        console.log("body: ", body);
+        console.log("response: ", response);
         this.accessCodeResponse = JSON.parse(body);
         await this.registerUser();
         await this.storeTokens();
@@ -143,7 +147,7 @@ class Oauth {
         this.errorMessage =
           "Error: "+response.statusCode+":"+body.toString()+
           " please close this window and try again";
-        console.log(JSON.parse(body));
+        console.log(body);
       }
     });
     return;
@@ -242,20 +246,19 @@ class Oauth {
           body: _dataString,
         };
       case "wahoo":
-        _dataString = "?code="+
+        _dataString = "code="+
         this.code+
-        "&client_id="+this.config[this.devId]["wahooClientId"]+
+        "&client_id="+this.config[this.devId]["whaooClientId"]+
         "&client_secret="+this.config[this.devId]["wahooSecret"]+
         "&grant_type=authorization_code"+
-        "&redirect_uri=https://us-central1-rove-26.cloudfunctions.net/wahooCallback";
+        "&redirect_uri=https://us-central1-rove-26.cloudfunctions.net/wahooCallback?state="+this.userId+":"+this.devId;
         return {
-          url: "https://api.wahooligan.com/oauth/token",
+          url: "https://api.wahooligan.com/oauth/token?"+_dataString,
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             "Accept": "application/json;charset=UTF-8",
           },
-          body: _dataString,
         };
       default:
         this.error = true;
