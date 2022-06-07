@@ -85,7 +85,7 @@ describe('ROVE Functions - Integration Tests', () => {
 
         it("Should get an error if the devID is not correctly formatted or missing", async () => {
             // set the request object with the correct provider, incorrect developerId and correct userId
-            const req = {url: 'https//test.com/?devId='+"incorrectDev"+'&userId='+testUser+'&provider=strava'};
+            const req = {url: 'https//test.com/?devId='+"incorrectDev"+'&userId='+testUser+'&provider=wahoo'};
             // set the assertions for the expected response object
             const res = {
                 send: (url) => {
@@ -98,7 +98,7 @@ describe('ROVE Functions - Integration Tests', () => {
 
         it("Should get an error if the developer is not correctly authorised", async () => {
             // set the request object with the correct provider, developerId and userId
-            const req = {url: 'https//test.com/?devId='+testDev+'&userId='+testUser+'&devKey=wrong-key&provider=strava'};
+            const req = {url: 'https//test.com/?devId='+testDev+'&userId='+testUser+'&devKey=wrong-key&provider=wahoo'};
             // set the assertions for the expected response object
             const res = {
                 send: (url) => {
@@ -111,7 +111,7 @@ describe('ROVE Functions - Integration Tests', () => {
 
         it("Should get an error if the userId is not provided", async () => {
             // set the request object with the correct provider, developerId and userId
-            const req = {url: 'https//test.com/?devId='+testDev+'&devKey=test-key&provider=strava'};
+            const req = {url: 'https//test.com/?devId='+testDev+'&devKey=test-key&provider=wahoo'};
             // set the assertions for the expected response object
             const res = {
                 send: (url) => {
@@ -173,7 +173,8 @@ describe('ROVE Functions - Integration Tests', () => {
             // set the assertions for the expected response object
             const res = {
                 send: (url) => {
-                    assert.include(url, "https://connect.wahoo.com//authorization?");
+                    assert.include(url, "https://api.wahooligan.com/oauth/authorize?");
+                    assert.include(url, "client_id=iA2JRS_dBkikcb0uEnHPtb6IDt1vDYNbityEEhp801I");
                     assert.include(url, "&redirect_uri=https://us-central1-rove-26.cloudfunctions.net/wahooCallback?state=");
                     assert.include(url, "state="+testUser+":"+testDev);
                 }
@@ -408,31 +409,30 @@ describe('ROVE Functions - Integration Tests', () => {
 
         })
     });// end Test 3
-/*     //---------TEST 4 ------------
+    //---------TEST 4 ------------
 
     describe("Testing that the Wahoo callbacks work: ", () => {
         it('wahoo callback should check userId and DevId and write the access tokens to the database...', async () => {
             //set up the stubbed response to mimic polar's response when called with the
             //code to get the token
-            const responseObject = {
+            const responseObject1 = {
                 statusCode: 200,
                 headers: {
                   'content-type': 'application/json'
                 }
               };
-              const responseBody = {
-                access_token: 'test-polar-access-token',
-                token_type: 'bearer',
+            const responseBody1 = {
+                access_token: 'test-wahoo-access-token',
                 expires_in: 21600,
-                x_user_id: '123456polar',
               };
-            
+
             const expectedTestUserDoc = {
                 devId: devUserData.devId,
                 email: devUserData.email,
-                id: 12345678,
+                strava_id: 12345678,
                 polar_access_token: 'test-polar-access-token',
                 polar_token_type: 'bearer',
+                polar_registration_date: "2011-10-14T12:50:37.000Z",
                 polar_token_expires_in: 21600,
                 polar_connected: true,
                 polar_user_id: '123456polar',
@@ -441,19 +441,24 @@ describe('ROVE Functions - Integration Tests', () => {
                 strava_token_expires_at: 1654014114,
                 strava_token_expires_in: 21600,
                 strava_connected: true,
+                wahoo_access_token: 'test-wahoo-access-token',
+                wahoo_token_expires_in: 21600,
+                wahoo_connected: true,
             }
 
-            sinon.stub(request, "post").yields(null, responseObject, JSON.stringify(responseBody));
+            const stubbedcall = sinon.stub(request, "post")
+            stubbedcall.onFirstCall().yields(null, responseObject1, JSON.stringify(responseBody1));
+
             //sinon.stub(polar.athlete, "get").returns({id: 12345678});
 
             // set the request object with the correct provider, developerId and userId
-            const req = {url: "https://us-central1-rove-26.cloudfunctions.net/polarCallback?state="+testUser+":"+testDev+"&code=testcode"};
+            const req = {url: "https://us-central1-rove-26.cloudfunctions.net/wahooCallback?state="+testUser+":"+testDev+"&code=testcode"};
             const res = {
                 send: (text) => {
                     assert.equal(text, "your authorization was successful please close this window")
                 },
             }
-            await myFunctions.polarCallback(req, res);
+            await myFunctions.wahooCallback(req, res);
 
             //now check the database was updated correctly
             testUserDoc = await admin.firestore()
@@ -466,6 +471,6 @@ describe('ROVE Functions - Integration Tests', () => {
             sinon.restore();
 
         })
-    });// end Test 4 */
+    });// end Test 4
 }); //end Integration TEST
 

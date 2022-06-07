@@ -23,8 +23,8 @@ const contentsOfDotEnvFile = { // convert to using a .env file for this or secre
       "oauth_consumer_key": "eb0a9a22-db68-4188-a913-77ee997924a8",
       "polarClientId": "654623e7-7191-4cfe-aab5-0bc24785fdee",
       "polarSecret": "376aae03-9990-4f69-a5a3-704594403bd9",
-      "whaooClientId": "test-wahoo-client-id",
-      "wahooSecret": "test-wahoo-secret",
+      "whaooClientId": "iA2JRS_dBkikcb0uEnHPtb6IDt1vDYNbityEEhp801I",
+      "wahooSecret": "w4FvDllcO0zYrnV1-VKR-T2gJ4mYUOiFJuwx-8C-C2I",
       "wahooWebhookToken": "97661c16-6359-4854-9498-a49c07b6ec11",
     },
     "anotherDeveloper": {
@@ -39,6 +39,7 @@ const configurations = contentsOfDotEnvFile["config"];
 
 admin.initializeApp();
 const db = admin.firestore();
+const oauth = new Oauth(configurations, db);
 
 // INTEGRATION FOR APP:
 // get url response and go through onboarding flow.
@@ -429,16 +430,16 @@ function wahooOauth(req) {
   const devId = appQuery["devId"];
   const provider = appQuery["provider"];
   // add parameters from user onto the callback redirect.
-  const oauth = new Oauth(devId, userId, configurations, provider, db);
+  oauth.setProvider(devId, userId, provider);
   return oauth.redirectUrl;
 }
 
-exports.wahooCallback = functions.https.onRequest((req, res) => {
+exports.wahooCallback = functions.https.onRequest(async (req, res) => {
   // recreate the oauth object that is managing the Oauth flow
   data = Url.parse(req.url, true).query;
-  const oauth = new Oauth.fromCallbackData("wahoo", configurations, data, db);
+  oauth.fromCallbackData("wahoo", data);
   if (oauth.status.gotCode) {
-    oauth.getAndSaveAccessCodes();
+    await oauth.getAndSaveAccessCodes();
   }
   if (!oauth.error) {
     res.send("your authorization was successful please close this window");
