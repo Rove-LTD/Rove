@@ -226,12 +226,14 @@ function stravaOauth(req) {
   let encodedParameters = "";
   let k = 0;
   for (k in parameters) {
-    const encodedValue = parameters[k];
-    const encodedKey = k;
-    if (encodedParameters === "") {
-      encodedParameters += `${encodedKey}=${encodedValue}`;
-    } else {
-      encodedParameters += `&${encodedKey}=${encodedValue}`;
+    if (parameters[k] != null) {
+      const encodedValue = parameters[k];
+      const encodedKey = k;
+      if (encodedParameters === "") {
+        encodedParameters += `${encodedKey}=${encodedValue}`;
+      } else {
+        encodedParameters += `&${encodedKey}=${encodedValue}`;
+      }
     }
   }
   const baseUrl = "https://www.strava.com/oauth/authorize?";
@@ -306,12 +308,14 @@ function polarOauth(req) {
   let encodedParameters = "";
   let k = 0;
   for (k in parameters) {
-    const encodedValue = parameters[k];
-    const encodedKey = k;
-    if (encodedParameters === "") {
-      encodedParameters += `${encodedKey}=${encodedValue}`;
-    } else {
-      encodedParameters += `&${encodedKey}=${encodedValue}`;
+    if (parameters[k] != null) {
+      const encodedValue = parameters[k];
+      const encodedKey = k;
+      if (encodedParameters === "") {
+        encodedParameters += `${encodedKey}=${encodedValue}`;
+      } else {
+        encodedParameters += `&${encodedKey}=${encodedValue}`;
+      }
     }
   }
   const baseUrl = "https://flow.polar.com/oauth2/authorization?";
@@ -436,7 +440,7 @@ function wahooOauth(req) {
 
 exports.wahooCallback = functions.https.onRequest(async (req, res) => {
   // recreate the oauth object that is managing the Oauth flow
-  data = Url.parse(req.url, true).query;
+  const data = Url.parse(req.url, true).query;
   oauth.fromCallbackData("wahoo", data);
   if (oauth.status.gotCode) {
     await oauth.getAndSaveAccessCodes();

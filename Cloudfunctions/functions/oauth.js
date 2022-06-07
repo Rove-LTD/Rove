@@ -1,20 +1,22 @@
+
+const request = require("request");
 /**
- * Oauth is a class to help manage the communication with the various
- * helth providers
- */
- const request = require("request");
-
+* Oauth is a class to help manage the communication with the various
+* fitness activity providers
+*/
 class Oauth {
-
+  /**
+  *
+  * @param {Object} config
+  * @param {Object} firebaseDb
+  */
   constructor(config, firebaseDb) {
     this.db = firebaseDb;
     this.config = config;
   }
   /**
-   *
    * @param {String} devId
    * @param {String} devsUserTag
-   * @param {Object} config
    * @param {String} provider
    */
   setProvider(devId, devsUserTag, provider) {
@@ -54,7 +56,7 @@ class Oauth {
     if (this.code == undefined || null || "") {
       if (!this.error) {
         this.error = true;
-        this.errorMessage = "Valid code not received from provider"
+        this.errorMessage = "Valid code not received from provider";
       }
     } else if (this.devId == "" || undefined || null) {
       this.error = true;
@@ -62,8 +64,7 @@ class Oauth {
     }
   }
   /**
-   *
-   * @return {String}
+   * @return {void}
    */
   getRedirect() {
     switch (this.provider) {
@@ -97,7 +98,7 @@ class Oauth {
         this.error = true;
         this.errorMessage =
           "error: the provider was badly formatted, missing or not supported";
-        return "";
+        break;
     }
 
     const parameters = {
@@ -122,101 +123,107 @@ class Oauth {
     }
     return (this.baseUrl + encodedParameters);
   }
-/**
- * 
- */
+  /**
+  *
+  * @return {void}
+  */
   async getAndSaveAccessCodes() {
-    await request.post(this.accessCodeOptions, async (error, response, body) => {
+    request.post(this.accessCodeOptions, async (error, response, body) => {
       if (!error && response.statusCode == 200) {
       // this is where the tokens come back.
         this.accessCodeResponse = JSON.parse(body);
         await this.registerUser();
         await this.storeTokens();
-        // send a response now to endpoint for devId confirming success
-        // await sendDevSuccess(devId); //TODO: create dev success post.
-        // userResponse = "Some good redirect.";
-        return;
       } else {
         this.error = true;
-        this.errorMessage = "Error: "+response.statusCode+":"+body.toString()+" please close this window and try again"
+        this.errorMessage =
+          "Error: "+response.statusCode+":"+body.toString()+
+          " please close this window and try again";
         console.log(JSON.parse(body));
-        // send an error response to dev.
-        // TODO: create dev fail post.
-        // userResponse = "Some bad redirect";
       }
     });
     return;
   }
-
+  /**
+   *
+   * @return {void}
+   */
   async storeTokens() {
-
     // set tokens for userId doc.
     const userRef = this.db.collection("users").doc(this.userId);
     await userRef.set(this.parameters, {merge: true});
-    // assign userId for devId.
-    // const devRef = db.collection("developers").doc(devId);
-    // write resultant message to dev endpoint.
     return;
   }
-
+  /**
+   * returns parameters to update database with
+   */
   get parameters() {
     switch (this.provider) {
       case "polar":
         return {
           "polar_access_token": this.accessCodeResponse["access_token"],
           "polar_token_type": this.accessCodeResponse["token_type"],
-          // "polar_token_expires_at": data["expires_at"], PVTODO: need to calculate from the expires in which is in seconds from now.
           "polar_token_expires_in": this.accessCodeResponse["expires_in"],
           "polar_connected": true,
           "polar_user_id": this.accessCodeResponse["x_user_id"],
-        };  
+        };
       case "wahoo":
         return {
           "wahoo_access_token": this.accessCodeResponse["access_token"],
           "wahoo_token_expires_in": this.accessCodeResponse["expires_in"],
           "wahoo_connected": true,
-        };  
+        };
+      default:
+        this.error = true;
+        this.errorMessage =
+          "could not set parameters to update database, provider not set correctly";
+        return {};
     }
-
   }
-
+  /**
+   *
+   * @return {void}
+   */
   async registerUser() {
-
     // if the user needs to be registered then register them
-    if (this.devId = "polar") {
+    if (this.devId == "polar") {
       // make request to polar to register the user.
       await request.post(this.registerUserOptions, async (error, response, body) => {
         if (!error && response.statusCode == 200) {
-          
           const updates = {
             "polar_registration_date": JSON.parse(body)["registration-date"],
           };
-          const userRef = this.db.collection("users").doc(userId);
+          const userRef = this.db.collection("users").doc(this.userId);
           await userRef.set(updates, {merge: true});
         } else if (response.statusCode == 409) {
-          // user already registered
-          message = "you are already registered with Polar - there is no need to re-register";
+          // user already registered - nothing to do here
+          console.log("user already registered");
         } else {
           console.log("error registering polar user: "+response.statusCode);
         }
       });
-    } else if (this.devId = "wahoo") {
-      // do registration is needed PV TODO
+    } else if (this.devId == "wahoo") {
+      // do registration if needed PV TODO
     }
-
     return;
   }
-
+  /**
+   * @return {Object}
+   */
   get accessCodeOptions() {
+    let _clientIdClientSecret;
+    let _buffer;
+    let _base64String;
+    let _dataString;
     switch (this.provider) {
       case "polar":
-        var _clientIdClientSecret = 
-          config[devId]["polarClientId"]+
-            ":"+config[devId]["polarSecret"];
-        var _buffer = 
+        _clientIdClientSecret = 
+          this.config[this.devId]["polarClientId"]+
+            ":"+this.config[this.devId]["polarSecret"];
+        _buffer = 
           new Buffer.from(_clientIdClientSecret); // eslint-disable-line
-        var _base64String = _buffer.toString("base64");
-        var _dataString = "code="+
+        _base64String = _buffer.toString("base64");
+        _dataString = "code="+
         this.code+
         "&grant_type=authorization_code"+
         "&redirect_uri=https://us-central1-rove-26.cloudfunctions.net/polarCallback";
@@ -231,7 +238,7 @@ class Oauth {
           body: _dataString,
         };
       case "wahoo":
-        var _dataString = "?code="+
+        _dataString = "?code="+
         this.code+
         "&client_id="+this.config[this.devId]["wahooClientId"]+
         "&client_secret="+this.config[this.devId]["wahooSecret"]+
@@ -249,12 +256,17 @@ class Oauth {
         default:
           this.error = true;
           this.errorMessage = "couldn't set secrets, invalid provider"
+          return {};
     }
   }
+  /**
+   * @return {Object}
+   */
   get registerUserOptions() {
+    let _dataString;
     switch (this.provider) {
       case "polar":
-        var dataString = "{member-id"+this.userId+"</member-id></register>";
+        _dataString = "{member-id"+this.userId+"</member-id></register>";
         return {
           url: "https://www.polaraccesslink.com/v3/users",
           method: "POST",
@@ -263,34 +275,32 @@ class Oauth {
             "Accept": "application/json",
             "Authorization": "Bearer "+this.accessCodeResponse["access_token"],
           },
-          body: dataString,
+          body: _dataString,
         };
-        break;
       case "wahoo":
-        var dataString = "{member-id"+this.userId+"</member-id></register>";
+        _dataString = "{member-id"+this.userId+"</member-id></register>";
         return {
-          url: "https://www.wahoo.com/v3/users",
+          url: "https://api.wahooligans.com/v3/users",
           method: "POST",
           headers: {
             "Content-Type": "application/xml",
             "Accept": "application/json",
             "Authorization": "Bearer "+this.accessCodeResponse["access_token"],
           },
-          body: dataString,
+          body: _dataString,
         };
-        break;
         default:
           this.error = true;
           this.errorMessage =
             "couldn't set register user options, invalid provider";
-          break;
+          return {};
     }
   }
+  /**
+   *
+   */
   registerWebhook() {
-
   }
-
-
 }
 
 module.exports = Oauth;
