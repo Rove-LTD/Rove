@@ -1,4 +1,4 @@
-
+/* eslint-disable max-len */
 const request = require("request");
 /**
 * Oauth is a class to help manage the communication with the various
@@ -71,7 +71,8 @@ class Oauth {
       case "polar":
         this.clientId = this.config[this.devId]["polarClientId"];
         this.clientSecret = this.config[this.devId]["polarSecret"];
-        this.callbackBaseUrl = "https://us-central1-rove-26.cloudfunctions.net/polarCallback";
+        this.callbackBaseUrl =
+          "https://us-central1-rove-26.cloudfunctions.net/polarCallback";
         this.baseUrl = "https://flow.polar.com/oauth2/authorization?";
         this.scope = "accessLink.read_all";
         this.state = this.userId+":"+this.devId;
@@ -79,7 +80,8 @@ class Oauth {
       case "wahoo":
         this.clientId = this.config[this.devId]["whaooClientId"];
         this.clientSecret = this.config[this.devId]["wahooSecret"];
-        this.callbackBaseUrl = "https://us-central1-rove-26.cloudfunctions.net/wahooCallback";
+        this.callbackBaseUrl =
+          "https://us-central1-rove-26.cloudfunctions.net/wahooCallback";
         this.scope = "email%20user_read%20workouts_read%20offline_data";
         this.state = this.userId+":"+this.devId;
         this.baseUrl = "https://api.wahooligan.com/oauth/authorize?";
@@ -87,12 +89,14 @@ class Oauth {
       case "strava":
         this.clientId = this.config[this.devId]["stravaClientId"];
         this.clientSecret = this.config[this.devId]["stravaSecret"];
-        this.callbackBaseUrl = "https://us-central1-rove-26.cloudfunctions.net/stravaCallback";
+        this.callbackBaseUrl =
+          "https://us-central1-rove-26.cloudfunctions.net/stravaCallback";
         break;
       case "garmin":
         this.oauth_consumer_key = this.config[this.devId]["oauth_consumer_key"];
         this.consumerSecret = this.config[this.devId]["consumerSecret"];
-        this.callbackBaseUrl = "https://us-central1-rove-26.cloudfunctions.net/oauthCallbackHandlerGarmin";
+        this.callbackBaseUrl =
+          "https://us-central1-rove-26.cloudfunctions.net/oauthCallbackHandlerGarmin";
         break;
       default:
         this.error = true;
@@ -128,7 +132,7 @@ class Oauth {
   * @return {void}
   */
   async getAndSaveAccessCodes() {
-    request.post(this.accessCodeOptions, async (error, response, body) => {
+    await request.post(this.accessCodeOptions, async (error, response, body) => {
       if (!error && response.statusCode == 200) {
       // this is where the tokens come back.
         this.accessCodeResponse = JSON.parse(body);
@@ -217,10 +221,10 @@ class Oauth {
     let _dataString;
     switch (this.provider) {
       case "polar":
-        _clientIdClientSecret = 
+        _clientIdClientSecret =
           this.config[this.devId]["polarClientId"]+
             ":"+this.config[this.devId]["polarSecret"];
-        _buffer = 
+        _buffer =
           new Buffer.from(_clientIdClientSecret); // eslint-disable-line
         _base64String = _buffer.toString("base64");
         _dataString = "code="+
@@ -249,14 +253,14 @@ class Oauth {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "Accept": "application/json;charset=UTF-8"
+            "Accept": "application/json;charset=UTF-8",
           },
           body: _dataString,
         };
-        default:
-          this.error = true;
-          this.errorMessage = "couldn't set secrets, invalid provider"
-          return {};
+      default:
+        this.error = true;
+        this.errorMessage = "couldn't set secrets, invalid provider";
+        return {};
     }
   }
   /**
@@ -289,11 +293,11 @@ class Oauth {
           },
           body: _dataString,
         };
-        default:
-          this.error = true;
-          this.errorMessage =
-            "couldn't set register user options, invalid provider";
-          return {};
+      default:
+        this.error = true;
+        this.errorMessage =
+          "couldn't set register user options, invalid provider";
+        return {};
     }
   }
   /**
