@@ -46,7 +46,8 @@ const db = admin.firestore();
 // tokens stored under userId
 
 exports.connectService = functions.https.onRequest(async (req, res) => {
-  // When dev calls this url with parameters: user-id, dev-id, and service to authenticate.
+  // Dev calls this service with parameters: user-id, dev-id, and service to
+  // authenticate.
   // TODO: create authorization with dev-secret keys and dev-id.
 
   // in form:  us-central1-rove.cloudfunctions.net/authenticateStrava?userId=***&devId=***&devKey=***&provider=***
@@ -428,9 +429,23 @@ function wahooOauth(req) {
   const devId = appQuery["devId"];
   const provider = appQuery["provider"];
   // add parameters from user onto the callback redirect.
-  const oauth = new Oauth(devId, userId, configurations, provider);
+  const oauth = new Oauth(devId, userId, configurations, provider, db);
   return oauth.redirectUrl;
 }
+
+exports.wahooCallback = functions.https.onRequest((req, res) => {
+  // recreate the oauth object that is managing the Oauth flow
+  data = Url.parse(req.url, true).query;
+  const oauth = new Oauth.fromCallbackData("wahoo", configurations, data, db);
+  if (oauth.status.gotCode) {
+    oauth.getAndSaveAccessCodes();
+  }
+  if (!oauth.error) {
+    res.send("your authorization was successful please close this window");
+  } else {
+    res.send(oauth.errorMessage);
+  }
+});
 
 exports.stravaWebhook = functions.https.onRequest((request, response) => {
   if (request.method === "POST") {
