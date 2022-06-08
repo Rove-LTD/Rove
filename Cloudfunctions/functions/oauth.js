@@ -133,14 +133,14 @@ class Oauth {
   * @return {Promise}
   */
   async getAndSaveAccessCodes() {
-    const response = {body: "", statusCode: 0};
+    let response = {body: "", statusCode: 0};
     try {
-      const response =
+      response =
         await got(this.accessCodeOptions).json();
     } catch (error) {
       this.error = true;
       this.errorMessage =
-        "Error: "+error;
+        "Error: "+error+
         " please close this window and try again";
       console.log(error);
       return;
@@ -150,15 +150,15 @@ class Oauth {
     // this is where the tokens come back.
       console.log("body: ", response.body);
       console.log("response: ", response);
-      this.accessCodeResponse = JSON.parse(body);
+      this.accessCodeResponse = JSON.parse(response.body);
       await this.registerUser();
       await this.storeTokens();
     } else {
       this.error = true;
       this.errorMessage =
-        "Error: "+response.statusCode+":"+body.toString()+
+        "Error: "+response.statusCode+":"+response.body+
         " please close this window and try again";
-      console.log(body);
+      console.log(response);
     }
   }
   /**
@@ -267,7 +267,7 @@ class Oauth {
           headers: {
             "Content-Type": "application/json",
             "Accept": "application/json;charset=UTF-8",
-          },          
+          },
         };
       default:
         this.error = true;
