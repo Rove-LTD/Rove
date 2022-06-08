@@ -512,14 +512,16 @@ exports.wahooWebhook = functions.https.onRequest((request, response) => {
     });
     // TODO: Send the information to an endpoint specified by the dev
     // registered to a user.
-    response.status(200).send("EVENT_RECEIVED");
+    response.status(200)
+    response.send("EVENT_RECEIVED");
   } else {
     functions.logger.info("---> Wahoo 'GET' webhook event received!", {
       query: request.query,
       body: request.body,
     });
 
-    response.status(200).send("EVENT_RECEIVED");
+    response.status(200)
+    response.send("EVENT_RECEIVED");
   }
 });
 
@@ -531,14 +533,16 @@ exports.polarWebhook = functions.https.onRequest((request, response) => {
     });
     // TODO: Send the information to an endpoint specified by the dev
     // registered to a user.
-    response.status(200).send("EVENT_RECEIVED");
+    response.status(200)
+    response.send("EVENT_RECEIVED");
   } else {
     functions.logger.info("---> Wahoo 'GET' webhook event received!", {
       query: request.query,
       body: request.body,
     });
 
-    response.status(200).send("EVENT_RECEIVED");
+    response.status(200)
+    response.send("EVENT_RECEIVED");
   }
 });
 

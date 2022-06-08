@@ -555,8 +555,8 @@ describe('ROVE Functions - Integration Tests', () => {
             }
 };
             res = {
-                send: (text)=> {assert.equal(text, "EVENT_RECIEVED")},
-                status: (code)=>{res.send(code)},
+                send: (text)=> {assert.equal(text, "EVENT_RECEIVED");},
+                status: (code)=>{assert.equal(code, 200);},
             }
 
             await myFunctions.wahooWebhook(req, res);

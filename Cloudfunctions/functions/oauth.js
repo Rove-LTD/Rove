@@ -291,11 +291,6 @@ class Oauth {
         return {};
     }
   }
-  /**
-   *
-   */
-  registerWebhook() {
-  }
 }
 
 module.exports = Oauth;
