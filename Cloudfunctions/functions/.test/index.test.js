@@ -419,6 +419,7 @@ describe('ROVE Functions - Integration Tests', () => {
             const responseObject1 = {
                 json() { return {
                     access_token: 'test-wahoo-access-token',
+                    refresh_token: 'test-wahoo-refresh-token',
                     expires_in: 21600,  
                 }
               }
@@ -440,6 +441,7 @@ describe('ROVE Functions - Integration Tests', () => {
                 strava_token_expires_in: 21600,
                 strava_connected: true,
                 wahoo_access_token: 'test-wahoo-access-token',
+                wahoo_refresh_token: 'test-wahoo-refresh-token',
                 wahoo_token_expires_in: 21600,
                 wahoo_connected: true,
             }
@@ -507,6 +509,7 @@ describe('ROVE Functions - Integration Tests', () => {
                 strava_token_expires_in: 21600,
                 strava_connected: true,
                 wahoo_access_token: 'test-wahoo-access-token',
+                wahoo_refresh_token: 'test-wahoo-refresh-token',
                 wahoo_token_expires_in: 21600,
                 wahoo_connected: true,
                 garmin_access_token: "o",
