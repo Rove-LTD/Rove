@@ -176,6 +176,7 @@ class Oauth {
         return {
           "wahoo_access_token": this.accessCodeResponse["access_token"],
           "wahoo_token_expires_in": this.accessCodeResponse["expires_in"],
+          "refresh_token": this.accessCodeResponse["refresh_token"],
           "wahoo_connected": true,
         };
       default:
