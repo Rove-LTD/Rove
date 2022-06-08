@@ -1,5 +1,6 @@
 /* eslint-disable max-len */
 const request = require("request");
+const got = require("got");
 /**
 * Oauth is a class to help manage the communication with the various
 * fitness activity providers
@@ -129,28 +130,36 @@ class Oauth {
   }
   /**
   *
-  * @return {void}
+  * @return {Promise}
   */
   async getAndSaveAccessCodes() {
-    await request.post(this.accessCodeOptions, async (error, response, body) => {
-      console.log("accessCodeOptions: ", this.accessCodeOptions);
-
-      if (!error && response.statusCode == 200) {
-      // this is where the tokens come back.
-        console.log("body: ", body);
-        console.log("response: ", response);
-        this.accessCodeResponse = JSON.parse(body);
-        await this.registerUser();
-        await this.storeTokens();
-      } else {
-        this.error = true;
-        this.errorMessage =
-          "Error: "+response.statusCode+":"+body.toString()+
-          " please close this window and try again";
-        console.log(body);
-      }
-    });
-    return;
+    const response = {};
+    try {
+    const response =
+      await got(this.accessCodeOptions).json();
+    } catch (error) {
+      this.error = true;
+      this.errorMessage =
+        "Error: "+error;
+        " please close this window and try again";
+      console.log(error);
+      return;
+    };
+    console.log("result: ", response);
+    if (response.statusCode == 200) {
+    // this is where the tokens come back.
+      console.log("body: ", response.body);
+      console.log("response: ", response);
+      this.accessCodeResponse = JSON.parse(body);
+      await this.registerUser();
+      await this.storeTokens();
+    } else {
+      this.error = true;
+      this.errorMessage =
+        "Error: "+response.statusCode+":"+body.toString()+
+        " please close this window and try again";
+      console.log(body);
+    }
   }
   /**
    *
@@ -258,7 +267,7 @@ class Oauth {
           headers: {
             "Content-Type": "application/json",
             "Accept": "application/json;charset=UTF-8",
-          },
+          },           
         };
       default:
         this.error = true;
