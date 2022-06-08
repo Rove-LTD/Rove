@@ -509,16 +509,16 @@ async function oauthCallbackHandlerGarmin(oAuthCallback, db) {
   // console.log(oauth_nonce);
   const oauthTimestamp = Math.round(new Date().getTime()/1000);
   // console.log(oauth_timestamp);
-  const consumerSecret = "ffqgs2OxeJkFHUM0c3pGysdCp1Znt0tnc2s";
   let oauthTokenSecret = oAuthCallback["oauth_token_secret"].split("-");
   const userId = oauthTokenSecret[1];
   const devId = oauthTokenSecret[2];
+  const consumerSecret = configurations[devId]["consumerSecret"];
   oauthTokenSecret = oauthTokenSecret[0];
   const parameters = {
     oauth_nonce: oauthNonce,
     oauth_verifier: oAuthCallback["oauth_verifier"],
     oauth_token: oAuthCallback["oauth_token"],
-    oauth_consumer_key: "eb0a9a22-db68-4188-a913-77ee997924a8",
+    oauth_consumer_key: configurations[devId]["oauth_consumer_key"],
     oauth_timestamp: oauthTimestamp,
     oauth_signature_method: "HMAC-SHA1",
     oauth_version: "1.0",
@@ -529,7 +529,7 @@ async function oauthCallbackHandlerGarmin(oAuthCallback, db) {
   const encodingKey = consumerSecret + "&" + oauthTokenSecret;
   const signature = crypto.createHmac("sha1", encodingKey).update(baseString).digest().toString("base64");
   const encodedSignature = encodeURIComponent(signature);
-  const url = "https://connectapi.garmin.com/oauth-service/oauth/access_token?oauth_consumer_key=eb0a9a22-db68-4188-a913-77ee997924a8&oauth_nonce="+oauthNonce.toString()+"&oauth_signature_method=HMAC-SHA1&oauth_timestamp="+oauthTimestamp.toString()+"&oauth_signature="+encodedSignature+"&oauth_verifier="+oAuthCallback["oauth_verifier"]+"&oauth_token="+oAuthCallback["oauth_token"]+"&oauth_version=1.0";
+  const url = "https://connectapi.garmin.com/oauth-service/oauth/access_token?oauth_consumer_key="+configurations[devId]["oauth_consumer_key"]+"&oauth_nonce="+oauthNonce.toString()+"&oauth_signature_method=HMAC-SHA1&oauth_timestamp="+oauthTimestamp.toString()+"&oauth_signature="+encodedSignature+"&oauth_verifier="+oAuthCallback["oauth_verifier"]+"&oauth_token="+oAuthCallback["oauth_token"]+"&oauth_version=1.0";
   const response = await got.post(url);
   console.log(response.body);
   await firestoreData(response.body, userId, devId);
