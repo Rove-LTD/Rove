@@ -504,6 +504,44 @@ exports.stravaWebhook = functions.https.onRequest((request, response) => {
   }
 });
 
+exports.wahooWebhook = functions.https.onRequest((request, response) => {
+  if (request.method === "POST") {
+    functions.logger.info("---> Wahoo 'POST' webhook event received!", {
+      query: request.query,
+      body: request.body,
+    });
+    // TODO: Send the information to an endpoint specified by the dev
+    // registered to a user.
+    response.status(200).send("EVENT_RECEIVED");
+  } else {
+    functions.logger.info("---> Wahoo 'GET' webhook event received!", {
+      query: request.query,
+      body: request.body,
+    });
+
+    response.status(200).send("EVENT_RECEIVED");
+  }
+});
+
+exports.polarWebhook = functions.https.onRequest((request, response) => {
+  if (request.method === "POST") {
+    functions.logger.info("---> Wahoo 'POST' webhook event received!", {
+      query: request.query,
+      body: request.body,
+    });
+    // TODO: Send the information to an endpoint specified by the dev
+    // registered to a user.
+    response.status(200).send("EVENT_RECEIVED");
+  } else {
+    functions.logger.info("---> Wahoo 'GET' webhook event received!", {
+      query: request.query,
+      body: request.body,
+    });
+
+    response.status(200).send("EVENT_RECEIVED");
+  }
+});
+
 async function oauthCallbackHandlerGarmin(oAuthCallback, db) {
   const oauthNonce = crypto.randomBytes(10).toString("hex");
   // console.log(oauth_nonce);

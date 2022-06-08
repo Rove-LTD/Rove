@@ -539,5 +539,26 @@ describe('ROVE Functions - Integration Tests', () => {
 
         })
     }); //End Test 5
+       //----------TEst 6---------------
+       describe("Testing that the Webhooks work: ", () => {
+        it('Webhooks should log event and repond with status 200...', async () => {
+            //set up the stubbed response to mimic polar's response when called with the
+            // set the request object with the correct provider, developerId and userId
+            const req = {
+                url: "https://us-central1-rove-26.cloudfunctions.net/wahooWebhook",
+                method: "POST",
+                body: { testfield: "this is a test",
+                verification_code: "this is a verifycode",
+            }
+};
+            res = {
+                send: (text)=> {assert.equal(text, "EVENT_RECIEVED")},
+                status: (code)=>{res.send(code)},
+            }
+
+            await myFunctions.wahooWebhook(req, res);
+
+        })
+    }); //End Test 6
 }); //end Integration TEST
 

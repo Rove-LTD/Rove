@@ -130,7 +130,7 @@ class Oauth {
   }
   /**
   *
-  * @return {Promise}
+  * @return {void}
   */
   async getAndSaveAccessCodes() {
     let response = {};
@@ -282,17 +282,7 @@ class Oauth {
           body: _dataString,
         };
       case "wahoo":
-        _dataString = "{member-id"+this.userId+"</member-id></register>";
-        return {
-          url: "https://api.wahooligans.com/v3/users",
-          method: "POST",
-          headers: {
-            "Content-Type": "application/xml",
-            "Accept": "application/json",
-            "Authorization": "Bearer "+this.accessCodeResponse["access_token"],
-          },
-          body: _dataString,
-        };
+        return {};
       default:
         this.error = true;
         this.errorMessage =
