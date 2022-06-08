@@ -133,7 +133,7 @@ class Oauth {
   * @return {Promise}
   */
   async getAndSaveAccessCodes() {
-    let response = {body: "", statusCode: 0};
+    let response = {};
     try {
       response =
         await got.post(this.accessCodeOptions).json();
@@ -145,7 +145,6 @@ class Oauth {
       console.log(error);
       return;
     }
-    console.log("response: ", response);
     this.accessCodeResponse = response;
     await this.registerUser();
     await this.storeTokens();
