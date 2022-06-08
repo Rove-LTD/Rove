@@ -534,18 +534,15 @@ async function oauthCallbackHandlerGarmin(oAuthCallback, db) {
   console.log(response.body);
   await firestoreData(response.body, userId, devId);
   async function firestoreData(data, userId, devId) {
-    data = data.split("=");
     // console.log(data);
     const garminAccessToken = (data[1].split("&"))[0];
     const garminAccessTokenSecret = data[2];
-    devId = devId.split("=")[1];
     const firestoreParameters = {
       "devId": devId,
       "garmin_access_token": garminAccessToken,
       "garmin_access_token_secret": garminAccessTokenSecret,
     };
-    userId = userId.split("=")[1];
-    await db.collection("users").doc(userId.toString()).set(firestoreParameters, {merge: true});
+    await db.collection("users").doc(userId).set(firestoreParameters, {merge: true});
     return true;
   }
 }

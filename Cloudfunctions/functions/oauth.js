@@ -136,7 +136,7 @@ class Oauth {
     let response = {body: "", statusCode: 0};
     try {
       response =
-        await got(this.accessCodeOptions).json();
+        await got.post(this.accessCodeOptions).json();
     } catch (error) {
       this.error = true;
       this.errorMessage =
@@ -147,8 +147,8 @@ class Oauth {
     }
     console.log("response: ", response);
     this.accessCodeResponse = response;
-    this.registerUser();
-    this.storeTokens();
+    await this.registerUser();
+    await this.storeTokens();
   }
   /**
    *

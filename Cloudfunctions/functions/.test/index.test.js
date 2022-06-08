@@ -25,6 +25,7 @@ const test = require('firebase-functions-test')(firebaseConfig, '.test/keys/rove
 
 const admin = require("firebase-admin");
 const request = require('request');
+const got = require('got');
 const strava = require("strava-v3");
 
 //------------------------Set Up of Test Data Project Complete ---------------//
@@ -413,18 +414,15 @@ describe('ROVE Functions - Integration Tests', () => {
 
     describe("Testing that the Wahoo callbacks work: ", () => {
         it('wahoo callback should check userId and DevId and write the access tokens to the database...', async () => {
-            //set up the stubbed response to mimic polar's response when called with the
+            //set up the stubbed response to mimic wahoo's response when called with the
             //code to get the token
             const responseObject1 = {
-                statusCode: 200,
-                headers: {
-                  'content-type': 'application/json'
+                json() { return {
+                    access_token: 'test-wahoo-access-token',
+                    expires_in: 21600,  
                 }
-              };
-            const responseBody1 = {
-                access_token: 'test-wahoo-access-token',
-                expires_in: 21600,
-              };
+              }
+            }
 
             const expectedTestUserDoc = {
                 devId: devUserData.devId,
@@ -446,10 +444,8 @@ describe('ROVE Functions - Integration Tests', () => {
                 wahoo_connected: true,
             }
 
-            const stubbedcall = sinon.stub(request, "post")
-            stubbedcall.onFirstCall().yields(null, responseObject1, JSON.stringify(responseBody1));
-
-            //sinon.stub(polar.athlete, "get").returns({id: 12345678});
+            const stubbedcall = sinon.stub(got, "post");
+            stubbedcall.onFirstCall().returns(responseObject1);
 
             // set the request object with the correct provider, developerId and userId
             const req = {url: "https://us-central1-rove-26.cloudfunctions.net/wahooCallback?state="+testUser+":"+testDev+"&code=testcode"};
@@ -467,19 +463,81 @@ describe('ROVE Functions - Integration Tests', () => {
             .get();
             // check called with the right arguments
             accessCodeOptions =  {
-                url: 'https://api.wahooligan.com/oauth/token?code=testcode&client_id=iA2JRS_dBkikcb0uEnHPtb6IDt1vDYNbityEEhp801I&client_secret=w4FvDllcO0zYrnV1-VKR-T2gJ4mYUOiFJuwx-8C-C2I&grant_type=authorization_code&redirect_uri=https://api.wahooligan.com/oauth/authorize?client_id=iA2JRS_dBkikcb0uEnHPtb6IDt1vDYNbityEEhp801I&response_type=code&redirect_uri=https://us-central1-rove-26.cloudfunctions.net/wahooCallback?state=paulsTestDevUser:paulsTestDev&scope=email%20user_read%20workouts_read%20offline_data',
+                url: 'https://api.wahooligan.com/oauth/token?code=testcode&client_id=iA2JRS_dBkikcb0uEnHPtb6IDt1vDYNbityEEhp801I&client_secret=w4FvDllcO0zYrnV1-VKR-T2gJ4mYUOiFJuwx-8C-C2I&grant_type=authorization_code&redirect_uri=https://us-central1-rove-26.cloudfunctions.net/wahooCallback?state=paulsTestDevUser:paulsTestDev',
                 method: 'POST',
                 headers: {
-                  'Content-Type': 'application/json',
-                  Accept: 'application/json;charset=UTF-8'
+                  "Content-Type": 'application/json',
+                  "Accept": 'application/json;charset=UTF-8'
                 }
               }
 
             assert.deepEqual(testUserDoc.data(), expectedTestUserDoc);
-            assert(stubbedcall.calledWith(options), "the call to wahoo had the wrong arguments");
+            assert(stubbedcall.calledWith(accessCodeOptions), "the call to wahoo had the wrong arguments");
             sinon.restore();
 
         })
     });// end Test 4
+    //----------TEst 5---------------
+    describe("Testing that the Garmin callbacks work: ", () => {
+        it('Garmin callback should check userId and DevId and write the access tokens to the database...', async () => {
+            //set up the stubbed response to mimic polar's response when called with the
+            //code to get the token
+            const responseObject1 = {
+                statusCode: 200,
+                headers: {
+                  'content-type': 'application/json'
+                },
+                body: "token=garmin-access-token&secret=garmin-test-secret",
+                expires_in: 21600,
+            };
+
+            const expectedTestUserDoc = {
+                devId: devUserData.devId,
+                email: devUserData.email,
+                strava_id: 12345678,
+                polar_access_token: 'test-polar-access-token',
+                polar_token_type: 'bearer',
+                polar_registration_date: "2011-10-14T12:50:37.000Z",
+                polar_token_expires_in: 21600,
+                polar_connected: true,
+                polar_user_id: '123456polar',
+                strava_access_token: 'test-long-access-token',
+                strava_refresh_token: 'test-refresh_token',
+                strava_token_expires_at: 1654014114,
+                strava_token_expires_in: 21600,
+                strava_connected: true,
+                wahoo_access_token: 'test-wahoo-access-token',
+                wahoo_token_expires_in: 21600,
+                wahoo_connected: true,
+                garmin_access_token: "o",
+                garmin_access_token_secret: "k",
+            }
+
+            const stubbedcall = sinon.stub(got, "post");
+            stubbedcall.onFirstCall().returns(responseObject1);
+
+            //sinon.stub(polar.athlete, "get").returns({id: 12345678});
+
+            // set the request object with the correct provider, developerId and userId
+            const req = {url: "https://us-central1-rove-26.cloudfunctions.net/wahooCallback?oauth_token_secret=testcode-"+testUser+"-"+testDev};
+            const res = {
+                send: (text) => {
+                    assert.equal(text, "THANKS, YOU CAN NOW CLOSE THIS WINDOW")
+                },
+            }
+            await myFunctions.oauthCallbackHandlerGarmin(req, res);
+
+            //now check the database was updated correctly
+            testUserDoc = await admin.firestore()
+            .collection("users")
+            .doc(testUser)
+            .get();
+            // cant check called with the right arguments as signiture is always different
+
+            assert.deepEqual(testUserDoc.data(), expectedTestUserDoc);
+            sinon.restore();
+
+        })
+    }); //End Test 5
 }); //end Integration TEST
 
