@@ -141,7 +141,7 @@ class Oauth {
         console.log("response: ", response);
         this.accessCodeResponse = JSON.parse(body);
         this.registerUser();
-        this.storeTokens();
+        await this.storeTokens();
       } else {
         this.error = true;
         this.errorMessage =

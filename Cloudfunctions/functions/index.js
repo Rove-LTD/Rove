@@ -508,11 +508,11 @@ async function oauthCallbackHandlerGarmin(oAuthCallback, db) {
   const oauthNonce = crypto.randomBytes(10).toString("hex");
   // console.log(oauth_nonce);
   const oauthTimestamp = Math.round(new Date().getTime()/1000);
-  // console.log(oauth_timestamp);
-  const consumerSecret = configurations[devId]["consumerSecret"];
   let oauthTokenSecret = oAuthCallback["oauth_token_secret"].split("-");
   const userId = oauthTokenSecret[1];
   const devId = oauthTokenSecret[2];
+  // console.log(oauth_timestamp);
+  const consumerSecret = configurations[devId]["consumerSecret"];
   oauthTokenSecret = oauthTokenSecret[0];
   const parameters = {
     oauth_nonce: oauthNonce,
