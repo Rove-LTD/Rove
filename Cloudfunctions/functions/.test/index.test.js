@@ -424,6 +424,21 @@ describe('ROVE Functions - Integration Tests', () => {
                 }
               }
             }
+            const responseObject2 = {
+                json() { return  {
+                    "id": 60462,
+                    "height": "2.0",
+                    "weight": "80.0",
+                    "first": "Bob",
+                    "last": "Smith",
+                    "email": "sample@test-domain.com",
+                    "birth": "1980-10-02",
+                    "gender": 1,
+                    "created_at": "2018-10-23T15:38:23.000Z",
+                    "updated_at": "2018-10-24T20:46:40.000Z"
+                  }
+              }
+            }
 
             const expectedTestUserDoc = {
                 devId: devUserData.devId,
@@ -443,11 +458,13 @@ describe('ROVE Functions - Integration Tests', () => {
                 wahoo_access_token: 'test-wahoo-access-token',
                 wahoo_refresh_token: 'test-wahoo-refresh-token',
                 wahoo_token_expires_in: 21600,
+                wahoo_user_id: 60462,
                 wahoo_connected: true,
             }
 
             const stubbedcall = sinon.stub(got, "post");
             stubbedcall.onFirstCall().returns(responseObject1);
+            stubbedcall.onSecondCall().returns(responseObject2);
 
             // set the request object with the correct provider, developerId and userId
             const req = {url: "https://us-central1-rove-26.cloudfunctions.net/wahooCallback?state="+testUser+":"+testDev+"&code=testcode"};
@@ -511,6 +528,7 @@ describe('ROVE Functions - Integration Tests', () => {
                 wahoo_access_token: 'test-wahoo-access-token',
                 wahoo_refresh_token: 'test-wahoo-refresh-token',
                 wahoo_token_expires_in: 21600,
+                wahoo_user_id: 60462,
                 wahoo_connected: true,
                 garmin_access_token: "o",
                 garmin_access_token_secret: "k",

@@ -192,7 +192,7 @@ class Oauth {
    */
   async registerUser() {
     // if the user needs to be registered then register them
-    if (this.devId == "polar") {
+    if (this.provider == "polar") {
       // make request to polar to register the user.
       request.post(this.registerUserOptions, async (error, response, body) => {
         if (!error && response.statusCode == 200) {
@@ -208,8 +208,27 @@ class Oauth {
           console.log("error registering polar user: "+response.statusCode);
         }
       });
-    } else if (this.devId == "wahoo") {
+    } else if (this.provider == "wahoo") {
       // do registration if needed PV TODO
+      // make request to wahoo to get the user id.
+      let response = {};
+      try {
+        response =
+          await got.post(this.registerUserOptions).json();
+      } catch (error) {
+        this.error = true;
+        this.errorMessage =
+          "Error: "+error+
+          " please close this window and try again";
+        console.log(error);
+        return;
+      }        
+      const updates = {
+        "wahoo_user_id": response["id"],
+      };
+      const userRef = this.db.collection("users").doc(this.userId);
+      await userRef.set(updates, {merge: true});
+
     }
     return;
   }
@@ -283,7 +302,14 @@ class Oauth {
           body: _dataString,
         };
       case "wahoo":
-        return {};
+        return {
+          url: "https://www.polaraccesslink.com/v3/users",
+          method: "GET",
+          headers: {
+            "Accept": "application/json",
+            "Authorization": "Bearer "+this.accessCodeResponse["access_token"],
+          },
+        };
       default:
         this.error = true;
         this.errorMessage =
