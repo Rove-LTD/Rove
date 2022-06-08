@@ -132,7 +132,7 @@ class Oauth {
   * @return {void}
   */
   async getAndSaveAccessCodes() {
-    await request.post(this.accessCodeOptions, async (error, response, body) => {
+    request.post(this.accessCodeOptions, async (error, response, body) => {
       console.log("accessCodeOptions: ", this.accessCodeOptions);
 
       if (!error && response.statusCode == 200) {
@@ -140,8 +140,8 @@ class Oauth {
         console.log("body: ", body);
         console.log("response: ", response);
         this.accessCodeResponse = JSON.parse(body);
-        await this.registerUser();
-        await this.storeTokens();
+        this.registerUser();
+        this.storeTokens();
       } else {
         this.error = true;
         this.errorMessage =
@@ -196,7 +196,7 @@ class Oauth {
     // if the user needs to be registered then register them
     if (this.devId == "polar") {
       // make request to polar to register the user.
-      await request.post(this.registerUserOptions, async (error, response, body) => {
+      request.post(this.registerUserOptions, async (error, response, body) => {
         if (!error && response.statusCode == 200) {
           const updates = {
             "polar_registration_date": JSON.parse(body)["registration-date"],
