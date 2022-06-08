@@ -214,7 +214,7 @@ class Oauth {
       let response = {};
       try {
         response =
-          await got.post(this.registerUserOptions).json();
+          await got.get(this.registerUserOptions).json();
       } catch (error) {
         this.error = true;
         this.errorMessage =
@@ -222,13 +222,12 @@ class Oauth {
           " please close this window and try again";
         console.log(error);
         return;
-      }        
+      }
       const updates = {
         "wahoo_user_id": response["id"],
       };
       const userRef = this.db.collection("users").doc(this.userId);
       await userRef.set(updates, {merge: true});
-
     }
     return;
   }
@@ -303,7 +302,7 @@ class Oauth {
         };
       case "wahoo":
         return {
-          url: "https://www.polaraccesslink.com/v3/users",
+          url: "https://api.wahooligan.com/v1/user",
           method: "GET",
           headers: {
             "Accept": "application/json",

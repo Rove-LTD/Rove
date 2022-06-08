@@ -462,9 +462,10 @@ describe('ROVE Functions - Integration Tests', () => {
                 wahoo_connected: true,
             }
 
-            const stubbedcall = sinon.stub(got, "post");
-            stubbedcall.onFirstCall().returns(responseObject1);
-            stubbedcall.onSecondCall().returns(responseObject2);
+            const stubbedpost = sinon.stub(got, "post");
+            const stubbedget = sinon.stub(got, "get");
+            stubbedpost.onFirstCall().returns(responseObject1);
+            stubbedget.onFirstCall().returns(responseObject2);
 
             // set the request object with the correct provider, developerId and userId
             const req = {url: "https://us-central1-rove-26.cloudfunctions.net/wahooCallback?state="+testUser+":"+testDev+"&code=testcode"};
@@ -491,7 +492,7 @@ describe('ROVE Functions - Integration Tests', () => {
               }
 
             assert.deepEqual(testUserDoc.data(), expectedTestUserDoc);
-            assert(stubbedcall.calledWith(accessCodeOptions), "the call to wahoo had the wrong arguments");
+            assert(stubbedpost.calledWith(accessCodeOptions), "the call to wahoo had the wrong arguments");
             sinon.restore();
 
         })
