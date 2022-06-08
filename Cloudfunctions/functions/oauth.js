@@ -145,21 +145,10 @@ class Oauth {
       console.log(error);
       return;
     }
-    console.log("result: ", response);
-    if (response.statusCode == 200) {
-    // this is where the tokens come back.
-      console.log("body: ", response.body);
-      console.log("response: ", response);
-      this.accessCodeResponse = JSON.parse(response.body);
-      await this.registerUser();
-      await this.storeTokens();
-    } else {
-      this.error = true;
-      this.errorMessage =
-        "Error: "+response.statusCode+":"+response.body+
-        " please close this window and try again";
-      console.log(response);
-    }
+    console.log("response: ", response);
+    this.accessCodeResponse = response;
+    this.registerUser();
+    this.storeTokens();
   }
   /**
    *
