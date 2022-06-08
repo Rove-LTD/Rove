@@ -133,10 +133,10 @@ class Oauth {
   * @return {Promise}
   */
   async getAndSaveAccessCodes() {
-    const response = {};
+    const response = {body: "", statusCode: 0};
     try {
-    const response =
-      await got(this.accessCodeOptions).json();
+      const response =
+        await got(this.accessCodeOptions).json();
     } catch (error) {
       this.error = true;
       this.errorMessage =
@@ -144,7 +144,7 @@ class Oauth {
         " please close this window and try again";
       console.log(error);
       return;
-    };
+    }
     console.log("result: ", response);
     if (response.statusCode == 200) {
     // this is where the tokens come back.
@@ -205,7 +205,7 @@ class Oauth {
     // if the user needs to be registered then register them
     if (this.devId == "polar") {
       // make request to polar to register the user.
-      await request.post(this.registerUserOptions, async (error, response, body) => {
+      request.post(this.registerUserOptions, async (error, response, body) => {
         if (!error && response.statusCode == 200) {
           const updates = {
             "polar_registration_date": JSON.parse(body)["registration-date"],
@@ -267,7 +267,7 @@ class Oauth {
           headers: {
             "Content-Type": "application/json",
             "Accept": "application/json;charset=UTF-8",
-          },           
+          },          
         };
       default:
         this.error = true;
