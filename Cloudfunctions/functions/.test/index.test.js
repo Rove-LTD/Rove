@@ -145,7 +145,8 @@ describe('ROVE Functions - Integration Tests', () => {
                 send: (url) => {
                     assert.include(url, "https://connect.garmin.com/oauthConfirm?oauth_token=");
                     assert.include(url, "&oauth_callback=https://us-central1-rove-26.cloudfunctions.net/oauthCallbackHandlerGarmin?oauth_token_secret=");
-                    assert.include(url, "userId="+testUser);
+                    assert.include(url, "-userId="+testUser);
+                    assert.include(url, "-devId="+testDev);
                     recievedGarminUrl = url;
                 }
             }
@@ -541,7 +542,7 @@ describe('ROVE Functions - Integration Tests', () => {
             //sinon.stub(polar.athlete, "get").returns({id: 12345678});
 
             // set the request object with the correct provider, developerId and userId
-            const req = {url: "https://us-central1-rove-26.cloudfunctions.net/wahooCallback?oauth_token_secret=testcode-"+testUser+"-"+testDev+"&oauth_verifier=test-verifyer&oauth_token=test-token"};
+            const req = {url: "https://us-central1-rove-26.cloudfunctions.net/wahooCallback?oauth_token_secret=testcode-userId="+testUser+"-devId="+testDev+"&oauth_verifier=test-verifyer&oauth_token=test-token"};
             const res = {
                 send: (text) => {
                     assert.equal(text, "THANKS, YOU CAN NOW CLOSE THIS WINDOW")

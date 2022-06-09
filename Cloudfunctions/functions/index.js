@@ -563,8 +563,8 @@ async function oauthCallbackHandlerGarmin(oAuthCallback, db) {
   const oauthTimestamp = Math.round(new Date().getTime()/1000);
   // console.log(oauth_timestamp);
   let oauthTokenSecret = oAuthCallback["oauth_token_secret"].split("-");
-  const userId = oauthTokenSecret[1];
-  const devId = oauthTokenSecret[2];
+  const userId = oauthTokenSecret[1].split("=")[1];
+  const devId = oauthTokenSecret[2].split("=")[1];
   const consumerSecret = configurations[devId]["consumerSecret"];
   oauthTokenSecret = oauthTokenSecret[0];
   const parameters = {
