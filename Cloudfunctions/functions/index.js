@@ -495,6 +495,10 @@ exports.stravaWebhook = functions.https.onRequest(async (request, response) => {
     const sanitisedActivity = filters.stravaSanitise([activity]);
     console.log(sanitisedActivity);
     // TODO: Send the information to an endpoint specified by the dev registered to a user.
+    const ref = admin.database().ref("activities");
+    const childRef = ref.push();
+    childRef.set(sanitisedActivity[0]);
+    response.status(200).send("OK!");
     response.status(200).send("EVENT_RECEIVED");
   } else if (request.method === "GET") {
     const VERIFY_TOKEN = "STRAVA";
