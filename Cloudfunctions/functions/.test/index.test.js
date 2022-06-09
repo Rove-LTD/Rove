@@ -532,8 +532,8 @@ describe('ROVE Functions - Integration Tests', () => {
                 wahoo_token_expires_in: 21600,
                 wahoo_user_id: 60462,
                 wahoo_connected: true,
-                garmin_access_token: "o",
-                garmin_access_token_secret: "k",
+                garmin_access_token: "garmin-access-token",
+                garmin_access_token_secret: "garmin-test-secret",
             }
 
             const stubbedcall = sinon.stub(got, "post");
