@@ -32,7 +32,7 @@ const strava = require("strava-v3");
 
 describe('ROVE Functions - Integration Tests', () => {
     let myFunctions;
-    let testUser = "paulsTestDevUser";
+    let testUser = "paulsTestDevSecondUser";
     let testDev = "paulsTestDev";
     let devTestData = {email: "paul.testDev@gmail.com", devKey: "test-key"};
     let devUserData = {devId: testDev, email: "paul.userTest@gmail.com"};
@@ -159,7 +159,7 @@ describe('ROVE Functions - Integration Tests', () => {
             // set the assertions for the expected response object
             const res = {
                 send: (url) => {
-                    assert.equal(url, "https://flow.polar.com/oauth2/authorization?client_id=654623e7-7191-4cfe-aab5-0bc24785fdee&response_type=code&redirect_uri=https://us-central1-rove-26.cloudfunctions.net/polarCallback&scope=accesslink.read_all&state=paulsTestDevUser:paulsTestDev");
+                    assert.equal(url, "https://flow.polar.com/oauth2/authorization?client_id=654623e7-7191-4cfe-aab5-0bc24785fdee&response_type=code&redirect_uri=https://us-central1-rove-26.cloudfunctions.net/polarCallback&scope=accesslink.read_all&state="+testUser+":"+testDev);
                     recievedPolarUrl = url;
                 }
             }
@@ -483,7 +483,7 @@ describe('ROVE Functions - Integration Tests', () => {
             .get();
             // check called with the right arguments
             accessCodeOptions =  {
-                url: 'https://api.wahooligan.com/oauth/token?code=testcode&client_id=iA2JRS_dBkikcb0uEnHPtb6IDt1vDYNbityEEhp801I&client_secret=w4FvDllcO0zYrnV1-VKR-T2gJ4mYUOiFJuwx-8C-C2I&grant_type=authorization_code&redirect_uri=https://us-central1-rove-26.cloudfunctions.net/wahooCallback?state=paulsTestDevUser:paulsTestDev',
+                url: 'https://api.wahooligan.com/oauth/token?code=testcode&client_id=iA2JRS_dBkikcb0uEnHPtb6IDt1vDYNbityEEhp801I&client_secret=w4FvDllcO0zYrnV1-VKR-T2gJ4mYUOiFJuwx-8C-C2I&grant_type=authorization_code&redirect_uri=https://us-central1-rove-26.cloudfunctions.net/wahooCallback?state='+testUser+':'+testDev,
                 method: 'POST',
                 headers: {
                   "Content-Type": 'application/json',
