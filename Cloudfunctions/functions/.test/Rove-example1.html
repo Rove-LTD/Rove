@@ -1,0 +1,29 @@
+<h5>Sign in with Polar!</h5>
+<input type="submit" value="Start" onclick="signUpWith('polar')">
+<h5>Sign in with Wahoo!</h5>
+<input type="submit" value="Start" onclick="signUpWith('wahoo')">
+<h5>Sign in with strava!</h5>
+<input type="submit" value="Start" onclick="signUpWith('strava')">
+<h5>Sign in with garmin!</h5>
+<input type="submit" value="Start" onclick="signUpWith('garmin')">
+<h5>Error Message</h5>
+<body error>errorMessage goes here</body>
+
+<script type="text/javascript">
+	const testDev = "paulsTestDev";
+	const testUser = "newpaulsTestDevUser";
+    function signUpWith(provider) {
+    	fetch('https://us-central1-rove-26.cloudfunctions.net/connectService?userId='+testUser+'&devId='+testDev+'&devKey=test-key&provider='+provider)
+  		.then(response => {
+
+				return response.text()
+			})
+  		.then(data=>{
+				if (data.includes("error:")) {
+					alert(data);
+				} else {
+				 window.location.href = data
+				}
+			});
+    }
+</script>

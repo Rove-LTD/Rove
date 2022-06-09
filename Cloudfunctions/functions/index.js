@@ -1,6 +1,9 @@
-/* eslint-disable guard-for-in */
 /* eslint-disable require-jsdoc */
 /* eslint-disable max-len */
+/**
+ * Index.js contains the main functions and callbacks for Oauth
+ * and webHook management
+ */
 const functions = require("firebase-functions");
 // The Firebase Admin SDK to access Firestore.
 const admin = require("firebase-admin");
@@ -10,16 +13,21 @@ const encodeparams = require("./encodeparams");
 const got = require("got");
 const request = require("request");
 const strava = require("strava-v3");
+const Oauth = require("./oauth");
+
 const filters = require("./data-filter");
 const contentsOfDotEnvFile = { // convert to using a .env file for this or secrets
   "config": {
     "paulsTestDev": {
-      "clientId": 72486,
-      "client_secret": "b0d500111e3d1774903da1f067b5b7adf38ca726",
+      "stravaClientId": 72486,
+      "stravaClientSecret": "b0d500111e3d1774903da1f067b5b7adf38ca726",
       "consumerSecret": "ffqgs2OxeJkFHUM0c3pGysdCp1Znt0tnc2s",
       "oauth_consumer_key": "eb0a9a22-db68-4188-a913-77ee997924a8",
       "polarClientId": "654623e7-7191-4cfe-aab5-0bc24785fdee",
-      "polarSecret": "cd23b05a-1132-434b-ab75-93854d823fab",
+      "polarSecret": "f797c0e1-a39d-4b48-a2d9-89c2baea9005",
+      "whaooClientId": "iA2JRS_dBkikcb0uEnHPtb6IDt1vDYNbityEEhp801I",
+      "wahooSecret": "w4FvDllcO0zYrnV1-VKR-T2gJ4mYUOiFJuwx-8C-C2I",
+      "wahooWebhookToken": "97661c16-6359-4854-9498-a49c07b6ec11",
     },
     "anotherDeveloper": {
       "clientId": "a different id",
@@ -29,10 +37,12 @@ const contentsOfDotEnvFile = { // convert to using a .env file for this or secre
 };
 
 const configurations = contentsOfDotEnvFile["config"];
-// change to configurations = process.env["config"] when environment variables set up properly
+// change to configurations = process.env["config"] when environment variables
+// set up properly
 
 admin.initializeApp();
 const db = admin.firestore();
+const oauth = new Oauth(configurations, db);
 
 // INTEGRATION FOR APP:
 // get url response and go through onboarding flow.
@@ -40,10 +50,12 @@ const db = admin.firestore();
 // tokens stored under userId
 
 exports.connectService = functions.https.onRequest(async (req, res) => {
-  // When dev calls this url with parameters: user-id, dev-id, and service to authenticate.
+  // Dev calls this service with parameters: user-id, dev-id, and service to
+  // authenticate.
   // TODO: create authorization with dev-secret keys and dev-id.
 
-  // in form:  us-central1-rove.cloudfunctions.net/authenticateStrava?userId=***&devId=***&devKey=***&provider=***
+  // in form:  us-central1-rove.cloudfunctions.net/authenticateStrava?
+  // userId=***&devId=***&devKey=***&provider=***
   const provider = (Url.parse(req.url, true).query)["provider"];
   const devId = (Url.parse(req.url, true).query)["devId"];
   const userId = (Url.parse(req.url, true).query)["userId"];
@@ -60,12 +72,14 @@ exports.connectService = functions.https.onRequest(async (req, res) => {
         .get();
 
     if (!devDoc.exists) {
-      url = "error: the developerId was badly formatted, missing or not authorised";
+      url =
+        "error: the developerId was badly formatted, missing or not authorised";
       res.send(url);
       return;
     }
     if (devDoc.data().devKey != devKey|| devKey == null) {
-      url = "error: the developerId was badly formatted, missing or not authorised";
+      url =
+        "error: the developerId was badly formatted, missing or not authorised";
       res.send(url);
       return;
     }
@@ -91,6 +105,8 @@ exports.connectService = functions.https.onRequest(async (req, res) => {
     url = await garminOauth(req);
   } else if (provider == "polar") {
     url = await polarOauth(req);
+  } else if (provider == "wahoo") {
+    url = await wahooOauth(req);
   } else {
     // the request was badly formatted with incorrect provider parameter
     url = "error: the provider was badly formatted, missing or not supported";
@@ -100,28 +116,31 @@ exports.connectService = functions.https.onRequest(async (req, res) => {
   return;
 });
 
-exports.oauthCallbackHandlerGarmin = functions.https.onRequest(async (req, res) => {
-  const oAuthCallback = Url.parse(req.url, true).query;
-  await oauthCallbackHandlerGarmin(oAuthCallback, db);
-  res.send("THANKS, YOU CAN NOW CLOSE THIS WINDOW");
-}),
+exports.oauthCallbackHandlerGarmin = functions.https
+    .onRequest(async (req, res) => {
+      const oAuthCallback = Url.parse(req.url, true).query;
+      await oauthCallbackHandlerGarmin(oAuthCallback, db);
+      res.send("THANKS, YOU CAN NOW CLOSE THIS WINDOW");
+    }),
 
 // callback from strava with token in
 exports.stravaCallback = functions.https.onRequest(async (req, res) => {
   // this comes from strava
   // create authorization for user completing oAuth flow.
-  const oAuthCallback = (Url.parse(req.url, true).query)["userId"].split(":"); // little bit jank.
+  const oAuthCallback = (Url.parse(req.url, true).query)["userId"].split(":");
   const code = (Url.parse(req.url, true).query)["code"];
   const userId = oAuthCallback[0];
   const devId = oAuthCallback[1];
   if (userId == null || devId == null || code == null) {
-    res.send("Error: missing userId of DevId in callback: an unexpected error has occurred please close this window and try again");
+    res.send(
+        "Error: missing userId of DevId in callback: an unexpected "+
+        "error has occurred please close this window and try again");
     return;
   }
   const dataString = "client_id="+
-    configurations[devId]["clientId"]+
+    configurations[devId]["stravaClientId"]+
     "&client_secret="+
-    configurations[devId]["client_secret"]+
+    configurations[devId]["stravaClientSecret"]+
     "&code="+
     code+
     "&grant_type=authorization_code";
@@ -142,7 +161,8 @@ exports.stravaCallback = functions.https.onRequest(async (req, res) => {
       // userResponse = "Some good redirect.";
       res.send("your authorization was successful please close this window");
     } else {
-      res.send("Error: "+response.statusCode+" please close this window and try again");
+      res.send("Error: "+response.statusCode+
+        " please close this window and try again");
       console.log(JSON.parse(body));
       // send an error response to dev.
       // TODO: create dev fail post.
@@ -159,7 +179,8 @@ exports.garminWebhook = functions.https.onRequest(async (req, res) => {
     });
     // get userbased on userid. (.where("id" == request.body.id)).
     // TODO: Get strava activity and sanatize
-    // TODO: Send the information to an endpoint specified by the dev registered to a user.
+    // TODO: Send the information to an endpoint specified by the dev
+    // registered to a user.
     res.status(200).send("EVENT_RECEIVED");
   } else if (req.method === "GET") {
     console.log("garmin not authorized");
@@ -187,8 +208,8 @@ async function stravaStoreTokens(userId, devId, data, db) {
 async function getStravaAthleteId(userId, devId, data, db) {
   // get athlete id from strava.
   strava.config({
-    "client_id": configurations[devId]["clientId"],
-    "client_secret": configurations[devId]["client_secret"],
+    "client_id": configurations[devId]["stravaClientId"],
+    "client_secret": configurations[devId]["stravaClientSecret"],
     "redirect_uri": "https://us-central1-rove-26.cloudfunctions.net/stravaCallback",
   });
   const parameters = {
@@ -207,21 +228,26 @@ function stravaOauth(req) {
   const devId = appQuery["devId"];
   // add parameters from user onto the callback redirect.
   const parameters = {
-    client_id: configurations[devId]["clientId"],
+    client_id: configurations[devId]["stravaClientId"],
     response_type: "code",
-    redirect_uri: "https://us-central1-rove-26.cloudfunctions.net/stravaCallback?userId="+userId + ":" + devId,
+    redirect_uri: "https://us-central1-rove-26.cloudfunctions.net/stravaCallback?userId="+
+      userId+
+      ":"+
+      devId,
     approval_prompt: "force",
     scope: "profile:read_all,activity:read_all",
   };
   let encodedParameters = "";
   let k = 0;
   for (k in parameters) {
-    const encodedValue = parameters[k];
-    const encodedKey = k;
-    if (encodedParameters === "") {
-      encodedParameters += `${encodedKey}=${encodedValue}`;
-    } else {
-      encodedParameters += `&${encodedKey}=${encodedValue}`;
+    if (parameters[k] != null) {
+      const encodedValue = parameters[k];
+      const encodedKey = k;
+      if (encodedParameters === "") {
+        encodedParameters += `${encodedKey}=${encodedValue}`;
+      } else {
+        encodedParameters += `&${encodedKey}=${encodedValue}`;
+      }
     }
   }
   const baseUrl = "https://www.strava.com/oauth/authorize?";
@@ -244,12 +270,16 @@ async function garminOauth(req) {
     oauth_version: "1.0",
   };
   const encodedParameters = encodeparams.collectParams(parameters);
-  const baseUrl = "https://connectapi.garmin.com/oauth-service/oauth/request_token";
-  const baseString = encodeparams.baseStringGen(encodedParameters, "GET", baseUrl);
+  const baseUrl =
+    "https://connectapi.garmin.com/oauth-service/oauth/request_token";
+  const baseString = encodeparams
+      .baseStringGen(encodedParameters, "GET", baseUrl);
   const encodingKey = consumerSecret + "&";
-  const signature = crypto.createHmac("sha1", encodingKey).update(baseString).digest().toString("base64");
+  const signature = crypto.createHmac("sha1", encodingKey)
+      .update(baseString).digest().toString("base64");
   const encodedSignature = encodeURIComponent(signature);
-  const url = "https://connectapi.garmin.com/oauth-service/oauth/request_token?oauth_consumer_key="+
+  const url =
+    "https://connectapi.garmin.com/oauth-service/oauth/request_token?oauth_consumer_key="+
     configurations[devId]["oauth_consumer_key"]+
     "&oauth_nonce="+
     oauthNonce.toString()+
@@ -296,12 +326,14 @@ function polarOauth(req) {
   let encodedParameters = "";
   let k = 0;
   for (k in parameters) {
-    const encodedValue = parameters[k];
-    const encodedKey = k;
-    if (encodedParameters === "") {
-      encodedParameters += `${encodedKey}=${encodedValue}`;
-    } else {
-      encodedParameters += `&${encodedKey}=${encodedValue}`;
+    if (parameters[k] != null) {
+      const encodedValue = parameters[k];
+      const encodedKey = k;
+      if (encodedParameters === "") {
+        encodedParameters += `${encodedKey}=${encodedValue}`;
+      } else {
+        encodedParameters += `&${encodedKey}=${encodedValue}`;
+      }
     }
   }
   const baseUrl = "https://flow.polar.com/oauth2/authorization?";
@@ -414,6 +446,31 @@ async function polarStoreTokens(userId, devId, data, db) {
   return;
 }
 
+function wahooOauth(req) {
+  const appQuery = Url.parse(req.url, true).query;
+  const userId = appQuery["userId"];
+  const devId = appQuery["devId"];
+  const provider = appQuery["provider"];
+  // add parameters from user onto the callback redirect.
+  oauth.setProvider(devId, userId, provider);
+  return oauth.redirectUrl;
+}
+
+exports.wahooCallback = functions.https.onRequest(async (req, res) => {
+  // recreate the oauth object that is managing the Oauth flow
+  console.log(req.url);
+  const data = Url.parse(req.url, true).query;
+  oauth.fromCallbackData("wahoo", data);
+  if (oauth.status.gotCode) {
+    await oauth.getAndSaveAccessCodes();
+  }
+  if (!oauth.error) {
+    res.send("your authorization was successful please close this window");
+  } else {
+    res.send(oauth.errorMessage);
+  }
+});
+
 exports.stravaWebhook = functions.https.onRequest(async (request, response) => {
   if (request.method === "POST") {
     functions.logger.info("webhook event received!", {
@@ -458,15 +515,57 @@ exports.stravaWebhook = functions.https.onRequest(async (request, response) => {
   }
 });
 
+exports.wahooWebhook = functions.https.onRequest((request, response) => {
+  if (request.method === "POST") {
+    functions.logger.info("---> Wahoo 'POST' webhook event received!", {
+      query: request.query,
+      body: request.body,
+    });
+    // TODO: Send the information to an endpoint specified by the dev
+    // registered to a user.
+    response.status(200);
+    response.send("EVENT_RECEIVED");
+  } else {
+    functions.logger.info("---> Wahoo 'GET' webhook event received!", {
+      query: request.query,
+      body: request.body,
+    });
+
+    response.status(200);
+    response.send("EVENT_RECEIVED");
+  }
+});
+
+exports.polarWebhook = functions.https.onRequest((request, response) => {
+  if (request.method === "POST") {
+    functions.logger.info("---> Wahoo 'POST' webhook event received!", {
+      query: request.query,
+      body: request.body,
+    });
+    // TODO: Send the information to an endpoint specified by the dev
+    // registered to a user.
+    response.status(200);
+    response.send("EVENT_RECEIVED");
+  } else {
+    functions.logger.info("---> Wahoo 'GET' webhook event received!", {
+      query: request.query,
+      body: request.body,
+    });
+
+    response.status(200);
+    response.send("EVENT_RECEIVED");
+  }
+});
+
 async function oauthCallbackHandlerGarmin(oAuthCallback, db) {
   const oauthNonce = crypto.randomBytes(10).toString("hex");
   // console.log(oauth_nonce);
   const oauthTimestamp = Math.round(new Date().getTime()/1000);
   // console.log(oauth_timestamp);
-  const consumerSecret = configurations[devId]["consumerSecret"];
   let oauthTokenSecret = oAuthCallback["oauth_token_secret"].split("-");
   const userId = oauthTokenSecret[1];
   const devId = oauthTokenSecret[2];
+  const consumerSecret = configurations[devId]["consumerSecret"];
   oauthTokenSecret = oauthTokenSecret[0];
   const parameters = {
     oauth_nonce: oauthNonce,
@@ -483,34 +582,20 @@ async function oauthCallbackHandlerGarmin(oAuthCallback, db) {
   const encodingKey = consumerSecret + "&" + oauthTokenSecret;
   const signature = crypto.createHmac("sha1", encodingKey).update(baseString).digest().toString("base64");
   const encodedSignature = encodeURIComponent(signature);
-  const url = "https://connectapi.garmin.com/oauth-service/oauth/access_token?oauth_consumer_key="+
-    configurations[devId]["oauth_consumer_key"]+
-    "&oauth_nonce="+
-    oauthNonce.toString()+
-    "&oauth_signature_method=HMAC-SHA1&oauth_timestamp="+
-    oauthTimestamp.toString()+
-    "&oauth_signature="+encodedSignature+
-    "&oauth_verifier="+
-    oAuthCallback["oauth_verifier"]+
-    "&oauth_token="+
-    oAuthCallback["oauth_token"]+
-    "&oauth_version=1.0";
+  const url = "https://connectapi.garmin.com/oauth-service/oauth/access_token?oauth_consumer_key="+configurations[devId]["oauth_consumer_key"]+"&oauth_nonce="+oauthNonce.toString()+"&oauth_signature_method=HMAC-SHA1&oauth_timestamp="+oauthTimestamp.toString()+"&oauth_signature="+encodedSignature+"&oauth_verifier="+oAuthCallback["oauth_verifier"]+"&oauth_token="+oAuthCallback["oauth_token"]+"&oauth_version=1.0";
   const response = await got.post(url);
   console.log(response.body);
   await firestoreData(response.body, userId, devId);
   async function firestoreData(data, userId, devId) {
-    data = data.split("=");
     // console.log(data);
     const garminAccessToken = (data[1].split("&"))[0];
     const garminAccessTokenSecret = data[2];
-    devId = devId.split("=")[1];
     const firestoreParameters = {
       "devId": devId,
       "garmin_access_token": garminAccessToken,
       "garmin_access_token_secret": garminAccessTokenSecret,
     };
-    userId = userId.split("=")[1];
-    await db.collection("users").doc(userId.toString()).set(firestoreParameters, {merge: true});
+    await db.collection("users").doc(userId).set(firestoreParameters, {merge: true});
     return true;
   }
 }

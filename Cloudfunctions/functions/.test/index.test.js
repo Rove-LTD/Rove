@@ -25,6 +25,7 @@ const test = require('firebase-functions-test')(firebaseConfig, '.test/keys/rove
 
 const admin = require("firebase-admin");
 const request = require('request');
+const got = require('got');
 const strava = require("strava-v3");
 
 //------------------------Set Up of Test Data Project Complete ---------------//
@@ -63,6 +64,7 @@ describe('ROVE Functions - Integration Tests', () => {
     after(async () => {
         // Do cleanup tasks.
         // TODO: PV delete the test developer data
+        await sinon.restore();
         test.cleanup();
     }); //end after
 
@@ -84,7 +86,7 @@ describe('ROVE Functions - Integration Tests', () => {
 
         it("Should get an error if the devID is not correctly formatted or missing", async () => {
             // set the request object with the correct provider, incorrect developerId and correct userId
-            const req = {url: 'https//test.com/?devId='+"incorrectDev"+'&userId='+testUser+'&provider=strava'};
+            const req = {url: 'https//test.com/?devId='+"incorrectDev"+'&userId='+testUser+'&provider=wahoo'};
             // set the assertions for the expected response object
             const res = {
                 send: (url) => {
@@ -97,7 +99,7 @@ describe('ROVE Functions - Integration Tests', () => {
 
         it("Should get an error if the developer is not correctly authorised", async () => {
             // set the request object with the correct provider, developerId and userId
-            const req = {url: 'https//test.com/?devId='+testDev+'&userId='+testUser+'&devKey=wrong-key&provider=strava'};
+            const req = {url: 'https//test.com/?devId='+testDev+'&userId='+testUser+'&devKey=wrong-key&provider=wahoo'};
             // set the assertions for the expected response object
             const res = {
                 send: (url) => {
@@ -110,7 +112,7 @@ describe('ROVE Functions - Integration Tests', () => {
 
         it("Should get an error if the userId is not provided", async () => {
             // set the request object with the correct provider, developerId and userId
-            const req = {url: 'https//test.com/?devId='+testDev+'&devKey=test-key&provider=strava'};
+            const req = {url: 'https//test.com/?devId='+testDev+'&devKey=test-key&provider=wahoo'};
             // set the assertions for the expected response object
             const res = {
                 send: (url) => {
@@ -166,6 +168,24 @@ describe('ROVE Functions - Integration Tests', () => {
 
         })
 
+        it('should get a properly formatted wahoo redirect url...', async () => {
+            // set the request object with the correct provider, developerId and userId
+            const req = {url: 'https//test.com/?devId='+testDev+'&userId='+testUser+'&devKey=test-key&provider=wahoo'};
+            // set the assertions for the expected response object
+            const res = {
+                send: (url) => {
+                    assert.include(url, "https://api.wahooligan.com/oauth/authorize?");
+                    assert.include(url, "client_id=iA2JRS_dBkikcb0uEnHPtb6IDt1vDYNbityEEhp801I");
+                    assert.include(url, "&redirect_uri=https://us-central1-rove-26.cloudfunctions.net/wahooCallback?state=");
+                    assert.include(url, "state="+testUser+":"+testDev);
+                }
+            }
+
+            await myFunctions.connectService(req, res);
+
+        })
+
+
     }); // End TEST 1------ test connectService() ------------
 
     //-------------TEST 2--- Test Callbacks from Strava-------
@@ -196,8 +216,8 @@ describe('ROVE Functions - Integration Tests', () => {
                 strava_token_expires_in: 21600,
                 strava_connected: true,
             }
-
-            sinon.stub(request, "post").yields(null, responseObject, JSON.stringify(responseBody));
+            const stubbedcall = sinon.stub(request, "post");
+            stubbedcall.yields(null, responseObject, JSON.stringify(responseBody));
             sinon.stub(strava.athlete, "get").returns({id: 12345678});
 
             // set the request object with the correct provider, developerId and userId
@@ -217,13 +237,13 @@ describe('ROVE Functions - Integration Tests', () => {
 
             assert.deepEqual(testUserDoc.data(), expectedTestUserDoc);
 
-            sinon.restore();
+            await sinon.restore();
 
         })
     });//End TEST 2--- Test Callbacks for Strava--------------
 
     //-------------TEST 2--- Test Callbacks for Polar-------
-    describe("Testing that the polar callbacks work: ", () => {
+    describe("Testing the polar callback...", async () => {
         it('polar callback should report error if user already registered', async () => {
             //set up the stubbed response to mimic polar's response when called with the
             //code to get the token
@@ -263,10 +283,29 @@ describe('ROVE Functions - Integration Tests', () => {
                 strava_connected: true,
             }
 
+            const clientIdClientSecret =
+                "654623e7-7191-4cfe-aab5-0bc24785fdee"+
+                ":"+
+                "f797c0e1-a39d-4b48-a2d9-89c2baea9005";
+            const buffer = new Buffer.from(clientIdClientSecret); // eslint-disable-line
+            const base64String = buffer.toString("base64");
+            const dataString = "code=testcode"+
+            "&grant_type=authorization_code"+
+            "&redirect_uri=https://us-central1-rove-26.cloudfunctions.net/polarCallback";
+            options = {
+                url: "https://polarremote.com/v2/oauth2/token",
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/x-www-form-urlencoded",
+                  "Accept": "application/json;charset=UTF-8",
+                  "Authorization": "Basic "+base64String,
+                },
+                body: dataString,
+              };
+
             const stubbedcall = sinon.stub(request, "post")
             stubbedcall.onFirstCall().yields(null, responseObject1, JSON.stringify(responseBody1));
             stubbedcall.onSecondCall().yields(null, responseObject2, JSON.stringify(responseBody2));
-            //sinon.stub(polar.athlete, "get").returns({id: 12345678});
 
             // set the request object with the correct provider, developerId and userId
             const req = {url: "https://us-central1-rove-26.cloudfunctions.net/polarCallback?state="+testUser+":"+testDev+"&code=testcode"};
@@ -284,6 +323,7 @@ describe('ROVE Functions - Integration Tests', () => {
             .get();
 
             assert.deepEqual(testUserDoc.data(), expectedTestUserDoc);
+            assert(stubbedcall.calledWith(options), "the call to polar had the wrong arguments");
 
             await sinon.restore();
 
@@ -348,7 +388,6 @@ describe('ROVE Functions - Integration Tests', () => {
             const stubbedcall = sinon.stub(request, "post")
             stubbedcall.onFirstCall().yields(null, responseObject1, JSON.stringify(responseBody1));
             stubbedcall.onSecondCall().yields(null, responseObject2, JSON.stringify(responseBody2));
-            //sinon.stub(polar.athlete, "get").returns({id: 12345678});
 
             // set the request object with the correct provider, developerId and userId
             const req = {url: "https://us-central1-rove-26.cloudfunctions.net/polarCallback?state="+testUser+":"+testDev+"&code=testcode"};
@@ -370,7 +409,178 @@ describe('ROVE Functions - Integration Tests', () => {
             await sinon.restore();
 
         })
-    });//End TEST 2--- Test Callbacks for Polar--------------
+    });// end Test 3
+    //---------TEST 4 ------------
 
+    describe("Testing that the Wahoo callbacks work: ", () => {
+        it('wahoo callback should check userId and DevId and write the access tokens to the database...', async () => {
+            //set up the stubbed response to mimic wahoo's response when called with the
+            //code to get the token
+            const responseObject1 = {
+                json() { return {
+                    access_token: 'test-wahoo-access-token',
+                    refresh_token: 'test-wahoo-refresh-token',
+                    expires_in: 21600,  
+                }
+              }
+            }
+            const responseObject2 = {
+                json() { return  {
+                    "id": 60462,
+                    "height": "2.0",
+                    "weight": "80.0",
+                    "first": "Bob",
+                    "last": "Smith",
+                    "email": "sample@test-domain.com",
+                    "birth": "1980-10-02",
+                    "gender": 1,
+                    "created_at": "2018-10-23T15:38:23.000Z",
+                    "updated_at": "2018-10-24T20:46:40.000Z"
+                  }
+              }
+            }
+
+            const expectedTestUserDoc = {
+                devId: devUserData.devId,
+                email: devUserData.email,
+                strava_id: 12345678,
+                polar_access_token: 'test-polar-access-token',
+                polar_token_type: 'bearer',
+                polar_registration_date: "2011-10-14T12:50:37.000Z",
+                polar_token_expires_in: 21600,
+                polar_connected: true,
+                polar_user_id: '123456polar',
+                strava_access_token: 'test-long-access-token',
+                strava_refresh_token: 'test-refresh_token',
+                strava_token_expires_at: 1654014114,
+                strava_token_expires_in: 21600,
+                strava_connected: true,
+                wahoo_access_token: 'test-wahoo-access-token',
+                wahoo_refresh_token: 'test-wahoo-refresh-token',
+                wahoo_token_expires_in: 21600,
+                wahoo_user_id: 60462,
+                wahoo_connected: true,
+            }
+
+            const stubbedpost = sinon.stub(got, "post");
+            const stubbedget = sinon.stub(got, "get");
+            stubbedpost.onFirstCall().returns(responseObject1);
+            stubbedget.onFirstCall().returns(responseObject2);
+
+            // set the request object with the correct provider, developerId and userId
+            const req = {url: "https://us-central1-rove-26.cloudfunctions.net/wahooCallback?state="+testUser+":"+testDev+"&code=testcode"};
+            const res = {
+                send: (text) => {
+                    assert.equal(text, "your authorization was successful please close this window")
+                },
+            }
+            await myFunctions.wahooCallback(req, res);
+
+            //now check the database was updated correctly
+            testUserDoc = await admin.firestore()
+            .collection("users")
+            .doc(testUser)
+            .get();
+            // check called with the right arguments
+            accessCodeOptions =  {
+                url: 'https://api.wahooligan.com/oauth/token?code=testcode&client_id=iA2JRS_dBkikcb0uEnHPtb6IDt1vDYNbityEEhp801I&client_secret=w4FvDllcO0zYrnV1-VKR-T2gJ4mYUOiFJuwx-8C-C2I&grant_type=authorization_code&redirect_uri=https://us-central1-rove-26.cloudfunctions.net/wahooCallback?state=paulsTestDevUser:paulsTestDev',
+                method: 'POST',
+                headers: {
+                  "Content-Type": 'application/json',
+                  "Accept": 'application/json;charset=UTF-8'
+                }
+              }
+
+            assert.deepEqual(testUserDoc.data(), expectedTestUserDoc);
+            assert(stubbedpost.calledWith(accessCodeOptions), "the call to wahoo had the wrong arguments");
+            sinon.restore();
+
+        })
+    });// end Test 4
+    //----------TEst 5---------------
+    describe("Testing that the Garmin callbacks work: ", () => {
+        it('Garmin callback should check userId and DevId and write the access tokens to the database...', async () => {
+            //set up the stubbed response to mimic polar's response when called with the
+            //code to get the token
+            const responseObject1 = {
+                statusCode: 200,
+                headers: {
+                  'content-type': 'application/json'
+                },
+                body: "token=garmin-access-token&secret=garmin-test-secret",
+                expires_in: 21600,
+            };
+
+            const expectedTestUserDoc = {
+                devId: devUserData.devId,
+                email: devUserData.email,
+                strava_id: 12345678,
+                polar_access_token: 'test-polar-access-token',
+                polar_token_type: 'bearer',
+                polar_registration_date: "2011-10-14T12:50:37.000Z",
+                polar_token_expires_in: 21600,
+                polar_connected: true,
+                polar_user_id: '123456polar',
+                strava_access_token: 'test-long-access-token',
+                strava_refresh_token: 'test-refresh_token',
+                strava_token_expires_at: 1654014114,
+                strava_token_expires_in: 21600,
+                strava_connected: true,
+                wahoo_access_token: 'test-wahoo-access-token',
+                wahoo_refresh_token: 'test-wahoo-refresh-token',
+                wahoo_token_expires_in: 21600,
+                wahoo_user_id: 60462,
+                wahoo_connected: true,
+                garmin_access_token: "o",
+                garmin_access_token_secret: "k",
+            }
+
+            const stubbedcall = sinon.stub(got, "post");
+            stubbedcall.onFirstCall().returns(responseObject1);
+
+            //sinon.stub(polar.athlete, "get").returns({id: 12345678});
+
+            // set the request object with the correct provider, developerId and userId
+            const req = {url: "https://us-central1-rove-26.cloudfunctions.net/wahooCallback?oauth_token_secret=testcode-"+testUser+"-"+testDev+"&oauth_verifier=test-verifyer&oauth_token=test-token"};
+            const res = {
+                send: (text) => {
+                    assert.equal(text, "THANKS, YOU CAN NOW CLOSE THIS WINDOW")
+                },
+            }
+            await myFunctions.oauthCallbackHandlerGarmin(req, res);
+
+            //now check the database was updated correctly
+            testUserDoc = await admin.firestore()
+            .collection("users")
+            .doc(testUser)
+            .get();
+            // cant check called with the right arguments as signiture is always different
+
+            assert.deepEqual(testUserDoc.data(), expectedTestUserDoc);
+            sinon.restore();
+
+        })
+    }); //End Test 5
+       //----------TEst 6---------------
+       describe("Testing that the Webhooks work: ", () => {
+        it('Webhooks should log event and repond with status 200...', async () => {
+            //set up the stubbed response to mimic polar's response when called with the
+            // set the request object with the correct provider, developerId and userId
+            const req = {
+                url: "https://us-central1-rove-26.cloudfunctions.net/wahooWebhook",
+                method: "POST",
+                body: { testfield: "this is a test",
+                verification_code: "this is a verifycode",
+            }
+};
+            res = {
+                send: (text)=> {assert.equal(text, "EVENT_RECEIVED");},
+                status: (code)=>{assert.equal(code, 200);},
+            }
+
+            await myFunctions.wahooWebhook(req, res);
+
+        })
+    }); //End Test 6
 }); //end Integration TEST
 
