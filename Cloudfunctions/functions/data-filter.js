@@ -348,6 +348,7 @@ garmin_examplar_2 = {
     "userAccessToken": "715a21a5-d9ae-4139-8ed7-d3ad4a833da4",
     "userId": "8e1ec0b4-7fa9-4a1c-be14-d8f6dee46bf7"
   }
+/*
 x = stravaSanitise([strava_examplar_1]);
 y = garminSanitise([garmin_examplar_2])
 
@@ -356,3 +357,4 @@ console.log(x)
 console.log()
 console.log("Garmin Sanitised")
 console.log(y)
+*/
