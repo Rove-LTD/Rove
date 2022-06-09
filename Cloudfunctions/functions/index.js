@@ -15,8 +15,8 @@ const request = require("request");
 const strava = require("strava-v3");
 const Oauth = require("./oauth");
 
-const contentsOfDotEnvFile = { // convert to using a .env file for this or
-  // secrets
+const filters = require("./data-filter");
+const contentsOfDotEnvFile = { // convert to using a .env file for this or secrets
   "config": {
     "paulsTestDev": {
       "stravaClientId": 72486,
@@ -471,19 +471,30 @@ exports.wahooCallback = functions.https.onRequest(async (req, res) => {
   }
 });
 
-exports.stravaWebhook = functions.https.onRequest((request, response) => {
+exports.stravaWebhook = functions.https.onRequest(async (request, response) => {
   if (request.method === "POST") {
     functions.logger.info("webhook event received!", {
       query: request.query,
       body: request.body,
     });
-    // get userbased on userid. (.where("id" == request.body.id)).
+    let stravaAccessToken;
+    // get userbased on userid. (.where("id" == request.body.owner_id)).
+    const userDoc = await db.collection("users").where("strava_id", "==", request.body.owner_id).get();
+    const userDocRef = userDoc.docs.at(0);
+    if (userDoc.docs.length == 1) {
+      stravaAccessToken = userDocRef.data()["strava_access_token"];
+    } else {
+      // there is an issue if there is more than one user with a userId in the DB.
+      console.log("error in number of users registered to strava webhook: " + request.body.owner_id);
+      return;
+    }
+    console.log(stravaAccessToken);
     // TODO: Get strava activity and sanatize
-    strava.activities.get({"id": request.body.object_id}, (result)=>{
-      console.log(result);
-    });
-    // TODO: Send the information to an endpoint specified by the dev
-    // registered to a user.
+    const activity = await strava.activities.get({"access_token": stravaAccessToken, "id": request.body.object_id});
+    console.log(activity);
+    const sanitisedActivity = filters.stravaSanitise([activity]);
+    console.log(sanitisedActivity);
+    // TODO: Send the information to an endpoint specified by the dev registered to a user.
     response.status(200).send("EVENT_RECEIVED");
   } else if (request.method === "GET") {
     const VERIFY_TOKEN = "STRAVA";
