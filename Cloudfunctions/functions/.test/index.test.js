@@ -27,12 +27,14 @@ const admin = require("firebase-admin");
 const request = require('request');
 const got = require('got');
 const strava = require("strava-v3");
+const { prototype } = require('mocha');
 
 //------------------------Set Up of Test Data Project Complete ---------------//
 
 describe('ROVE Functions - Integration Tests', () => {
     let myFunctions;
-    let testUser = "paulsTestDevSecondUser";
+    let testUser = "paulsTestDevSecondUser";    //<----edit user before running 
+                                                //the test
     let testDev = "paulsTestDev";
     let devTestData = {email: "paul.testDev@gmail.com", devKey: "test-key", polar_signature_secret_key: "e14f5f33-0ffc-4f38-8f7e-8d243337f986", polar_webhook_id: "wPWwr1P7"};
     let devUserData = {devId: testDev, email: "paul.userTest@gmail.com"};
@@ -149,8 +151,24 @@ describe('ROVE Functions - Integration Tests', () => {
                     recievedGarminUrl = url;
                 }
             }
+            // set up the stub to mimic the response to the Garmin service
+            const responseObject = {
+                body: "oauth_token=test-Oauth-token&oauth_token_secret=test-Oauth-secret"
+            };
+
+            const stubbedcall = sinon.stub(got, "get" );
+            stubbedcall.returns(responseObject);
 
             await myFunctions.connectService(req, res);
+            // check the stubbed function was called with the correct arguments
+            calledWith = stubbedcall.args[0].toString();
+            assert.include(calledWith, "https://connectapi.garmin.com/oauth-service/oauth/request_token?oauth_consumer_key=eb0a9a22-db68-4188-a913-77ee997924a8&oauth_nonce=" );
+            assert.include(calledWith, "&oauth_signature_method=HMAC-SHA1&oauth_timestamp=");
+            assert.include(calledWith, "&oauth_signature=");
+            assert.include(calledWith, "&oauth_version=1.0");
+
+            sinon.restore();
+
 
         })
         it('should get a properly formatted polar redirect url...', async () => {

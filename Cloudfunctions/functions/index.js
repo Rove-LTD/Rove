@@ -291,7 +291,7 @@ async function garminOauth(req) {
   let response = "";
   try {
     // get OAuth tokens from garmin
-    response = await got(url);
+    response = await got.get(url);
   } catch (error) {
     console.log(error.response.body);
     return error.response.body;
