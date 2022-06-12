@@ -450,7 +450,6 @@ function wahooOauth(req) {
   const appQuery = Url.parse(req.url, true).query;
   const userId = appQuery["userId"];
   const devId = appQuery["devId"];
-  const provider = appQuery["provider"];
   // add parameters from user onto the callback redirect.
   oauthWahoo.setDevUser(devId, userId);
   return oauthWahoo.redirectUrl;

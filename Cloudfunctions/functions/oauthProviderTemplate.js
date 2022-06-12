@@ -6,7 +6,6 @@ const got = require("got");
 * fitness activity providers
 */
 class OauthProviderName {
-  provider = "provider_name"; //edit to put in provider name
   /**
   *
   * @param {Object} config
@@ -15,6 +14,8 @@ class OauthProviderName {
   constructor(config, firebaseDb) {
     this.db = firebaseDb;
     this.config = config;
+    this.provider = "provider_name"; //edit to put in provider name
+
   }
   /**
    * @param {String} devId

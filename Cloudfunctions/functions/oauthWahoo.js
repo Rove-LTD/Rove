@@ -6,7 +6,6 @@ const got = require("got");
 * fitness activity providers
 */
 class OauthWahoo {
-  provider = "wahoo";
   /**
   *
   * @param {Object} config
@@ -15,6 +14,8 @@ class OauthWahoo {
   constructor(config, firebaseDb) {
     this.db = firebaseDb;
     this.config = config;
+    this.provider = "wahoo";
+
   }
   /**
    * @param {String} devId
