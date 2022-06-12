@@ -14,8 +14,7 @@ class OauthProviderName {
   constructor(config, firebaseDb) {
     this.db = firebaseDb;
     this.config = config;
-    this.provider = "provider_name"; //edit to put in provider name
-
+    this.provider = "provider_name"; // edit to put in provider name
   }
   /**
    * @param {String} devId
@@ -163,7 +162,6 @@ class OauthProviderName {
   /**
    * returns accessCodeFields from the response to update database with
    */
- 
   get tokenData() {
     // CHANGE to match field names from provider
     return {
@@ -304,4 +302,4 @@ class OauthProviderName {
   }
 }
 
-module.exports = OauthWahoo;
+module.exports = OauthProviderName;

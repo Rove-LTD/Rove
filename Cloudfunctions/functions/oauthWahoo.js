@@ -1,5 +1,4 @@
 /* eslint-disable max-len */
-const request = require("request");
 const got = require("got");
 /**
 * Oauth is a class to help manage the communication with the various
@@ -15,7 +14,6 @@ class OauthWahoo {
     this.db = firebaseDb;
     this.config = config;
     this.provider = "wahoo";
-
   }
   /**
    * @param {String} devId
@@ -65,13 +63,13 @@ class OauthWahoo {
    * @return {void}
    */
   getRedirect() {
-      this.clientId = this.config[this.devId]["whaooClientId"];
-      this.clientSecret = this.config[this.devId]["wahooSecret"];
-      this.callbackBaseUrl =
-        "https://us-central1-rove-26.cloudfunctions.net/wahooCallback";
-      this.scope = "email%20user_read%20workouts_read%20offline_data";
-      this.state = this.userId+":"+this.devId;
-      this.baseUrl = "https://api.wahooligan.com/oauth/authorize?";
+    this.clientId = this.config[this.devId]["whaooClientId"];
+    this.clientSecret = this.config[this.devId]["wahooSecret"];
+    this.callbackBaseUrl =
+      "https://us-central1-rove-26.cloudfunctions.net/wahooCallback";
+    this.scope = "email%20user_read%20workouts_read%20offline_data";
+    this.state = this.userId+":"+this.devId;
+    this.baseUrl = "https://api.wahooligan.com/oauth/authorize?";
 
     const parameters = {
       client_id: this.clientId,
@@ -167,9 +165,6 @@ class OauthWahoo {
    * @return {Object}
    */
   get accessCodeOptions() {
-    let _clientIdClientSecret;
-    let _buffer;
-    let _base64String;
     const _dataString = "code="+
     this.code+
     "&client_id="+this.config[this.devId]["whaooClientId"]+
@@ -183,7 +178,7 @@ class OauthWahoo {
         "Content-Type": "application/json",
         "Accept": "application/json;charset=UTF-8",
       },
-    }
+    };
   }
   /**
    * @return {Object}
