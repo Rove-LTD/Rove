@@ -5,7 +5,8 @@ const got = require("got");
 * Oauth is a class to help manage the communication with the various
 * fitness activity providers
 */
-class Oauth {
+class OauthProviderName {
+  provider = "provider_name"; //edit to put in provider name
   /**
   *
   * @param {Object} config
@@ -20,10 +21,9 @@ class Oauth {
    * @param {String} devsUserTag
    * @param {String} provider
    */
-  setProvider(devId, devsUserTag, provider) {
+  setDevUser(devId, devsUserTag) {
     this.devId = devId;
     this.userId = devsUserTag;
-    this.provider = provider;
     this.status = {redirectUrl: false,
       gotCode: false,
       gotAccessToken: false,
@@ -67,7 +67,7 @@ class Oauth {
   /**
    * @return {void}
    */
-  getRedirect() {
+  getRedirect() { // choose the right properties for the provider
     switch (this.provider) {
       case "polar":
         this.clientId = this.config[this.devId]["polarClientId"];
@@ -156,36 +156,21 @@ class Oauth {
   async storeTokens() {
     // set tokens for userId doc.
     const userRef = this.db.collection("users").doc(this.userId);
-    await userRef.set(this.parameters, {merge: true});
+    await userRef.set(this.tokenData, {merge: true});
     return;
   }
   /**
-   * returns parameters to update database with
+   * returns accessCodeFields from the response to update database with
    */
-  get parameters() {
-    switch (this.provider) {
-      case "polar":
-        return {
-          "polar_access_token": this.accessCodeResponse["access_token"],
-          "polar_token_type": this.accessCodeResponse["token_type"],
-          "polar_token_expires_in": this.accessCodeResponse["expires_in"],
-          "polar_connected": true,
-          "polar_user_id": this.accessCodeResponse["x_user_id"],
-        };
-      case "wahoo":
-        return {
-          "wahoo_access_token": this.accessCodeResponse["access_token"],
-          "wahoo_token_expires_in": this.accessCodeResponse["expires_in"],
-          "wahoo_refresh_token": this.accessCodeResponse["refresh_token"],
-          "wahoo_connected": true,
-        };
-      default:
-        this.error = true;
-        this.errorMessage =
-          "could not set parameters to update database, provider not set correctly";
-        return {};
-    }
+ 
+  get tokenData() {
+    // CHANGE to match field names from provider
+    return {
+      "provider_access_token": this.accessCodeResponse["access_token"],
+      "provider_connected": true,
+    };
   }
+
   /**
    *
    * @return {void}
@@ -318,4 +303,4 @@ class Oauth {
   }
 }
 
-module.exports = Oauth;
+module.exports = OauthWahoo;
