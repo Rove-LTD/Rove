@@ -597,44 +597,48 @@ async function polarWebhookUtility(devId, action, webhookId) {
   const clientIdClientSecret = configurations[devId]["polarClientId"]+":"+configurations[devId]["polarSecret"];
   const buffer = new Buffer.from(clientIdClientSecret); // eslint-disable-line
   const base64String = buffer.toString("base64");
+  const _headers = {
+    "Content-Type":"application/json",
+    "Accept":"application/json",
+    "Authorization": "Basic "+base64String,
+  };
   let _data;
-  let _method;
   let _url = "https://www.polaraccesslink.com/v3/webhooks";
+  let response;
+  let options;
   switch (action) {
     case "register":
-      _data = {
-        "events": [
-          "EXERCISE", "SLEEP"
-        ],
-        "url": "https://us-central1-rove-26.cloudfunctions.net/polarWebhook"
-      };
-      _method = "POST"
+      options = {
+        url: _url,
+        method: "POST",
+        headers: _headers,
+        body: JSON.stringify({
+          "events": [
+            "EXERCISE", "SLEEP"
+          ],
+          "url": "https://us-central1-rove-26.cloudfunctions.net/polarWebhook"
+        }),
+      }
+      response = await got.post(options)
       break;
     case "delete":
-      _url = _url+"/"+webhookId;
-      _method = "DELETE"
+      options = {
+        _url: _url+"/"+webhookId,
+        _method:  "DELETE",
+        headers: _headers,
+      }
+      response = await got.delete(options)
       break;
     case "get":
-      const data = {
-        "events": [
-          "EXERCISE", "SLEEP"
-        ],
-        "url": "https://us-central1-rove-26.cloudfunctions.net/polarWebhook"
-      };
-      _method = "GET";
+      options = {
+        _url: _url,
+        _method:  "GET",
+        headers: _headers,
+      }
+      response = await got.get(options)
       break;
   }
-  const options = {
-    url: _url,
-    method: _method,
-    headers: {
-      "Content-Type":"application/json",
-      "Accept":"application/json",
-      "Authorization": "Basic "+base64String,
-    },
-    body: JSON.stringify(_data),
-  }
-  const response = await got(options)
+
   return response;
 
 }

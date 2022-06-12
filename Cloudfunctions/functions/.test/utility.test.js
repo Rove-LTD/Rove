@@ -65,21 +65,90 @@ describe('ROVE Functions - Integration Tests', () => {
 
 //-------TEST 1------ test connectService() ------------
     describe("Testing that the developer can set up polar webhook", () => {
-        it('should get error if the provider is not correct...', async () => {
+        beforeEach( () => {
+            // stub out the got functions.
+            const getExampleResponse = {
+                body: JSON.stringify({
+                    "data": {
+                        "id": "abdf33",
+                        "events": "EXERCISE, SLEEP",
+                        "url": "https://myapp.example.com/acl_webhook"
+                    }
+                }),
+                statusCode: 200
+
+            };
+            const deleteExampleResponse = {
+                body: JSON.stringify({
+                    "timestamp": "2019-08-24T14:15:22Z",
+                    "status": 0,
+                    "errorType": "string",
+                    "message": "string",
+                    "corrId": "string"
+                }),
+                statusCode: 204,
+            };
+            const postExampleResponse = {
+                body: JSON.stringify({
+                "data": {
+                    "id": "abdf33",
+                    "events": "EXERCISE, SLEEP",
+                    "url": "https://myapp.example.com/acl_webhook",
+                    "signature_secret_key": "abe1f3ae-fd33-11e8-8eb2-f2801f1b9fd1"
+                    },                  
+                }),
+                statusCode: 201,
+            };
+        
+ 
+            const stubbedGet = sinon.stub(got, "get");
+            const stubbedDelete = sinon.stub(got, "delete");
+            const stubbedPost = sinon.stub(got, "post");
+            stubbedGet.returns(getExampleResponse);
+            stubbedDelete.returns(deleteExampleResponse);
+            stubbedPost.returns(postExampleResponse);
+        });
+        afterEach( () => {
+            // restore the got functions
+            sinon.restore();
+        });
+
+        it('should register up polar webhook correctly...', async () => {
             // set the request object with the incorrect provider, correct developerId, devKey and userId
             const req = {url: 'https//test.com/?devId='+testDev+"&action=register"};
             // set the assertions for the expected response object
             const res = {
                 send: (url) => {
-                    assert.equal(url, "error: the provider was badly formatted, missing or not supported");
+                    assert.equal(url, 'webhook created successfully{"data":{"id":"abdf33","events":"EXERCISE, SLEEP","url":"https://myapp.example.com/acl_webhook","signature_secret_key":"abe1f3ae-fd33-11e8-8eb2-f2801f1b9fd1"}}');
                 }
-            }
-            function stubbedGot (url) {
-                return "test";
-            }
-            
-            stubbedGot = sinon.stub(got);
+            };
 
+            await myFunctions.polarWebhookSetup(req, res);
+
+        });
+        it('should delete a polar webhook correctly...', async () => {
+            // set the request object with the incorrect provider, correct developerId, devKey and userId
+            const req = {url: 'https//test.com/?devId='+testDev+"&action=delete&webhookId=abdf33"};
+            // set the assertions for the expected response object
+            const res = {
+                send: (url) => {
+                    assert.equal(url, "webhook deleted successfully");
+                }
+            };
+            
+            await myFunctions.polarWebhookSetup(req, res);
+
+        });
+        it('should get up polar webhook correctly...', async () => {
+            // set the request object with the incorrect provider, correct developerId, devKey and userId
+            const req = {url: 'https//test.com/?devId='+testDev+"&action=get"};
+            // set the assertions for the expected response object
+            const res = {
+                send: (url) => {
+                    assert.equal(url, 'webhook: {"data":{"id":"abdf33","events":"EXERCISE, SLEEP","url":"https://myapp.example.com/acl_webhook"}}');
+                }
+            };
+            
             await myFunctions.polarWebhookSetup(req, res);
 
         });
