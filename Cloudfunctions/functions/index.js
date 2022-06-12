@@ -14,31 +14,11 @@ const got = require("got");
 const request = require("request");
 const strava = require("strava-v3");
 const Oauth = require("./oauth");
-
+const contentsOfDotEnvFile = require("./config.json");
 const filters = require("./data-filter");
-const contentsOfDotEnvFile = { // convert to using a .env file for this or secrets
-  "config": {
-    "paulsTestDev": {
-      "stravaClientId": 72486,
-      "stravaClientSecret": "b0d500111e3d1774903da1f067b5b7adf38ca726",
-      "consumerSecret": "ffqgs2OxeJkFHUM0c3pGysdCp1Znt0tnc2s",
-      "oauth_consumer_key": "eb0a9a22-db68-4188-a913-77ee997924a8",
-      "polarClientId": "654623e7-7191-4cfe-aab5-0bc24785fdee",
-      "polarSecret": "f797c0e1-a39d-4b48-a2d9-89c2baea9005",
-      "whaooClientId": "iA2JRS_dBkikcb0uEnHPtb6IDt1vDYNbityEEhp801I",
-      "wahooSecret": "w4FvDllcO0zYrnV1-VKR-T2gJ4mYUOiFJuwx-8C-C2I",
-      "wahooWebhookToken": "97661c16-6359-4854-9498-a49c07b6ec11",
-    },
-    "anotherDeveloper": {
-      "clientId": "a different id",
-      "client_secret": "another secret",
-    },
-  },
-};
 
 const configurations = contentsOfDotEnvFile["config"];
-// change to configurations = process.env["config"] when environment variables
-// set up properly
+// find a way to decrypt and encrypt this information
 
 admin.initializeApp();
 const db = admin.firestore();
