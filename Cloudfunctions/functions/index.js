@@ -498,14 +498,39 @@ exports.stravaWebhook = functions.https.onRequest(async (request, response) => {
   }
 });
 
-exports.wahooWebhook = functions.https.onRequest((request, response) => {
+exports.wahooWebhook = functions.https.onRequest(async (request, response) => {
   if (request.method === "POST") {
     functions.logger.info("---> Wahoo 'POST' webhook event received!", {
       query: request.query,
       body: request.body,
     });
+    // check the webhook token is correct
+    // TODO: parameterise
+    if (request.body.webhook_token != "97661c16-6359-4854-9498-a49c07b6ec11") {
+      console.log("Wahoo Webhook event recieved that did not have the correct webhook token");
+      response.status(401);
+      response.send("NOT AUTHORISED");
+      return;
+    }
+    /**
+     * "body":{"user":{"id":1510441},"event_type":"workout_summary","workout_summary":{"duration_active_accum":"9.0","workout":{"name":"Cycling","workout_token":"ELEMNT AE48:274","workout_type_id":0,"id":147564736,"updated_at":"2022-06-13T16:39:08.000Z","plan_id":null,"minutes":0,"starts":"2022-06-13T16:38:51.000Z","created_at":"2022-06-13T16:39:08.000Z"},"speed_avg":"0.0","duration_total_accum":"9.0","cadence_avg":"0.0","id":140473420,"work_accum":"0.0","power_bike_tss_last":null,"ascent_accum":"0.0","power_bike_np_last":null,"duration_paused_accum":"0.0","created_at":"2022-06-13T16:39:09.000Z","updated_at":"2022-06-13T16:39:09.000Z","power_avg":"0.0","file":{"url":"https://cdn.wahooligan.com/wahoo-cloud/production/uploads/workout_file/file/WpHvKL3irWsv2vHzGzGF_Q/2022-06-13-163851-ELEMNT_AE48-274-0.fit"},"distance_accum":"0.0","heart_rate_avg":"0.0","calories_accum":"0.0"},"webhook_token":"97661c16-6359-4854-9498-a49c07b6ec11"}}
+     */
     // TODO: Send the information to an endpoint specified by the dev
     // registered to a user.
+    var devList = [];
+    const userQuery = await db.collection("users").where("wahoo_user_id", "==", request.body.user.id).get();
+    userQuery.docs.forEach((doc)=>{
+      devList.push(doc.data()["devId"]);
+    });
+    function onlyUnique(value, index, self) {
+      return self.indexOf(value) === index;
+    }
+    devList = devList.filter(onlyUnique);
+    // now we have a list of developer Id's that are interested in this
+    // users data
+    // 1) sanatise and 2) send
+    const sanitisedActivity = filters.wahooSanitise(request.body);
+
     response.status(200);
     response.send("EVENT_RECEIVED");
   } else {
