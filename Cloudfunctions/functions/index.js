@@ -519,13 +519,36 @@ exports.wahooWebhook = functions.https.onRequest((request, response) => {
   }
 });
 
-exports.polarWebhook = functions.https.onRequest((request, response) => {
+exports.polarWebhook = functions.https.onRequest(async (request, response) => {
   if (request.method === "POST") {
     functions.logger.info("---> polar 'POST' webhook event received!", {
       query: request.query,
       body: request.body,
     });
     // TODO: Send the information to an endpoint specified by the dev
+    const userQuery = await db.collection("users").where("polar_user_id", "==", request.body.user_id).get();
+    const userToken = userQuery.docs.at(0).data()["polar_access_token"];
+    if (request.body.event == "EXERCISE") {
+      const headers = {
+        "Accept": "application/json", "Authorization": "Bearer " + userToken,
+      };
+      const options = {
+        url: "https://www.polaraccesslink.com/v3/exercises/" + request.body.entity_id,
+        method: "POST",
+        headers: headers,
+      };
+      const activity = await got.get(options);
+      console.log(activity);
+      // save info to dev endpoint here.
+
+      /* {
+   "event": "EXERCISE",
+   "user_id": 475,
+   "entity_id": "aQlC83",
+   "timestamp": "2018-05-15T14:22:24Z",
+   "url": "https://www.polaraccesslink.com/v3/exercises/aQlC83"
+}*/
+    }
     // registered to a user.
     response.status(200);
     response.send("OK");
