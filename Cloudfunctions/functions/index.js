@@ -437,7 +437,7 @@ function wahooOauth(req) {
 
 exports.wahooCallback = functions.https.onRequest(async (req, res) => {
   // recreate the oauth object that is managing the Oauth flow
-  console.log(req.url);
+  // console.log(req.url);
   const data = Url.parse(req.url, true).query;
   oauthWahoo.fromCallbackData(data);
   if (oauthWahoo.status.gotCode) {
@@ -554,11 +554,11 @@ exports.polarWebhookSetup = functions.https.onRequest(async (req, res) => {
 
   // save the response to the developers doc in the developers collection
   if (action == "register" && response.statusCode == 201) {
-    responseObject = JSON.parse(response.body);
+    const responseObject = JSON.parse(response.body);
     const data = {
       polar_webhook_id: responseObject.data.id,
       polar_signature_secret_key: responseObject.data.signature_secret_key,
-    }
+    };
     const devRef = db.collection("developers").doc(devId);
     await devRef.set(data, {merge: true});
     res.send("webhook created successfully" + response.body);
@@ -577,12 +577,11 @@ async function polarWebhookUtility(devId, action, webhookId) {
   const buffer = new Buffer.from(clientIdClientSecret); // eslint-disable-line
   const base64String = buffer.toString("base64");
   const _headers = {
-    "Content-Type":"application/json",
-    "Accept":"application/json",
+    "Content-Type": "application/json",
+    "Accept": "application/json",
     "Authorization": "Basic "+base64String,
   };
-  let _data;
-  let _url = "https://www.polaraccesslink.com/v3/webhooks";
+  const _url = "https://www.polaraccesslink.com/v3/webhooks";
   let response;
   let options;
   switch (action) {
@@ -593,33 +592,31 @@ async function polarWebhookUtility(devId, action, webhookId) {
         headers: _headers,
         body: JSON.stringify({
           "events": [
-            "EXERCISE", "SLEEP"
+            "EXERCISE", "SLEEP",
           ],
-          "url": "https://us-central1-rove-26.cloudfunctions.net/polarWebhook"
+          "url": "https://us-central1-rove-26.cloudfunctions.net/polarWebhook",
         }),
-      }
-      response = await got.post(options)
+      };
+      response = await got.post(options);
       break;
     case "delete":
       options = {
         _url: _url+"/"+webhookId,
-        _method:  "DELETE",
+        _method: "DELETE",
         headers: _headers,
-      }
-      response = await got.delete(options)
+      };
+      response = await got.delete(options);
       break;
     case "get":
       options = {
         _url: _url,
-        _method:  "GET",
+        _method: "GET",
         headers: _headers,
-      }
-      response = await got.get(options)
+      };
+      response = await got.get(options);
       break;
   }
-
   return response;
-
 }
 
 async function oauthCallbackHandlerGarmin(oAuthCallback, db) {
@@ -649,7 +646,7 @@ async function oauthCallbackHandlerGarmin(oAuthCallback, db) {
   const encodedSignature = encodeURIComponent(signature);
   const url = "https://connectapi.garmin.com/oauth-service/oauth/access_token?oauth_consumer_key="+configurations[devId]["oauth_consumer_key"]+"&oauth_nonce="+oauthNonce.toString()+"&oauth_signature_method=HMAC-SHA1&oauth_timestamp="+oauthTimestamp.toString()+"&oauth_signature="+encodedSignature+"&oauth_verifier="+oAuthCallback["oauth_verifier"]+"&oauth_token="+oAuthCallback["oauth_token"]+"&oauth_version=1.0";
   const response = await got.post(url);
-  console.log(response.body);
+  // console.log(response.body);
   await firestoreData(response.body, userId, devId);
   async function firestoreData(data, userId, devId) {
     data = data.split("=");
