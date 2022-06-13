@@ -13,7 +13,7 @@ const encodeparams = require("./encodeparams");
 const got = require("got");
 const request = require("request");
 const strava = require("strava-v3");
-const Oauth = require("./oauth");
+const OauthWahoo = require("./oauthWahoo");
 const contentsOfDotEnvFile = require("./config.json");
 const filters = require("./data-filter");
 
@@ -22,7 +22,7 @@ const configurations = contentsOfDotEnvFile["config"];
 
 admin.initializeApp();
 const db = admin.firestore();
-const oauth = new Oauth(configurations, db);
+const oauthWahoo = new OauthWahoo(configurations, db);
 
 // INTEGRATION FOR APP:
 // get url response and go through onboarding flow.
@@ -430,24 +430,23 @@ function wahooOauth(req) {
   const appQuery = Url.parse(req.url, true).query;
   const userId = appQuery["userId"];
   const devId = appQuery["devId"];
-  const provider = appQuery["provider"];
   // add parameters from user onto the callback redirect.
-  oauth.setProvider(devId, userId, provider);
-  return oauth.redirectUrl;
+  oauthWahoo.setDevUser(devId, userId);
+  return oauthWahoo.redirectUrl;
 }
 
 exports.wahooCallback = functions.https.onRequest(async (req, res) => {
   // recreate the oauth object that is managing the Oauth flow
   console.log(req.url);
   const data = Url.parse(req.url, true).query;
-  oauth.fromCallbackData("wahoo", data);
-  if (oauth.status.gotCode) {
-    await oauth.getAndSaveAccessCodes();
+  oauthWahoo.fromCallbackData(data);
+  if (oauthWahoo.status.gotCode) {
+    await oauthWahoo.getAndSaveAccessCodes();
   }
-  if (!oauth.error) {
+  if (!oauthWahoo.error) {
     res.send("your authorization was successful please close this window");
   } else {
-    res.send(oauth.errorMessage);
+    res.send(oauthWahoo.errorMessage);
   }
 });
 
