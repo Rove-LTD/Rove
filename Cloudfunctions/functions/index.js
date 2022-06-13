@@ -530,7 +530,7 @@ exports.wahooWebhook = functions.https.onRequest(async (request, response) => {
     // users data
     // 1) sanatise and 2) send
     const sanitisedActivity = filters.wahooSanitise(request.body);
-
+    // TODO: Send to webhook for each devId.
     response.status(200);
     response.send("EVENT_RECEIVED");
   } else {

@@ -131,18 +131,20 @@ function garminSanitise(activities) {
     return summaryActivities
 }
 
-function wahooSanitise(activity) {
+exports.wahooSanitise = function (activity) {
   wahooWorkoutType = { 0:	"BIKING",
-    1: RUNNING,
-    2: FE,
-    3: RUNNING_TRACK,
-    4: RUNNING_TRAIL,
-    5: RUNNING_TREADMILL,	
-    6: WALKING,
-    7: WALKING_SPEED,
-    8: WALKING_NORDIC,
-    9: HIKING,
-    10: MOUNTAINEERING,
+    1: "RUNNING",
+    2: "FE",
+    3: "RUNNING_TRACK",
+    4: "RUNNING_TRAIL",
+    5: "RUNNING_TREADMILL",	
+    6: "WALKING",
+    7: "WALKING_SPEED",
+    8: "WALKING_NORDIC",
+    9: "HIKING",
+    10: "MOUNTAINEERING",
+  };
+/* the rest are below TODO: 
     11: BIKING_CYCLECROSS,
     12: BIKING_INDOOR,
     13: BIKING_MOUNTAIN,	
@@ -187,7 +189,7 @@ function wahooSanitise(activity) {
     64:	EBIKING,
     65:	TICKR_OFFLINE,
     66:	YOGA,
-    255:	UNKNOWN,}
+    255:	UNKNOWN,} */
   wahooExemplar = {
     "user": {
       "id":1510441
@@ -226,13 +228,13 @@ function wahooSanitise(activity) {
       "calories_accum":"0.0"
     },
     "webhook_token":"97661c16-6359-4854-9498-a49c07b6ec11"
-  }
+  };
   let summaryActivity = {};
   summaryActivity = {
   "activity_id" : activity.workout_summary.workout.id,
-  "activity_name" : activity.workout_summary.name,
-  "activity_type" :  wahooWorkoutType[activity.workout_summary.workout_type_id],
-  "distance_in_meters" : Math.round(activities[i]["distance"]),
+  "activity_name" : activity.workout_summary.workout.name,
+  "activity_type" :  wahooWorkoutType[activity.workout_summary.workout.workout_type_id], // TODO: complete the sanitisation.
+ /* "distance_in_meters" : Math.round(activities[i]["distance"]),
   "average_pace_in_meters_per_second" : parseFloat(activities[i]["average_speed"]).toFixed(1),
   "active_calories" : Math.round(activities[i]["kilojoules"]),
   "activity_duration_in_seconds" : activities[i]["moving_time"],
@@ -241,13 +243,9 @@ function wahooSanitise(activity) {
   "average_cadence" : parseFloat(activities[i]["average_cadence"]).toFixed(1),
   "elevation_gain" : parseFloat(activities[i]["elev_high"]).toFixed(1),
   "elevation_loss" : parseFloat(activities[i]["elev_low"]).toFixed(1),
-  "data_source" : "strava",
+  "data_source" : "strava",*/
   };
-  for (const property in summaryActivity) {
-    if (typeof summaryActivity[property] == "undefined") {
-      summaryActivity[property] = null;
-    }
-  }
+
   return summaryActivity;
 }
 
