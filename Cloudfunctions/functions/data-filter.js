@@ -23,6 +23,56 @@ new_standard_format = {
     "data_source" : null,
   }
 
+function polarSanatise(activity) {
+  const summaryActivity = {
+    // standard fields
+    "activity_id" : activity["id"],
+    "activity_name" : activity["detailed-sport-info"],
+    "activity_type" : activity["sport"],
+    "distance_in_meters" : activity["distance"],
+    "active_calories" : activity["calories"],
+    "activity_duration_in_seconds" : activity["duration"],
+    "start_time" : Date(activity["start-time"]),
+    "average_heart_rate_bpm" : activity["heart-rate"]["average"],
+    "data_source" : "polar",
+    // some extra fields here
+    "max_heart_rate_bpm" : activity["heart-rate"]["maximum"],
+    "device-id": activity["device-id"],
+    "training-load": activity["training-load"],
+    "has-route": activity["has-route"],
+    "fat-percentage": activity["fat-percentage"],
+    "carbohydrate-percentage": activity["carbohydrate-percentage"],
+    "protein-percentage": activity["protein-percentage"]
+  }
+/*{
+    "id": 1937529874,
+    "upload-time": "2008-10-13T10:40:02Z",
+    "polar-user": "https://www.polaraccesslink/v3/users/1",
+    "transaction-id": 179879,
+    "device": "Polar M400",
+    "device-id": "1111AAAA",
+    "start-time": "2008-10-13T10:40:02Z",
+    "start-time-utc-offset": 180,
+    "duration": "PT2H44M",
+    "calories": 530,
+    "distance": 1600,
+    "heart-rate": {
+      "average": 129,
+      "maximum": 147
+    },
+    "training-load": 143.22,
+    "sport": "OTHER",
+    "has-route": true,
+    "club-id": 999,
+    "club-name": "Polar Club",
+    "detailed-sport-info": "WATERSPORTS_WATERSKI",
+    "fat-percentage": 60,
+    "carbohydrate-percentage": 38,
+    "protein-percentage": 2
+  }*/
+  return summaryActivity;
+}
+
 function stravaSanitise(activities) {
 let summaryActivities = [{}];
 

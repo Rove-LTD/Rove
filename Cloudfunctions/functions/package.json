@@ -19,7 +19,8 @@
     "firebase-functions": "^3.21.2",
     "got": "^11.8.5",
     "request": "^2.88.2",
-    "strava-v3": "^2.1.0"
+    "strava-v3": "^2.1.0",
+    "tinyduration": "^3.2.2"
   },
   "devDependencies": {
     "chai": "4.3.6",
