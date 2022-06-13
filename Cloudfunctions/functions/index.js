@@ -14,31 +14,11 @@ const got = require("got");
 const request = require("request");
 const strava = require("strava-v3");
 const OauthWahoo = require("./oauthWahoo");
-
+const contentsOfDotEnvFile = require("./config.json");
 const filters = require("./data-filter");
-const contentsOfDotEnvFile = { // convert to using a .env file for this or secrets
-  "config": {
-    "paulsTestDev": {
-      "stravaClientId": 72486,
-      "stravaClientSecret": "b0d500111e3d1774903da1f067b5b7adf38ca726",
-      "consumerSecret": "ffqgs2OxeJkFHUM0c3pGysdCp1Znt0tnc2s",
-      "oauth_consumer_key": "eb0a9a22-db68-4188-a913-77ee997924a8",
-      "polarClientId": "654623e7-7191-4cfe-aab5-0bc24785fdee",
-      "polarSecret": "f797c0e1-a39d-4b48-a2d9-89c2baea9005",
-      "whaooClientId": "iA2JRS_dBkikcb0uEnHPtb6IDt1vDYNbityEEhp801I",
-      "wahooSecret": "w4FvDllcO0zYrnV1-VKR-T2gJ4mYUOiFJuwx-8C-C2I",
-      "wahooWebhookToken": "97661c16-6359-4854-9498-a49c07b6ec11",
-    },
-    "anotherDeveloper": {
-      "clientId": "a different id",
-      "client_secret": "another secret",
-    },
-  },
-};
 
 const configurations = contentsOfDotEnvFile["config"];
-// change to configurations = process.env["config"] when environment variables
-// set up properly
+// find a way to decrypt and encrypt this information
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -291,7 +271,7 @@ async function garminOauth(req) {
   let response = "";
   try {
     // get OAuth tokens from garmin
-    response = await got(url);
+    response = await got.get(url);
   } catch (error) {
     console.log(error.response.body);
     return error.response.body;
@@ -494,6 +474,10 @@ exports.stravaWebhook = functions.https.onRequest(async (request, response) => {
     const sanitisedActivity = filters.stravaSanitise([activity]);
     console.log(sanitisedActivity);
     // TODO: Send the information to an endpoint specified by the dev registered to a user.
+    const ref = admin.database().ref("activities");
+    const childRef = ref.push();
+    childRef.set(sanitisedActivity[0]);
+    response.status(200).send("OK!");
     response.status(200).send("EVENT_RECEIVED");
   } else if (request.method === "GET") {
     const VERIFY_TOKEN = "STRAVA";
@@ -537,24 +521,106 @@ exports.wahooWebhook = functions.https.onRequest((request, response) => {
 
 exports.polarWebhook = functions.https.onRequest((request, response) => {
   if (request.method === "POST") {
-    functions.logger.info("---> Wahoo 'POST' webhook event received!", {
+    functions.logger.info("---> polar 'POST' webhook event received!", {
       query: request.query,
       body: request.body,
     });
     // TODO: Send the information to an endpoint specified by the dev
     // registered to a user.
     response.status(200);
-    response.send("EVENT_RECEIVED");
+    response.send("OK");
   } else {
-    functions.logger.info("---> Wahoo 'GET' webhook event received!", {
+    functions.logger.info("---> polar 'GET' webhook event received!", {
       query: request.query,
       body: request.body,
     });
 
     response.status(200);
-    response.send("EVENT_RECEIVED");
+    response.send("OK");
   }
 });
+
+exports.polarWebhookSetup = functions.https.onRequest(async (req, res) => {
+  // get the devId and DevKey
+  const devId = Url.parse(req.url, true).query["devId"];
+  const action = Url.parse(req.url, true).query["action"];
+  const webhookId = Url.parse(req.url, true).query["webhookId"];
+  if (action == "delete" && webhookId == null) {
+    res.send("Error: webhook Id not provided");
+    return;
+  }
+  // make the call to polar and get the response
+  const response = await polarWebhookUtility(devId, action, webhookId);
+
+  // save the response to the developers doc in the developers collection
+  if (action == "register" && response.statusCode == 201) {
+    responseObject = JSON.parse(response.body);
+    const data = {
+      polar_webhook_id: responseObject.data.id,
+      polar_signature_secret_key: responseObject.data.signature_secret_key,
+    }
+    const devRef = db.collection("developers").doc(devId);
+    await devRef.set(data, {merge: true});
+    res.send("webhook created successfully" + response.body);
+  } else if (action == "get" && response.statusCode == 200) {
+    res.send("webhook: "+response.body);
+  } else if (action == "delete" && response.statusCode == 204) {
+    res.send("webhook deleted successfully");
+  } else {
+    res.send("error: "+response.statusCode+response.body);
+  }
+  return;
+});
+
+async function polarWebhookUtility(devId, action, webhookId) {
+  const clientIdClientSecret = configurations[devId]["polarClientId"]+":"+configurations[devId]["polarSecret"];
+  const buffer = new Buffer.from(clientIdClientSecret); // eslint-disable-line
+  const base64String = buffer.toString("base64");
+  const _headers = {
+    "Content-Type":"application/json",
+    "Accept":"application/json",
+    "Authorization": "Basic "+base64String,
+  };
+  let _data;
+  let _url = "https://www.polaraccesslink.com/v3/webhooks";
+  let response;
+  let options;
+  switch (action) {
+    case "register":
+      options = {
+        url: _url,
+        method: "POST",
+        headers: _headers,
+        body: JSON.stringify({
+          "events": [
+            "EXERCISE", "SLEEP"
+          ],
+          "url": "https://us-central1-rove-26.cloudfunctions.net/polarWebhook"
+        }),
+      }
+      response = await got.post(options)
+      break;
+    case "delete":
+      options = {
+        _url: _url+"/"+webhookId,
+        _method:  "DELETE",
+        headers: _headers,
+      }
+      response = await got.delete(options)
+      break;
+    case "get":
+      options = {
+        _url: _url,
+        _method:  "GET",
+        headers: _headers,
+      }
+      response = await got.get(options)
+      break;
+  }
+
+  return response;
+
+}
 
 async function oauthCallbackHandlerGarmin(oAuthCallback, db) {
   const oauthNonce = crypto.randomBytes(10).toString("hex");
