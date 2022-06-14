@@ -434,15 +434,9 @@ exports.stravaWebhook = functions.https.onRequest(async (request, response) => {
     console.log(stravaAccessToken);
     // TODO: Get strava activity and sanatize
     const activity = await strava.activities.get({"access_token": stravaAccessToken, "id": request.body.object_id});
-<<<<<<< HEAD
     // console.log(activity);
     const sanitisedActivity = filters.stravaSanitise([activity]);
     // console.log(sanitisedActivity);
-=======
-    console.log(activity);
-    const sanitisedActivity = filters.stravaSanitise([activity]);
-    console.log(sanitisedActivity);
->>>>>>> main
     // TODO: Send the information to an endpoint specified by the dev registered to a user.
     const ref = admin.database().ref("activities");
     const childRef = ref.push();
