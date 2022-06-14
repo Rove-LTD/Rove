@@ -208,7 +208,7 @@ exports.wahooSanitise = function (activity) {
     "average_pace_in_meters_per_second" : parseFloat(activity.workout_summary.speed_avg).toFixed(2), //checkunits
     "active_calories": parseFloat(activity.workout_summary.calories_accum).toFixed(1),
     "activity_duration_in_seconds": activity.workout_summary.duration_total_accum,
-    "start_time" : new Date(activity.workout_summary.workout.starts),
+    "start_time" : activity.workout_summary.workout.starts,
     "average_heart_rate_bpm" : activity.workout_summary.heart_rate_avg,
     "average_cadence" : parseFloat(activity.workout_summary.cadence_avg).toFixed(1),
     "elevation_gain" : parseFloat(activity.workout_summary.ascent_accum).toFixed(1),

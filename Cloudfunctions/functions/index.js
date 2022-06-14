@@ -546,7 +546,7 @@ exports.wahooWebhook = functions.https.onRequest(async (request, response) => {
     })
     // TODO: save as a backup for each user
     userRefList.forEach((user)=>{
-      sendToUser(user);
+      writeToUser(user);
     })
 
     function sendToDev(devId) { // TODO:
@@ -554,9 +554,9 @@ exports.wahooWebhook = functions.https.onRequest(async (request, response) => {
       // use got to send to the endpoint with the agreed headers
       return;;
     }
-    function sendToUser(userRef) {
+    async function writeToUser(userRef) {
       // write to database as a backup
-      userRef.collection("activities").doc().set(sanitisedActivity);
+      await userRef.collection("activities").doc().set(sanitisedActivity);
       return;
     }
 
