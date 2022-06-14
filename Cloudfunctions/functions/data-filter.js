@@ -139,7 +139,8 @@ function garminSanitise(activities) {
 }
 
 exports.wahooSanitise = function (activity) {
-  wahooWorkoutType = { 0:	"BIKING",
+  wahooWorkoutType = { 
+    0:	"BIKING",
     1: "RUNNING",
     2: "FE",
     3: "RUNNING_TRACK",
@@ -150,92 +151,52 @@ exports.wahooSanitise = function (activity) {
     8: "WALKING_NORDIC",
     9: "HIKING",
     10: "MOUNTAINEERING",
-  };
-/* the rest are below TODO: 
-    11: BIKING_CYCLECROSS,
-    12: BIKING_INDOOR,
-    13: BIKING_MOUNTAIN,	
-    14: BIKING_RECUMBENT,
-    15: BIKING_ROAD,
-    16: BIKING_TRACK,
-    17: BIKING_MOTOCYCLING,
-    18: FE_GENERAL,
-    19: FE_TREADMILL,
-    20: FE_ELLIPTICAL,
-    21: FE_BIKE,
-    22: FE_ROWER,
-    23: FE_CLIMBER,
-    25: SWIMMING_LAP,
-    26: SWIMMING_OPEN_WATER,
-    27: SNOWBOARDING,
-    28: SKIING,
-    29: SKIING_DOWNHILL,
-    30: SKIINGCROSS_COUNTRY,
-    31: SKATING,
-    32: SKATING_ICE,
-    33:	SKATING_INLINE,
-    34:	LONG_BOARDING,
-    35:	SAILING,
-    36:	WINDSURFING,
-    37:	CANOEING,
-    38:	KAYAKING,	
-    39:	ROWING,
-    40:	KITEBOARDING,
-    41:	STAND_UP_PADDLE_BOARD,
-    42:	WORKOUT,
-    43:	CARDIO_CLASS,
-    44:	STAIR_CLIMBER,	
-    45:	WHEELCHAIR,
-    46:	GOLFING,
-    47:	OTHER,
-    49:	BIKING_INDOOR_CYCLING_CLASS,
-    56:	WALKING_TREADMILL,
-    61:	BIKING_INDOOR_TRAINER,	
-    62:	MULTISPORT,
-    63:	TRANSITION,
-    64:	EBIKING,
-    65:	TICKR_OFFLINE,
-    66:	YOGA,
-    255:	UNKNOWN,} */
-  wahooExemplar = {
-    "user": {
-      "id":1510441
-    },
-    //"event_type":"workout_summary",
-    "workout_summary":{
-      "duration_active_accum":"9.0",
-      "workout": {
-       // "name":"Cycling",
-        "workout_token":"ELEMNT AE48:274",
-       // "workout_type_id":0,
-        "id":147564736,
-        "updated_at":"2022-06-13T16:39:08.000Z",
-        "plan_id":null,
-        "minutes":0,
-       // "starts":"2022-06-13T16:38:51.000Z",
-        "created_at":"2022-06-13T16:39:08.000Z"
-      },
-     // "speed_avg":"0.0",
-     // "duration_total_accum":"9.0",
-     // "cadence_avg":"0.0",
-      "id":140473420,
-      "work_accum":"0.0",
-      "power_bike_tss_last":null,
-      "ascent_accum":"0.0",
-      "power_bike_np_last":null,
-      "duration_paused_accum":"0.0",
-      "created_at":"2022-06-13T16:39:09.000Z",
-      "updated_at":"2022-06-13T16:39:09.000Z",
-      "power_avg":"0.0",
-      "file":{
-        "url":"https://cdn.wahooligan.com/wahoo-cloud/production/uploads/workout_file/file/WpHvKL3irWsv2vHzGzGF_Q/2022-06-13-163851-ELEMNT_AE48-274-0.fit"
-      },
-     // "distance_accum":"0.0",
-     // "heart_rate_avg":"0.0",
-      "calories_accum":"0.0"
-    },
-    "webhook_token":"97661c16-6359-4854-9498-a49c07b6ec11"
-  };
+    11: "BIKING_CYCLECROSS",
+    12: "BIKING_INDOOR",
+    13: "BIKING_MOUNTAIN",	
+    14: "BIKING_RECUMBENT",
+    15: "BIKING_ROAD",
+    16: "BIKING_TRACK",
+    17: "BIKING_MOTOCYCLING",
+    18: "FE_GENERAL",
+    19: "FE_TREADMILL",
+    20: "FE_ELLIPTICAL",
+    21: "FE_BIKE",
+    22: "FE_ROWER",
+    23: "FE_CLIMBER",
+    25: "SWIMMING_LAP",
+    26: "SWIMMING_OPEN_WATER",
+    27: "SNOWBOARDING",
+    28: "SKIING",
+    29: "SKIING_DOWNHILL",
+    30: "SKIINGCROSS_COUNTRY",
+    31: "SKATING",
+    32: "SKATING_ICE",
+    33:	"SKATING_INLINE",
+    34:	"LONG_BOARDING",
+    35:	"SAILING",
+    36:	"WINDSURFING",
+    37:	"CANOEING",
+    38:	"KAYAKING",	
+    39:	"ROWING",
+    40:	"KITEBOARDING",
+    41:	"STAND_UP_PADDLE_BOARD",
+    42:	"WORKOUT",
+    43:	"CARDIO_CLASS",
+    44:	"STAIR_CLIMBER",	
+    45:	"WHEELCHAIR",
+    46:	"GOLFING",
+    47:	"OTHER",
+    49:	"BIKING_INDOOR_CYCLING_CLASS",
+    56:	"WALKING_TREADMILL",
+    61:	"BIKING_INDOOR_TRAINER",	
+    62:	"MULTISPORT",
+    63:	"TRANSITION",
+    64:	"EBIKING",
+    65:	"TICKR_OFFLINE",
+    66:	"YOGA",
+    255:"UNKNOWN",}
+ 
   let summaryActivity = {};
 
   if (activity.event_type == "workout_summary") {
@@ -252,10 +213,20 @@ exports.wahooSanitise = function (activity) {
     "average_cadence" : parseFloat(activity.workout_summary.cadence_avg).toFixed(1),
     "elevation_gain" : parseFloat(activity.workout_summary.ascent_accum).toFixed(1),
     "data_source" : "wahoo",
+    // --------TODO: Here is additional data we need to agree on -------
+    "work_accum": activity.workout_summary.work_accum,
+    "power_bike_tss_last": activity.workout_summary.power_bike_tss_last,
+    "ascent_accum": activity.workout_summary.ascent_accum,
+    "power_bike_np_last": activity.workout_summary.power_bike_np_last,
+    "duration_paused_accum": activity.workout_summary.duration_paused_accum,
+    "created_at": activity.workout_summary.created_at,
+    "updated_at": activity.workout_summary.updated_at,
+    "power_avg": activity.workout_summary.power_avg,
+    "file": activity.workout_summary.file,
     };
   } else {
     // we dont recognise this event type yet
-    throw new SanatiseError("dont recognise the wahoo event_type: "+activity.event_type);
+    throw new SanatiseError("don't recognise the wahoo event_type: "+activity.event_type);
   }
 
   return summaryActivity;
@@ -478,6 +449,45 @@ garmin_examplar_2 = {
     "userAccessToken": "715a21a5-d9ae-4139-8ed7-d3ad4a833da4",
     "userId": "8e1ec0b4-7fa9-4a1c-be14-d8f6dee46bf7"
   }
+  wahooExemplar = {
+    "user": {
+      "id":1510441
+    },
+    "event_type":"workout_summary",
+    "workout_summary":{
+      "duration_active_accum":"9.0",
+      "workout": {
+        "name":"Cycling",
+        "workout_token":"ELEMNT AE48:274",
+        "workout_type_id":0,
+        "id":147564736,
+        "updated_at":"2022-06-13T16:39:08.000Z",
+        "plan_id":null,
+        "minutes":0,
+        "starts":"2022-06-13T16:38:51.000Z",
+        "created_at":"2022-06-13T16:39:08.000Z"
+      },
+      "speed_avg":"0.0",
+      "duration_total_accum":"9.0",
+      "cadence_avg":"0.0",
+      "id":140473420,
+      "work_accum":"0.0",
+      "power_bike_tss_last":null,
+      "ascent_accum":"0.0",
+      "power_bike_np_last":null,
+      "duration_paused_accum":"0.0",
+      "created_at":"2022-06-13T16:39:09.000Z",
+      "updated_at":"2022-06-13T16:39:09.000Z",
+      "power_avg":"0.0",
+      "file":{
+        "url":"https://cdn.wahooligan.com/wahoo-cloud/production/uploads/workout_file/file/WpHvKL3irWsv2vHzGzGF_Q/2022-06-13-163851-ELEMNT_AE48-274-0.fit"
+      },
+      "distance_accum":"0.0",
+      "heart_rate_avg":"0.0",
+      "calories_accum":"0.0"
+    },
+    "webhook_token":"97661c16-6359-4854-9498-a49c07b6ec11"
+  };
 /*
 x = stravaSanitise([strava_examplar_1]);
 y = garminSanitise([garmin_examplar_2])
