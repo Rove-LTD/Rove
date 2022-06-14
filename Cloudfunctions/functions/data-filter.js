@@ -2,6 +2,13 @@
 // by Ben Thompson-Watson
 // 24/05/2022
 
+const { ParseError } = require("got/dist/source");
+class SanatiseError {
+  constuctor (message) {
+    this.errorMessage = message
+  }
+}
+
 /* eslint-disable max-len */
 /* eslint-disable */
 
@@ -194,23 +201,23 @@ exports.wahooSanitise = function (activity) {
     "user": {
       "id":1510441
     },
-    "event_type":"workout_summary",
+    //"event_type":"workout_summary",
     "workout_summary":{
       "duration_active_accum":"9.0",
       "workout": {
-        "name":"Cycling",
+       // "name":"Cycling",
         "workout_token":"ELEMNT AE48:274",
-        "workout_type_id":0,
+       // "workout_type_id":0,
         "id":147564736,
         "updated_at":"2022-06-13T16:39:08.000Z",
         "plan_id":null,
         "minutes":0,
-        "starts":"2022-06-13T16:38:51.000Z",
+       // "starts":"2022-06-13T16:38:51.000Z",
         "created_at":"2022-06-13T16:39:08.000Z"
       },
-      "speed_avg":"0.0",
-      "duration_total_accum":"9.0",
-      "cadence_avg":"0.0",
+     // "speed_avg":"0.0",
+     // "duration_total_accum":"9.0",
+     // "cadence_avg":"0.0",
       "id":140473420,
       "work_accum":"0.0",
       "power_bike_tss_last":null,
@@ -223,28 +230,33 @@ exports.wahooSanitise = function (activity) {
       "file":{
         "url":"https://cdn.wahooligan.com/wahoo-cloud/production/uploads/workout_file/file/WpHvKL3irWsv2vHzGzGF_Q/2022-06-13-163851-ELEMNT_AE48-274-0.fit"
       },
-      "distance_accum":"0.0",
-      "heart_rate_avg":"0.0",
+     // "distance_accum":"0.0",
+     // "heart_rate_avg":"0.0",
       "calories_accum":"0.0"
     },
     "webhook_token":"97661c16-6359-4854-9498-a49c07b6ec11"
   };
   let summaryActivity = {};
-  summaryActivity = {
-  "activity_id" : activity.workout_summary.workout.id,
-  "activity_name" : activity.workout_summary.workout.name,
-  "activity_type" :  wahooWorkoutType[activity.workout_summary.workout.workout_type_id], // TODO: complete the sanitisation.
- /* "distance_in_meters" : Math.round(activities[i]["distance"]),
-  "average_pace_in_meters_per_second" : parseFloat(activities[i]["average_speed"]).toFixed(1),
-  "active_calories" : Math.round(activities[i]["kilojoules"]),
-  "activity_duration_in_seconds" : activities[i]["moving_time"],
-  "start_time" : new Date(activities[i]["start_date_local"]),
-  "average_heart_rate_bpm" : activities[i]["average_heartrate"],
-  "average_cadence" : parseFloat(activities[i]["average_cadence"]).toFixed(1),
-  "elevation_gain" : parseFloat(activities[i]["elev_high"]).toFixed(1),
-  "elevation_loss" : parseFloat(activities[i]["elev_low"]).toFixed(1),
-  "data_source" : "strava",*/
-  };
+
+  if (activity.event_type == "workout_summary") {
+    summaryActivity = {
+    "activity_id": activity.workout_summary.id,
+    "activity_name": activity.workout_summary.workout.name,
+    "activity_type":  wahooWorkoutType[activity.workout_summary.workout.workout_type_id], // TODO: complete the sanitisation.
+    "distance_in_meters": parseFloat(activity.workout_summary.distance_accum).toFixed(2), //checkunits
+    "average_pace_in_meters_per_second" : parseFloat(activity.workout_summary.speed_avg).toFixed(2), //checkunits
+    "active_calories": parseFloat(activity.workout_summary.calories_accum).toFixed(1),
+    "activity_duration_in_seconds": activity.workout_summary.duration_total_accum,
+    "start_time" : new Date(activity.workout_summary.workout.starts),
+    "average_heart_rate_bpm" : activity.workout_summary.heart_rate_avg,
+    "average_cadence" : parseFloat(activity.workout_summary.cadence_avg).toFixed(1),
+    "elevation_gain" : parseFloat(activity.workout_summary.ascent_accum).toFixed(1),
+    "data_source" : "wahoo",
+    };
+  } else {
+    // we dont recognise this event type yet
+    throw new SanatiseError("dont recognise the wahoo event_type: "+activity.event_type);
+  }
 
   return summaryActivity;
 }

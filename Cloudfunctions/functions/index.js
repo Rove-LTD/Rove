@@ -518,9 +518,11 @@ exports.wahooWebhook = functions.https.onRequest(async (request, response) => {
     // TODO: Send the information to an endpoint specified by the dev
     // registered to a user.
     var devList = [];
+    var userRefList = [];
     const userQuery = await db.collection("users").where("wahoo_user_id", "==", request.body.user.id).get();
     userQuery.docs.forEach((doc)=>{
       devList.push(doc.data()["devId"]);
+      userRefList.push(doc.ref);
     });
     function onlyUnique(value, index, self) {
       return self.indexOf(value) === index;
@@ -529,8 +531,35 @@ exports.wahooWebhook = functions.https.onRequest(async (request, response) => {
     // now we have a list of developer Id's that are interested in this
     // users data
     // 1) sanatise and 2) send
-    const sanitisedActivity = filters.wahooSanitise(request.body);
-    // TODO: Send to webhook for each devId.
+    let sanitisedActivity
+    try {
+      sanitisedActivity = filters.wahooSanitise(request.body);
+    } catch (error) {
+      console.log(error.errorMessage);
+      response.status(404);
+      response.send("Event type not recognised");
+      return;
+    }
+    // TODO: Send to webhook for each developer interested in this user
+    devList.forEach((devId)=>{
+      sendToDev(devId);
+    })
+    // TODO: save as a backup for each user
+    userRefList.forEach((user)=>{
+      sendToUser(user);
+    })
+
+    function sendToDev(devId) { // TODO:
+      // read endpoint from devId
+      // use got to send to the endpoint with the agreed headers
+      return;;
+    }
+    function sendToUser(userRef) {
+      // write to database as a backup
+      userRef.collection("activities").doc().set(sanitisedActivity);
+      return;
+    }
+
     response.status(200);
     response.send("EVENT_RECEIVED");
   } else {
