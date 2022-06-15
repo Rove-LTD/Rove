@@ -32,8 +32,6 @@ const oauthWahoo = new OauthWahoo(configurations, db);
 exports.connectService = functions.https.onRequest(async (req, res) => {
   // Dev calls this service with parameters: user-id, dev-id, and service to
   // authenticate.
-  // TODO: create authorization with dev-secret keys and dev-id.
-
   // in form:  us-central1-rove.cloudfunctions.net/authenticateStrava?
   // userId=***&devId=***&devKey=***&provider=***
   const provider = (Url.parse(req.url, true).query)["provider"];
@@ -505,7 +503,7 @@ exports.wahooWebhook = functions.https.onRequest(async (request, response) => {
       body: request.body,
     });
     // check the webhook token is correct
-    // TODO: parameterise
+    // TODO: parameterise - should be a lookup in a collection("wahooWebhookTokens")
     if (request.body.webhook_token != "97661c16-6359-4854-9498-a49c07b6ec11") {
       console.log("Wahoo Webhook event recieved that did not have the correct webhook token");
       response.status(401);
@@ -537,9 +535,9 @@ exports.wahooWebhook = functions.https.onRequest(async (request, response) => {
     devList.forEach((devId)=>{
       return;
     });
-    // TODO: save as a backup for each user
+    // save raw and sanitised activites as a backup for each user
     userRefList.forEach(async (userRef)=>{
-      await userRef.collection("activities").doc().set(sanitisedActivity);
+      await userRef.collection("activities").doc().set({"sanitised": sanitisedActivity, "raw": request.body});
     });
 
     response.status(200);
