@@ -1,18 +1,25 @@
 // Data Collection, Cleaning and Storage Functions:
 // by Ben Thompson-Watson
 // 24/05/2022
+// Wahoo sanatise Function by Paul Ventisei
+// 15/06/2022
 
-const { ParseError } = require("got/dist/source");
+/**
+ * Sanatise Error class is used to throw an error message from the
+ * sanatise functions
+ */
 class SanatiseError {
-  constuctor (message) {
-    this.errorMessage = message
+  /**
+   * @param {String} message
+   */
+  constuctor(message) {
+    this.errorMessage = message;
   }
 }
 
 /* eslint-disable max-len */
 /* eslint-disable */
-
-
+const {ParseError} = require("got/dist/source");
 
 new_standard_format = {
     "activity_id" : null,

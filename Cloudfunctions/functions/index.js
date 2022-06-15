@@ -512,26 +512,19 @@ exports.wahooWebhook = functions.https.onRequest(async (request, response) => {
       response.send("NOT AUTHORISED");
       return;
     }
-    /**
-     * "body":{"user":{"id":1510441},"event_type":"workout_summary","workout_summary":{"duration_active_accum":"9.0","workout":{"name":"Cycling","workout_token":"ELEMNT AE48:274","workout_type_id":0,"id":147564736,"updated_at":"2022-06-13T16:39:08.000Z","plan_id":null,"minutes":0,"starts":"2022-06-13T16:38:51.000Z","created_at":"2022-06-13T16:39:08.000Z"},"speed_avg":"0.0","duration_total_accum":"9.0","cadence_avg":"0.0","id":140473420,"work_accum":"0.0","power_bike_tss_last":null,"ascent_accum":"0.0","power_bike_np_last":null,"duration_paused_accum":"0.0","created_at":"2022-06-13T16:39:09.000Z","updated_at":"2022-06-13T16:39:09.000Z","power_avg":"0.0","file":{"url":"https://cdn.wahooligan.com/wahoo-cloud/production/uploads/workout_file/file/WpHvKL3irWsv2vHzGzGF_Q/2022-06-13-163851-ELEMNT_AE48-274-0.fit"},"distance_accum":"0.0","heart_rate_avg":"0.0","calories_accum":"0.0"},"webhook_token":"97661c16-6359-4854-9498-a49c07b6ec11"}}
-     */
-    // TODO: Send the information to an endpoint specified by the dev
-    // registered to a user.
-    var devList = [];
-    var userRefList = [];
-    const userQuery = await db.collection("users").where("wahoo_user_id", "==", request.body.user.id).get();
+    let devList = [];
+    const userRefList = [];
+    const userQuery = await db.collection("users")
+        .where("wahoo_user_id", "==", request.body.user.id).get();
     userQuery.docs.forEach((doc)=>{
       devList.push(doc.data()["devId"]);
       userRefList.push(doc.ref);
     });
-    function onlyUnique(value, index, self) {
-      return self.indexOf(value) === index;
-    }
     devList = devList.filter(onlyUnique);
     // now we have a list of developer Id's that are interested in this
     // users data
     // 1) sanatise and 2) send
-    let sanitisedActivity
+    let sanitisedActivity;
     try {
       sanitisedActivity = filters.wahooSanitise(request.body);
     } catch (error) {
@@ -542,23 +535,12 @@ exports.wahooWebhook = functions.https.onRequest(async (request, response) => {
     }
     // TODO: Send to webhook for each developer interested in this user
     devList.forEach((devId)=>{
-      sendToDev(devId);
-    })
-    // TODO: save as a backup for each user
-    userRefList.forEach((user)=>{
-      writeToUser(user);
-    })
-
-    function sendToDev(devId) { // TODO:
-      // read endpoint from devId
-      // use got to send to the endpoint with the agreed headers
-      return;;
-    }
-    async function writeToUser(userRef) {
-      // write to database as a backup
-      await userRef.collection("activities").doc().set(sanitisedActivity);
       return;
-    }
+    });
+    // TODO: save as a backup for each user
+    userRefList.forEach(async (userRef)=>{
+      await userRef.collection("activities").doc().set(sanitisedActivity);
+    });
 
     response.status(200);
     response.send("EVENT_RECEIVED");
@@ -567,7 +549,6 @@ exports.wahooWebhook = functions.https.onRequest(async (request, response) => {
       query: request.query,
       body: request.body,
     });
-
     response.status(200);
     response.send("EVENT_RECEIVED");
   }
@@ -738,4 +719,9 @@ async function oauthCallbackHandlerGarmin(oAuthCallback, db) {
     await db.collection("users").doc(userId).set(firestoreParameters, {merge: true});
     return true;
   }
+}
+
+// Utility Functions -----------------------------
+function onlyUnique(value, index, self) {
+  return self.indexOf(value) === index;
 }
