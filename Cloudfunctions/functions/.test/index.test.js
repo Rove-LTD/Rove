@@ -78,6 +78,9 @@ describe('ROVE Functions - Integration Tests', () => {
             const res = {
                 send: (url) => {
                     assert.equal(url, "error: the provider was badly formatted, missing or not supported");
+                },
+                statusCode: (code) => {
+                    assert.equal(code, 400);
                 }
             }
 
@@ -92,6 +95,9 @@ describe('ROVE Functions - Integration Tests', () => {
             const res = {
                 send: (url) => {
                     assert.equal(url, "error: the developerId was badly formatted, missing or not authorised");
+                },
+                statusCode: (code) => {
+                    assert.equal(code, 400);
                 }
             }
 
@@ -105,6 +111,9 @@ describe('ROVE Functions - Integration Tests', () => {
             const res = {
                 send: (url) => {
                     assert.equal(url, "error: the developerId was badly formatted, missing or not authorised");
+                },
+                statusCode: (code) => {
+                    assert.equal(code, 400);
                 }
             }
 
@@ -118,6 +127,9 @@ describe('ROVE Functions - Integration Tests', () => {
             const res = {
                 send: (url) => {
                     assert.equal(url, "error: the userId parameter is missing");
+                },
+                statusCode: (code) => {
+                    assert.equal(code, 400);
                 }
             }
 
