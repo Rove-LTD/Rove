@@ -56,17 +56,20 @@ exports.connectService = functions.https.onRequest(async (req, res) => {
     if (!devDoc.exists) {
       url =
         "error: the developerId was badly formatted, missing or not authorised";
+      res.statusCode(400);
       res.send(url);
       return;
     }
     if (devDoc.data().devKey != devKey|| devKey == null) {
       url =
         "error: the developerId was badly formatted, missing or not authorised";
+      res.statusCode(400);
       res.send(url);
       return;
     }
   } else {
     url = "error: the developerId parameter is missing";
+    res.statusCode(400);
     res.send(url);
     return;
   }
@@ -74,6 +77,7 @@ exports.connectService = functions.https.onRequest(async (req, res) => {
   // now check the userId has been given
   if (userId == null) {
     url = "error: the userId parameter is missing";
+    res.statusCode(400);
     res.send(url);
     return;
   }
