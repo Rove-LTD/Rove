@@ -579,8 +579,8 @@ describe('ROVE Functions - Integration Tests', () => {
 
         })
     }); //End Test 5
-       //----------TEst 6---------------
-       describe("Testing that the Webhooks work: ", () => {
+    //----------TEST 6---------------
+    describe("Testing that the Webhooks work: ", () => {
         before ('set up the wahoo userId in the test User doc', async () => {
             await admin.firestore()
             .collection("users")
@@ -642,6 +642,88 @@ describe('ROVE Functions - Integration Tests', () => {
            assert.deepEqual(sanatisedActivity, expectedResults);
 
 
+        })
+        it.only('Polar Webhook should get event, sanatise, save and repond with status 200...', async () => {
+            //set up the stubbed response to mimic polar's response when called with the
+            stubbedPolarCall = sinon.stub(got, "get");
+            stubbedPolarCall.onFirstCall().returns("polar payload");
+            // set the request object with the correct provider, developerId and userId
+            const req = {
+                url: "https://us-central1-rove-26.cloudfunctions.net/wahooWebhook",
+                method: "POST",
+                body: {
+                    "id": 1937529874,
+                    "upload-time": "2008-10-13T10:40:02Z",
+                    "polar-user": "https://www.polaraccesslink/v3/users/1",
+                    "transaction-id": 179879,
+                    "device": "Polar M400",
+                    "device-id": "1111AAAA",
+                    "start-time": "2008-10-13T10:40:02Z",
+                    "start-time-utc-offset": 180,
+                    "duration": "PT2H44M",
+                    "calories": 530,
+                    "distance": 1600,
+                    "heart-rate": {
+                      "average": 129,
+                      "maximum": 147
+                    },
+                    "training-load": 143.22,
+                    "sport": "OTHER",
+                    "has-route": true,
+                    "club-id": 999,
+                    "club-name": "Polar Club",
+                    "detailed-sport-info": "WATERSPORTS_WATERSKI",
+                    "fat-percentage": 60,
+                    "carbohydrate-percentage": 38,
+                    "protein-percentage": 2
+                  }
+            };
+            res = {
+                send: (text)=> {assert.equal(text, "EVENT_RECEIVED");},
+                status: (code)=>{assert.equal(code, 200);},
+            }
+
+            await myFunctions.polarWebhook(req, res);
+            // check polar was called with the right arguments
+            assert(stubbedPolarCall.calledWith(), "polar arguments");
+
+            //now check the database was updated correctly
+           const testUserDocs = await admin.firestore()
+           .collection("users")
+           .doc(testUser)
+           .collection("activities")
+           .get();
+
+           const sanatisedActivity = testUserDocs.docs[0].data();
+           const expectedResults = { // TODO:
+                sanitised: {
+                    activity_id: 140473420,
+                    activity_name: "Cycling",
+                    activity_type: "BIKING",
+                    distance_in_meters: "0.00",
+                    average_pace_in_meters_per_second: "0.00",
+                    active_calories: "0.0",
+                    activity_duration_in_seconds: "9.0",
+                    start_time: '2022-06-13T16:38:51.000Z',
+                    average_heart_rate_bpm: "0.0",
+                    average_cadence: "0.0",
+                    elevation_gain: "0.0",
+                    data_source: "wahoo",
+                    work_accum: "0.0",
+                    power_bike_tss_last: null,
+                    ascent_accum: "0.0",
+                    power_bike_np_last: null,
+                    duration_paused_accum: "0.0",
+                    created_at: "2022-06-13T16:39:09.000Z",
+                    updated_at: "2022-06-13T16:39:09.000Z",
+                    power_avg: "0.0",
+                    file: {
+                        "url":"https://cdn.wahooligan.com/wahoo-cloud/production/uploads/workout_file/file/WpHvKL3irWsv2vHzGzGF_Q/2022-06-13-163851-ELEMNT_AE48-274-0.fit"
+                    },
+                },
+                raw: req.body,
+            }
+           assert.deepEqual(sanatisedActivity, expectedResults);
         })
     }); //End Test 6
 }); //end Integration TEST
