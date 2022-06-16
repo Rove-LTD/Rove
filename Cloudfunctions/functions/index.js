@@ -16,8 +16,6 @@ const strava = require("strava-v3");
 const OauthWahoo = require("./oauthWahoo");
 const contentsOfDotEnvFile = require("./config.json");
 const filters = require("./data-filter");
-const td = require("tinyduration");
-
 
 const configurations = contentsOfDotEnvFile["config"];
 // find a way to decrypt and encrypt this information
@@ -578,7 +576,7 @@ exports.polarWebhook = functions.https.onRequest(async (request, response) => {
       };
       const activity = await got.get(options).json();
       console.log(activity.sport);
-      const sanitisedActivity = polarSanatise(activity);
+      const sanitisedActivity = filters.polarSanatise(activity);
       // write sanitised information
       await db.collection("users").doc(userQuery.docs.at(0).id).collection("activities").doc().set(sanitisedActivity);
       // save info to dev endpoint here.
@@ -602,37 +600,6 @@ exports.polarWebhook = functions.https.onRequest(async (request, response) => {
 
     response.status(200);
     response.send("OK");
-  }
-  function polarSanatise(activity) {
-    const summaryActivity = {
-      // standard fields
-      "activity_id": activity["id"],
-      "activity_name": activity["detailed_sport_info"],
-      "activity_type": activity["sport"],
-      "distance_in_meters": activity["distance"],
-      "active_calories": activity["calories"],
-      "activity_duration_in_seconds": td.parse(activity["duration"]).seconds,
-      "start_time": new Date(activity["start_time"]),
-      "data_source": "polar",
-      // some extra fields here
-      "device": activity["device"],
-      "training_load": activity["training_load"],
-      "has_route": activity["has_route"],
-      "fat_percentage": activity["fat_percentage"],
-      "carbohydrate_percentage": activity["carbohydrate_percentage"],
-      "protein_percentage": activity["protein_percentage"],
-    };
-    for (const property in summaryActivity) {
-      if (typeof summaryActivity[property] == "undefined") {
-        summaryActivity[property] = null;
-      }
-    }
-    if (activity["heart_rate"]["average"] != undefined) {
-      // deal with the fact that some don't have hr
-      summaryActivity.set("average_heart_rate_bpm", activity["heart-rate"]["average"]);
-      summaryActivity.set("max_heart_rate_bpm", activity["heart-rate"]["maximum"]);
-    }
-    return summaryActivity;
   }
 });
 

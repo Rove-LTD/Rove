@@ -20,6 +20,8 @@ class SanatiseError {
 /* eslint-disable max-len */
 /* eslint-disable */
 const {ParseError} = require("got/dist/source");
+const td = require("tinyduration");
+
 
 new_standard_format = {
     "activity_id" : null,
@@ -37,28 +39,39 @@ new_standard_format = {
     "data_source" : null,
   }
 
-function polarSanatise(activity) {
-  const summaryActivity = {
-    // standard fields
-    "activity_id" : activity["id"],
-    "activity_name" : activity["detailed-sport-info"],
-    "activity_type" : activity["sport"],
-    "distance_in_meters" : activity["distance"],
-    "active_calories" : activity["calories"],
-    "activity_duration_in_seconds" : activity["duration"],
-    "start_time" : Date(activity["start-time"]),
-    "average_heart_rate_bpm" : activity["heart-rate"]["average"],
-    "data_source" : "polar",
-    // some extra fields here
-    "max_heart_rate_bpm" : activity["heart-rate"]["maximum"],
-    "device-id": activity["device-id"],
-    "training-load": activity["training-load"],
-    "has-route": activity["has-route"],
-    "fat-percentage": activity["fat-percentage"],
-    "carbohydrate-percentage": activity["carbohydrate-percentage"],
-    "protein-percentage": activity["protein-percentage"]
+  function polarSanatise(activity) {
+    const summaryActivity = {
+      // standard fields
+      "activity_id": activity["id"],
+      "activity_name": activity["detailed_sport_info"],
+      "activity_type": activity["sport"],
+      "distance_in_meters": activity["distance"],
+      "active_calories": activity["calories"],
+      "activity_duration_in_seconds": td.parse(activity["duration"]).seconds,
+      "start_time": new Date(activity["start_time"]),
+      "data_source": "polar",
+      // some extra fields here
+      "device": activity["device"],
+      "training_load": activity["training_load"],
+      "has_route": activity["has_route"],
+      "fat_percentage": activity["fat_percentage"],
+      "carbohydrate_percentage": activity["carbohydrate_percentage"],
+      "protein_percentage": activity["protein_percentage"],
+    };
+    for (const property in summaryActivity) {
+      if (typeof summaryActivity[property] == "undefined") {
+        summaryActivity[property] = null;
+      }
+    }
+    if (activity["heart_rate"]["average"] != undefined) {
+      // deal with the fact that some don't have hr
+      summaryActivity.set("average_heart_rate_bpm", activity["heart-rate"]["average"]);
+      summaryActivity.set("max_heart_rate_bpm", activity["heart-rate"]["maximum"]);
+    }
+    return summaryActivity;
   }
 /*{
+    Polar Example Return.
     "id": 1937529874,
     "upload-time": "2008-10-13T10:40:02Z",
     "polar-user": "https://www.polaraccesslink/v3/users/1",
@@ -84,8 +97,6 @@ function polarSanatise(activity) {
     "carbohydrate-percentage": 38,
     "protein-percentage": 2
   }*/
-  return summaryActivity;
-}
 
 function stravaSanitise(activities) {
 let summaryActivities = [{}];
