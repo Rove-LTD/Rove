@@ -16,6 +16,8 @@ const strava = require("strava-v3");
 const OauthWahoo = require("./oauthWahoo");
 const contentsOfDotEnvFile = require("./config.json");
 const filters = require("./data-filter");
+const td = require("tinyduration");
+
 
 const configurations = contentsOfDotEnvFile["config"];
 // find a way to decrypt and encrypt this information
@@ -52,17 +54,20 @@ exports.connectService = functions.https.onRequest(async (req, res) => {
     if (!devDoc.exists) {
       url =
         "error: the developerId was badly formatted, missing or not authorised";
+      res.statusCode(400);
       res.send(url);
       return;
     }
     if (devDoc.data().devKey != devKey|| devKey == null) {
       url =
         "error: the developerId was badly formatted, missing or not authorised";
+      res.statusCode(400);
       res.send(url);
       return;
     }
   } else {
     url = "error: the developerId parameter is missing";
+    res.statusCode(400);
     res.send(url);
     return;
   }
@@ -70,6 +75,7 @@ exports.connectService = functions.https.onRequest(async (req, res) => {
   // now check the userId has been given
   if (userId == null) {
     url = "error: the userId parameter is missing";
+    res.statusCode(400);
     res.send(url);
     return;
   }
@@ -468,9 +474,9 @@ exports.stravaWebhook = functions.https.onRequest(async (request, response) => {
     console.log(stravaAccessToken);
     // TODO: Get strava activity and sanatize
     const activity = await strava.activities.get({"access_token": stravaAccessToken, "id": request.body.object_id});
-    console.log(activity);
+    // console.log(activity);
     const sanitisedActivity = filters.stravaSanitise([activity]);
-    console.log(sanitisedActivity);
+    // console.log(sanitisedActivity);
     // TODO: Send the information to an endpoint specified by the dev registered to a user.
     const ref = admin.database().ref("activities");
     const childRef = ref.push();
@@ -570,8 +576,11 @@ exports.polarWebhook = functions.https.onRequest(async (request, response) => {
         method: "POST",
         headers: headers,
       };
-      const activity = await got.get(options);
-      console.log(activity);
+      const activity = await got.get(options).json();
+      console.log(activity.sport);
+      const sanitisedActivity = polarSanatise(activity);
+      // write sanitised information
+      await db.collection("users").doc(userQuery.docs.at(0).id).collection("activities").doc().set(sanitisedActivity);
       // save info to dev endpoint here.
 
       /* {
@@ -593,6 +602,37 @@ exports.polarWebhook = functions.https.onRequest(async (request, response) => {
 
     response.status(200);
     response.send("OK");
+  }
+  function polarSanatise(activity) {
+    const summaryActivity = {
+      // standard fields
+      "activity_id": activity["id"],
+      "activity_name": activity["detailed_sport_info"],
+      "activity_type": activity["sport"],
+      "distance_in_meters": activity["distance"],
+      "active_calories": activity["calories"],
+      "activity_duration_in_seconds": td.parse(activity["duration"]).seconds,
+      "start_time": new Date(activity["start_time"]),
+      "data_source": "polar",
+      // some extra fields here
+      "device": activity["device"],
+      "training_load": activity["training_load"],
+      "has_route": activity["has_route"],
+      "fat_percentage": activity["fat_percentage"],
+      "carbohydrate_percentage": activity["carbohydrate_percentage"],
+      "protein_percentage": activity["protein_percentage"],
+    };
+    for (const property in summaryActivity) {
+      if (typeof summaryActivity[property] == "undefined") {
+        summaryActivity[property] = null;
+      }
+    }
+    if (activity["heart_rate"]["average"] != undefined) {
+      // deal with the fact that some don't have hr
+      summaryActivity.set("average_heart_rate_bpm", activity["heart-rate"]["average"]);
+      summaryActivity.set("max_heart_rate_bpm", activity["heart-rate"]["maximum"]);
+    }
+    return summaryActivity;
   }
 });
 
