@@ -32,8 +32,6 @@ const oauthWahoo = new OauthWahoo(configurations, db);
 exports.connectService = functions.https.onRequest(async (req, res) => {
   // Dev calls this service with parameters: user-id, dev-id, and service to
   // authenticate.
-  // TODO: create authorization with dev-secret keys and dev-id.
-
   // in form:  us-central1-rove.cloudfunctions.net/authenticateStrava?
   // userId=***&devId=***&devKey=***&provider=***
   const provider = (Url.parse(req.url, true).query)["provider"];
@@ -498,14 +496,50 @@ exports.stravaWebhook = functions.https.onRequest(async (request, response) => {
   }
 });
 
-exports.wahooWebhook = functions.https.onRequest((request, response) => {
+exports.wahooWebhook = functions.https.onRequest(async (request, response) => {
   if (request.method === "POST") {
     functions.logger.info("---> Wahoo 'POST' webhook event received!", {
       query: request.query,
       body: request.body,
     });
-    // TODO: Send the information to an endpoint specified by the dev
-    // registered to a user.
+    // check the webhook token is correct
+    // TODO: parameterise - should be a lookup in a collection("wahooWebhookTokens")
+    if (request.body.webhook_token != "97661c16-6359-4854-9498-a49c07b6ec11") {
+      console.log("Wahoo Webhook event recieved that did not have the correct webhook token");
+      response.status(401);
+      response.send("NOT AUTHORISED");
+      return;
+    }
+    let devList = [];
+    const userRefList = [];
+    const userQuery = await db.collection("users")
+        .where("wahoo_user_id", "==", request.body.user.id).get();
+    userQuery.docs.forEach((doc)=>{
+      devList.push(doc.data()["devId"]);
+      userRefList.push(doc.ref);
+    });
+    devList = devList.filter(onlyUnique);
+    // now we have a list of developer Id's that are interested in this
+    // users data
+    // 1) sanatise and 2) send
+    let sanitisedActivity;
+    try {
+      sanitisedActivity = filters.wahooSanitise(request.body);
+    } catch (error) {
+      console.log(error.errorMessage);
+      response.status(404);
+      response.send("Event type not recognised");
+      return;
+    }
+    // TODO: Send to webhook for each developer interested in this user
+    devList.forEach((devId)=>{
+      return;
+    });
+    // save raw and sanitised activites as a backup for each user
+    userRefList.forEach(async (userRef)=>{
+      await userRef.collection("activities").doc().set({"sanitised": sanitisedActivity, "raw": request.body});
+    });
+
     response.status(200);
     response.send("EVENT_RECEIVED");
   } else {
@@ -513,19 +547,41 @@ exports.wahooWebhook = functions.https.onRequest((request, response) => {
       query: request.query,
       body: request.body,
     });
-
     response.status(200);
     response.send("EVENT_RECEIVED");
   }
 });
 
-exports.polarWebhook = functions.https.onRequest((request, response) => {
+exports.polarWebhook = functions.https.onRequest(async (request, response) => {
   if (request.method === "POST") {
     functions.logger.info("---> polar 'POST' webhook event received!", {
       query: request.query,
       body: request.body,
     });
     // TODO: Send the information to an endpoint specified by the dev
+    const userQuery = await db.collection("users").where("polar_user_id", "==", request.body.user_id).get();
+    const userToken = userQuery.docs.at(0).data()["polar_access_token"];
+    if (request.body.event == "EXERCISE") {
+      const headers = {
+        "Accept": "application/json", "Authorization": "Bearer " + userToken,
+      };
+      const options = {
+        url: "https://www.polaraccesslink.com/v3/exercises/" + request.body.entity_id,
+        method: "POST",
+        headers: headers,
+      };
+      const activity = await got.get(options);
+      console.log(activity);
+      // save info to dev endpoint here.
+
+      /* {
+   "event": "EXERCISE",
+   "user_id": 475,
+   "entity_id": "aQlC83",
+   "timestamp": "2018-05-15T14:22:24Z",
+   "url": "https://www.polaraccesslink.com/v3/exercises/aQlC83"
+}*/
+    }
     // registered to a user.
     response.status(200);
     response.send("OK");
@@ -661,4 +717,9 @@ async function oauthCallbackHandlerGarmin(oAuthCallback, db) {
     await db.collection("users").doc(userId).set(firestoreParameters, {merge: true});
     return true;
   }
+}
+
+// Utility Functions -----------------------------
+function onlyUnique(value, index, self) {
+  return self.indexOf(value) === index;
 }
