@@ -23,24 +23,27 @@ const {ParseError} = require("got/dist/source");
 const td = require("tinyduration");
 
 
-new_standard_format = {
-    "activity_id" : null,
-    "activity_name" : null,
-    "activity_type" : null,
-    "distance_in_meters" : null,
-    "average_pace_in_meters_per_second" : null,
-    "active_calories" : null,
-    "activity_duration_in_seconds" : null,
-    "start_time" : null,
-    "average_heart_rate_bpm" : null,
-    "average_cadence" : null,
-    "elevation_gain" : null,
-    "elevation_loss" : null,
-    "data_source" : null,
+class standard_format {
+  constructor() {
+    let activity_id = null;
+    let activity_name = null;
+    let activity_type = null;
+    let distance_in_meters = null;
+    let average_pace_in_meters_per_second = null;
+    let active_calories = null;
+    let activity_duration_in_seconds = null;
+    let start_time = null;
+    let average_heart_rate_bpm = null;
+    let average_cadence = null;
+    let elevation_gain = null;
+    let elevation_loss = null;
+    let data_source = null;
   }
+}
 
-  function polarSanatise(activity) {
-    const summaryActivity = {
+  exports.polarSanatise = function (activity) {
+    // standard fields
+    summaryActivity = {
       // standard fields
       "activity_id": activity["id"],
       "activity_name": activity["detailed_sport_info"],
@@ -48,26 +51,28 @@ new_standard_format = {
       "distance_in_meters": activity["distance"],
       "active_calories": activity["calories"],
       "activity_duration_in_seconds": td.parse(activity["duration"]).seconds,
-      "start_time": new Date(activity["start_time"]),
+      "start_time": new Date(activity["start_time"]).toISOString(),
       "data_source": "polar",
-      // some extra fields here
-      "device": activity["device"],
-      "training_load": activity["training_load"],
-      "has_route": activity["has_route"],
-      "fat_percentage": activity["fat_percentage"],
-      "carbohydrate_percentage": activity["carbohydrate_percentage"],
-      "protein_percentage": activity["protein_percentage"],
+      "average_pace_in_meters_per_second": null
+    }
+    if (activity["heart_rate"]["average"] != undefined) {
+      // deal with the fact that some don't have hr
+      summaryActivity.average_heart_rate_bpm =
+          activity["heart_rate"]["average"];
+      summaryActivity.max_heart_rate_bpm =
+          activity["heart_rate"]["maximum"];
+    } else {
+      summaryActivity.average_heart_rate_bpm = null;
+      summaryActivity.max_heart_rate_bpm = null;
     };
+    summaryActivity.average_cadence = null;
+    summaryActivity.elevation_gain = null;
+    summaryActivity.elevation_loss = null;
     for (const property in summaryActivity) {
       if (typeof summaryActivity[property] == "undefined") {
         summaryActivity[property] = null;
       }
-    }
-    if (activity["heart_rate"]["average"] != undefined) {
-      // deal with the fact that some don't have hr
-      summaryActivity.set("average_heart_rate_bpm", activity["heart-rate"]["average"]);
-      summaryActivity.set("max_heart_rate_bpm", activity["heart-rate"]["maximum"]);
-    }
+    };
     return summaryActivity;
   }
 /*{
