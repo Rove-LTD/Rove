@@ -648,7 +648,7 @@ describe('ROVE Functions - Integration Tests', () => {
 
 
         })
-        it.only('Polar Webhook should get event, sanatise, save and repond with status 200...', async () => {
+        it('Polar Webhook should get event, sanatise, save and repond with status 200...', async () => {
             //set up the stubbed response to mimic polar's response when called with the
             const polarExercisePayload = {
                 json() { return {
