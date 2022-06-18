@@ -50,11 +50,38 @@ class standard_format {
       "activity_type": activity["sport"],
       "distance_in_meters": activity["distance"],
       "active_calories": activity["calories"],
-      "activity_duration_in_seconds": td.parse(activity["duration"]).seconds,
       "start_time": new Date(activity["start_time"]).toISOString(),
       "data_source": "polar",
       "average_pace_in_meters_per_second": null
     }
+    const duration = td.parse(activity["duration"]);
+    let durationInSeconds = 0;
+    Object.keys(duration).forEach(function(key,index) {
+      switch (key) {
+        case "hours":
+          durationInSeconds = durationInSeconds + duration[key]*3600;
+          break;
+        case "minutes":
+          durationInSeconds = durationInSeconds + duration[key]*60;
+          break;
+        case "seconds":
+          durationInSeconds = durationInSeconds + duration[key];
+          break;
+        case "days":
+          durationInSeconds = durationInSeconds + duration[key]*3600*24;
+          break;
+        case "weeks":
+          durationInSeconds = durationInSeconds + duration[key]*3600*24*7;
+          break;
+        case "months":
+          durationInSeconds = NaN
+          break;
+        case "years":
+          durationInSeconds = NaN;
+          break;
+      }
+    });
+    summaryActivity.activity_duration_in_seconds = durationInSeconds;
     if (activity["heart_rate"]["average"] != undefined) {
       // deal with the fact that some don't have hr
       summaryActivity.average_heart_rate_bpm =
