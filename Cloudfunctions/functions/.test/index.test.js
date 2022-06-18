@@ -78,6 +78,9 @@ describe('ROVE Functions - Integration Tests', () => {
             const res = {
                 send: (url) => {
                     assert.equal(url, "error: the provider was badly formatted, missing or not supported");
+                },
+                status: (code) => {
+                    assert.equal(code, 400);
                 }
             }
 
@@ -92,6 +95,9 @@ describe('ROVE Functions - Integration Tests', () => {
             const res = {
                 send: (url) => {
                     assert.equal(url, "error: the developerId was badly formatted, missing or not authorised");
+                },
+                status: (code) => {
+                    assert.equal(code, 400);
                 }
             }
 
@@ -105,6 +111,9 @@ describe('ROVE Functions - Integration Tests', () => {
             const res = {
                 send: (url) => {
                     assert.equal(url, "error: the developerId was badly formatted, missing or not authorised");
+                },
+                status: (code) => {
+                    assert.equal(code, 400);
                 }
             }
 
@@ -118,6 +127,9 @@ describe('ROVE Functions - Integration Tests', () => {
             const res = {
                 send: (url) => {
                     assert.equal(url, "error: the userId parameter is missing");
+                },
+                status: (code) => {
+                    assert.equal(code, 400);
                 }
             }
 
@@ -611,7 +623,7 @@ describe('ROVE Functions - Integration Tests', () => {
            const testUserDocs = await admin.firestore()
            .collection("users")
            .doc(testUser)
-           .collection("activities") // how do I get this reference? - actually dont need it becasue the test database only has one activity....
+           .collection("activities")
            .get();
 
            const sanatisedActivity = testUserDocs.docs[0].data();
