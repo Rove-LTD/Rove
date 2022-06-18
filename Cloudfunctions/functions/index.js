@@ -105,6 +105,90 @@ exports.oauthCallbackHandlerGarmin = functions.https
       res.send("THANKS, YOU CAN NOW CLOSE THIS WINDOW");
     }),
 
+
+exports.getActivityData = functions.https.onRequest(async (req, res) => {
+  const appQuery = Url.parse(req.url, true).query;
+  const userId = appQuery["userId"];
+  const devId = appQuery["devId"];
+  const devKey = appQuery["devKey"];
+  const before = appQuery["before"];
+  const after = appQuery["after"];
+  let url = "";
+
+  // parameter checks
+  // first check developer exists and the devKey matches
+  if (devId != null) {
+    const devDoc = await admin.firestore()
+        .collection("developers")
+        .doc(devId)
+        .get();
+    if (!devDoc.exists) {
+      url =
+        "error: the developerId was badly formatted, missing or not authorised";
+      res.statusCode(400);
+      res.send(url);
+      return;
+    }
+    if (devDoc.data().devKey != devKey|| devKey == null) {
+      url =
+        "error: the developerId was badly formatted, missing or not authorised";
+      res.statusCode(400);
+      res.send(url);
+      return;
+    }
+    // Validate before and after dates
+    if (before == null || after == null) {
+      url =
+        "error: either before or after date was badly formatted or missing";
+      res.statusCode(400);
+      res.send(url);
+      return;
+    } else if ( before < after ) {
+      url =
+        "error: either before and after dates swapped or after date placed too early!";
+      res.statusCode(400);
+      res.send(url);
+      return;
+    }
+  } else {
+    url = "error: the developerId parameter is missing";
+    res.statusCode(400);
+    res.send(url);
+    return;
+  }
+
+  // now check the userId has been given
+  if (userId == null) {
+    url = "error: the userId parameter is missing";
+    res.statusCode(400);
+    res.send(url);
+    return;
+  }
+  // Iterate through userDocs and find targetted user
+  const sessions = [];
+  const userDocs = await db.collection("users").get();
+  let user = null;
+  for (const doc of userDocs) {
+    if (doc.data().userId == userId) {
+      user = doc;
+      break;
+    }
+  }
+  if (user == null) {
+    url = "error: the userId is not valid";
+    res.statusCode(400);
+    res.send(url);
+    return;
+  }
+  const rawActivites = await db.collection("users").document(user.id).activites.get();
+  for (const doc of rawActivites) {
+    if (new Date(doc.data().sanitised.created_at)> new Date(after) && new Date(doc.data().sanitised.created_at) < new Date(before)) {
+      sessions.push([doc.data().sanitised, doc.data().raw]);
+    }
+  }
+  res.send(200);
+  return;
+});
 // callback from strava with token in
 exports.stravaCallback = functions.https.onRequest(async (req, res) => {
   // this comes from strava
