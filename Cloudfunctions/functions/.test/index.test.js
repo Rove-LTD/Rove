@@ -28,6 +28,7 @@ const request = require('request');
 const got = require('got');
 const strava = require("strava-v3");
 const { prototype } = require('mocha');
+const { wahooSanitise } = require('../data-filter.js');
 
 //------------------------Set Up of Test Data Project Complete ---------------//
 
@@ -602,9 +603,18 @@ describe('ROVE Functions - Integration Tests', () => {
                 "polar_user_id": "polar_test_user",
                 "polar_access_token": "polar_test_access_token",
             }, {merge: true});
+
+            activityDocs = await admin.firestore()
+                .collection("users")
+                .doc(testUser)
+                .collection("activities")
+                .get();
+            
+            activityDocs.forEach(async (doc)=>{
+                await doc.ref.delete();
+            });
         });
         it('Webhooks should log event and repond with status 200...', async () => {
-            //set up the stubbed response to mimic polar's response when called with the
             // set the request object with the correct provider, developerId and userId
             const req = {
                 url: "https://us-central1-rove-26.cloudfunctions.net/wahooWebhook",
@@ -618,7 +628,8 @@ describe('ROVE Functions - Integration Tests', () => {
 
 
             await myFunctions.wahooWebhook(req, res);
-
+            const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+            await wait(1000);
             //now check the database was updated correctly
            const testUserDocs = await admin.firestore()
            .collection("users")
@@ -629,11 +640,12 @@ describe('ROVE Functions - Integration Tests', () => {
            const sanatisedActivity = testUserDocs.docs[0].data();
            const expectedResults = {
                 sanitised: {
+                    userTag: "paulsTestDevSecondUser",
                     activity_id: 140473420,
                     activity_name: "Cycling",
                     activity_type: "BIKING",
-                    distance_in_meters: "0",
-                    average_pace_in_meters_per_second: "0.00",
+                    distance_in_meters: "0.0",
+                    average_pace_in_meters_per_second: "0.0",
                     active_calories: "0.0",
                     activity_duration_in_seconds: "9.0",
                     start_time: '2022-06-13T16:38:51.000Z',
@@ -656,6 +668,7 @@ describe('ROVE Functions - Integration Tests', () => {
                 },
                 raw: req.body,
             }
+
            assert.deepEqual(sanatisedActivity, expectedResults);
 
 
@@ -715,12 +728,14 @@ describe('ROVE Functions - Integration Tests', () => {
             await myFunctions.polarWebhook(req, res);
             // check polar was called with the right arguments
             // assert(stubbedPolarCall.calledWith(), "polar arguments");
-
+            const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+            await wait(1000);
             //now check the database was updated correctly
            const testUserDocs = await admin.firestore()
            .collection("users")
            .doc(testUser)
            .collection("activities")
+           .where("raw.id", "==", 1937529874)
            .get();
 
            const sanatisedActivity = testUserDocs.docs[0].data();

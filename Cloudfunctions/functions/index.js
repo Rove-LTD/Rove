@@ -547,6 +547,7 @@ exports.wahooWebhook = functions.https.onRequest(async (request, response) => {
 
     response.status(200);
     response.send("EVENT_RECEIVED");
+    return;
   } else {
     functions.logger.info("---> Wahoo 'GET' webhook event received!", {
       query: request.query,

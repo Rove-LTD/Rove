@@ -304,14 +304,15 @@ exports.wahooSanitise = function (activity) {
     "activity_id": activity.workout_summary.id,
     "activity_name": activity.workout_summary.workout.name,
     "activity_type":  wahooWorkoutType[activity.workout_summary.workout.workout_type_id], // TODO: complete the sanitisation.
-    "distance_in_meters": parseFloat(activity.workout_summary.distance_accum).toFixed(2), //checkunits
-    "average_pace_in_meters_per_second" : parseFloat(activity.workout_summary.speed_avg).toFixed(2), //checkunits
-    "active_calories": parseFloat(activity.workout_summary.calories_accum).toFixed(1),
+    "distance_in_meters": activity.workout_summary.distance_accum, //checkunits
+    "average_pace_in_meters_per_second" : activity.workout_summary.speed_avg, //checkunits
+    "active_calories": activity.workout_summary.calories_accum,
     "activity_duration_in_seconds": activity.workout_summary.duration_total_accum,
     "start_time" : activity.workout_summary.workout.starts,
     "average_heart_rate_bpm" : activity.workout_summary.heart_rate_avg,
-    "average_cadence" : parseFloat(activity.workout_summary.cadence_avg).toFixed(1),
-    "elevation_gain" : parseFloat(activity.workout_summary.ascent_accum).toFixed(1),
+    "average_cadence" : activity.workout_summary.cadence_avg,
+    "elevation_gain" : activity.workout_summary.ascent_accum,
+    "elevation_loss": null,
     "data_source" : "wahoo",
     // --------TODO: Here is additional data we need to agree on -------
     "work_accum": activity.workout_summary.work_accum,
