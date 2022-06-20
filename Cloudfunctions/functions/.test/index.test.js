@@ -28,6 +28,7 @@ const request = require('request');
 const got = require('got');
 const strava = require("strava-v3");
 const { prototype } = require('mocha');
+const { wahooSanitise } = require('../data-filter.js');
 
 //------------------------Set Up of Test Data Project Complete ---------------//
 
@@ -591,16 +592,29 @@ describe('ROVE Functions - Integration Tests', () => {
 
         })
     }); //End Test 5
-       //----------TEst 6---------------
-       describe("Testing that the Webhooks work: ", () => {
+    //----------TEST 6---------------
+    describe("Testing that the Webhooks work: ", () => {
         before ('set up the wahoo userId in the test User doc', async () => {
             await admin.firestore()
             .collection("users")
             .doc(testUser)
-            .set({"wahoo_user_id": "wahoo_test_user"}, {merge: true});
+            .set({
+                "wahoo_user_id": "wahoo_test_user",
+                "polar_user_id": "polar_test_user",
+                "polar_access_token": "polar_test_access_token",
+            }, {merge: true});
+
+            activityDocs = await admin.firestore()
+                .collection("users")
+                .doc(testUser)
+                .collection("activities")
+                .get();
+            
+            activityDocs.forEach(async (doc)=>{
+                await doc.ref.delete();
+            });
         });
         it('Webhooks should log event and repond with status 200...', async () => {
-            //set up the stubbed response to mimic polar's response when called with the
             // set the request object with the correct provider, developerId and userId
             const req = {
                 url: "https://us-central1-rove-26.cloudfunctions.net/wahooWebhook",
@@ -614,7 +628,8 @@ describe('ROVE Functions - Integration Tests', () => {
 
 
             await myFunctions.wahooWebhook(req, res);
-
+            const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+            await wait(1000);
             //now check the database was updated correctly
            const testUserDocs = await admin.firestore()
            .collection("users")
@@ -625,17 +640,19 @@ describe('ROVE Functions - Integration Tests', () => {
            const sanatisedActivity = testUserDocs.docs[0].data();
            const expectedResults = {
                 sanitised: {
+                    userTag: "paulsTestDevSecondUser",
                     activity_id: 140473420,
                     activity_name: "Cycling",
                     activity_type: "BIKING",
-                    distance_in_meters: "0.00",
-                    average_pace_in_meters_per_second: "0.00",
+                    distance_in_meters: "0.0",
+                    average_pace_in_meters_per_second: "0.0",
                     active_calories: "0.0",
                     activity_duration_in_seconds: "9.0",
                     start_time: '2022-06-13T16:38:51.000Z',
                     average_heart_rate_bpm: "0.0",
                     average_cadence: "0.0",
                     elevation_gain: "0.0",
+                    elevation_loss: null,
                     data_source: "wahoo",
                     work_accum: "0.0",
                     power_bike_tss_last: null,
@@ -651,9 +668,99 @@ describe('ROVE Functions - Integration Tests', () => {
                 },
                 raw: req.body,
             }
+
            assert.deepEqual(sanatisedActivity, expectedResults);
 
 
+        })
+        it('Polar Webhook should get event, sanatise, save and repond with status 200...', async () => {
+            //set up the stubbed response to mimic polar's response when called with the
+            const polarExercisePayload = {
+                json() { return {
+                        
+                        "id": 1937529874,
+                        "upload_time": "2008-10-13T10:40:02Z",
+                        "polar_user": "https://www.polaraccesslink/v3/users/1",
+                        "transaction_id": 179879,
+                        "device": "Polar M400",
+                        "device_id": "1111AAAA",
+                        "start_time": "2008-10-13T10:40:02Z",
+                        "start_time_utc_offset": 180,
+                        "duration": "PT2H44M",
+                        "calories": 530,
+                        "distance": 1600,
+                        "heart_rate": {
+                        "average": 129,
+                        "maximum": 147
+                        },
+                        "training_load": 143.22,
+                        "sport": "OTHER",
+                        "has_route": true,
+                        "club_id": 999,
+                        "club_name": "Polar Club",
+                        "detailed_sport_info": "WATERSPORTS_WATERSKI",
+                        "fat_percentage": 60,
+                        "carbohydrate_percentage": 38,
+                        "protein_percentage": 2
+                        
+                    }
+                }
+            }
+            stubbedPolarCall = sinon.stub(got, "get");
+            stubbedPolarCall.onFirstCall().returns(polarExercisePayload);
+            // set the request object with the correct provider, developerId and userId
+            const req = {
+                url: "https://us-central1-rove-26.cloudfunctions.net/wahooWebhook",
+                method: "POST",
+                body: {
+                    "event": "EXERCISE",
+                    "user_id": "polar_test_user",
+                    "entity_id": "aQlC83",
+                    "timestamp": "2018-05-15T14:22:24Z",
+                    "url": "https://www.polaraccesslink.com/v3/exercises/aQlC83"
+                  }
+            };
+            res = {
+                send: (text)=> {assert.equal(text, "OK");},
+                status: (code)=>{assert.equal(code, 200);},
+            }
+
+            await myFunctions.polarWebhook(req, res);
+            // check polar was called with the right arguments
+            // assert(stubbedPolarCall.calledWith(), "polar arguments");
+            const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+            await wait(1000);
+            //now check the database was updated correctly
+           const testUserDocs = await admin.firestore()
+           .collection("users")
+           .doc(testUser)
+           .collection("activities")
+           .where("raw.id", "==", 1937529874)
+           .get();
+
+           const sanatisedActivity = testUserDocs.docs[0].data();
+           const expectedResults = { // TODO:
+                sanitised: {
+                    userTag: testUser,
+                    activity_id: 1937529874,
+                    activity_name: "WATERSPORTS_WATERSKI",
+                    activity_type: "OTHER",
+                    distance_in_meters: 1600, //float no trailing 0
+                    average_pace_in_meters_per_second: null, //float
+                    active_calories: 530,
+                    activity_duration_in_seconds: 9840,
+                    start_time: '2008-10-13T10:40:02.000Z', //ISO 8601 UTC
+                    average_heart_rate_bpm: 129,
+                    max_heart_rate_bpm: 147,
+                    average_cadence: null,
+                    elevation_gain: null,
+                    elevation_loss: null,
+                    data_source: "polar",
+                },
+                raw: polarExercisePayload.json(),
+            }
+           assert.deepEqual(sanatisedActivity, expectedResults);
+           sinon.restore();
         })
     }); //End Test 6
 }); //end Integration TEST

@@ -515,12 +515,12 @@ exports.wahooWebhook = functions.https.onRequest(async (request, response) => {
       return;
     }
     let devList = [];
-    const userRefList = [];
+    const userDocsList = [];
     const userQuery = await db.collection("users")
         .where("wahoo_user_id", "==", request.body.user.id).get();
     userQuery.docs.forEach((doc)=>{
       devList.push(doc.data()["devId"]);
-      userRefList.push(doc.ref);
+      userDocsList.push(doc);
     });
     devList = devList.filter(onlyUnique);
     // now we have a list of developer Id's that are interested in this
@@ -540,12 +540,14 @@ exports.wahooWebhook = functions.https.onRequest(async (request, response) => {
       return;
     });
     // save raw and sanitised activites as a backup for each user
-    userRefList.forEach(async (userRef)=>{
-      await userRef.collection("activities").doc().set({"sanitised": sanitisedActivity, "raw": request.body});
+    userDocsList.forEach(async (userDoc)=>{
+      sanitisedActivity["userTag"] = userDoc.id;
+      await userDoc.ref.collection("activities").doc().set({"sanitised": sanitisedActivity, "raw": request.body});
     });
 
     response.status(200);
     response.send("EVENT_RECEIVED");
+    return;
   } else {
     functions.logger.info("---> Wahoo 'GET' webhook event received!", {
       query: request.query,
@@ -563,23 +565,47 @@ exports.polarWebhook = functions.https.onRequest(async (request, response) => {
       body: request.body,
     });
     // TODO: Send the information to an endpoint specified by the dev
-    const userQuery = await db.collection("users").where("polar_user_id", "==", request.body.user_id).get();
-    const userToken = userQuery.docs.at(0).data()["polar_access_token"];
-    if (request.body.event == "EXERCISE") {
-      const headers = {
-        "Accept": "application/json", "Authorization": "Bearer " + userToken,
-      };
-      const options = {
-        url: "https://www.polaraccesslink.com/v3/exercises/" + request.body.entity_id,
-        method: "POST",
-        headers: headers,
-      };
-      const activity = await got.get(options).json();
-      console.log(activity.sport);
-      const sanitisedActivity = filters.polarSanatise(activity);
-      // write sanitised information
-      await db.collection("users").doc(userQuery.docs.at(0).id).collection("activities").doc().set(sanitisedActivity);
-      // save info to dev endpoint here.
+  }
+  let devList = [];
+  const userDocsList = [];
+  const userQuery = await db.collection("users")
+      .where("polar_user_id", "==", request.body.user_id).get();
+  userQuery.docs.forEach((doc)=>{
+    devList.push(doc.data()["devId"]);
+    userDocsList.push(doc);
+  });
+  devList = devList.filter(onlyUnique);
+  // request the exercise information from Polar - the access token is 
+  // needed for this
+  const userToken = userQuery.docs[0].data()["polar_access_token"];
+  if (request.body.event == "EXERCISE") {
+    const headers = {
+      "Accept": "application/json", "Authorization": "Bearer " + userToken,
+    };
+    const options = {
+      url: "https://www.polaraccesslink.com/v3/exercises/" + request.body.entity_id,
+      method: "POST",
+      headers: headers,
+    };
+    const activity = await got.get(options).json();
+    let sanitisedActivity;
+    try {
+      sanitisedActivity = filters.polarSanatise(activity);;
+    } catch (error) {
+      console.log(error.errorMessage);
+      response.status(404);
+      response.send("Error reading Polar Activity");
+      return;
+    }
+    devList.forEach((devId)=>{
+      return;
+    });
+    // write sanitised information and raw information to each user
+    userDocsList.forEach(async (userDoc)=>{
+      sanitisedActivity["userTag"] = userDoc.id;
+      await userDoc.ref.collection("activities").doc().set({"sanitised": sanitisedActivity, "raw": activity});
+    });
+    // save info to dev endpoint here.
 
       /* {
    "event": "EXERCISE",
@@ -588,8 +614,6 @@ exports.polarWebhook = functions.https.onRequest(async (request, response) => {
    "timestamp": "2018-05-15T14:22:24Z",
    "url": "https://www.polaraccesslink.com/v3/exercises/aQlC83"
 }*/
-    }
-    // registered to a user.
     response.status(200);
     response.send("OK");
   } else {
