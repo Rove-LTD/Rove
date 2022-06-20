@@ -37,7 +37,8 @@ describe('ROVE Functions - Integration Tests', () => {
     let testUser = "paulsTestDevSecondUser";    //<----edit user before running 
                                                 //the test
     let testDev = "paulsTestDev";
-    let devTestData = {email: "paul.testDev@gmail.com", devKey: "test-key", polar_signature_secret_key: "e14f5f33-0ffc-4f38-8f7e-8d243337f986", polar_webhook_id: "wPWwr1P7"};
+    let devTestData = {email: "paul.testDev@gmail.com", devKey: "test-key", polar_signature_secret_key: "e14f5f33-0ffc-4f38-8f7e-8d243337f986", polar_webhook_id: "wPWwr1P7",
+endpoint: "https://roveapitestdatabase-default-rtdb.firebaseio.com/newmessage.json"};
     let devUserData = {devId: testDev, email: "paul.userTest@gmail.com"};
     let recievedGarminUrl = "";
     let recievedStravaUrl = "";
@@ -640,7 +641,7 @@ describe('ROVE Functions - Integration Tests', () => {
            const sanatisedActivity = testUserDocs.docs[0].data();
            const expectedResults = {
                 sanitised: {
-                    userTag: "paulsTestDevSecondUser",
+                    userId: "paulsTestDevSecondUser",
                     activity_id: 140473420,
                     activity_name: "Cycling",
                     activity_type: "BIKING",
@@ -741,7 +742,7 @@ describe('ROVE Functions - Integration Tests', () => {
            const sanatisedActivity = testUserDocs.docs[0].data();
            const expectedResults = { // TODO:
                 sanitised: {
-                    userTag: testUser,
+                    userId: testUser,
                     activity_id: 1937529874,
                     activity_name: "WATERSPORTS_WATERSKI",
                     activity_type: "OTHER",

@@ -16,6 +16,9 @@ const strava = require("strava-v3");
 const OauthWahoo = require("./oauthWahoo");
 const contentsOfDotEnvFile = require("./config.json");
 const filters = require("./data-filter");
+const { optionsToEndpoint } = require("firebase-functions");
+const { retryAfterStatusCodes } = require("got/dist/source/core/calculate-retry-delay");
+const { waitForDebugger } = require("inspector");
 
 const configurations = contentsOfDotEnvFile["config"];
 // find a way to decrypt and encrypt this information
@@ -544,7 +547,6 @@ exports.wahooWebhook = functions.https.onRequest(async (request, response) => {
       sanitisedActivity["userTag"] = userDoc.id;
       await userDoc.ref.collection("activities").doc().set({"sanitised": sanitisedActivity, "raw": request.body});
     });
-
     response.status(200);
     response.send("EVENT_RECEIVED");
     return;
@@ -564,56 +566,47 @@ exports.polarWebhook = functions.https.onRequest(async (request, response) => {
       query: request.query,
       body: request.body,
     });
-    // TODO: Send the information to an endpoint specified by the dev
-  }
-  let devList = [];
-  const userDocsList = [];
-  const userQuery = await db.collection("users")
-      .where("polar_user_id", "==", request.body.user_id).get();
-  userQuery.docs.forEach((doc)=>{
-    devList.push(doc.data()["devId"]);
-    userDocsList.push(doc);
-  });
-  devList = devList.filter(onlyUnique);
-  // request the exercise information from Polar - the access token is 
-  // needed for this
-  const userToken = userQuery.docs[0].data()["polar_access_token"];
-  if (request.body.event == "EXERCISE") {
-    const headers = {
-      "Accept": "application/json", "Authorization": "Bearer " + userToken,
-    };
-    const options = {
-      url: "https://www.polaraccesslink.com/v3/exercises/" + request.body.entity_id,
-      method: "POST",
-      headers: headers,
-    };
-    const activity = await got.get(options).json();
-    let sanitisedActivity;
-    try {
-      sanitisedActivity = filters.polarSanatise(activity);;
-    } catch (error) {
-      console.log(error.errorMessage);
-      response.status(404);
-      response.send("Error reading Polar Activity");
-      return;
+    const userDocsList = [];
+    const userQuery = await db.collection("users")
+        .where("polar_user_id", "==", request.body.user_id).get();
+    userQuery.docs.forEach((doc)=>{
+      userDocsList.push(doc);
+    });
+    // request the exercise information from Polar - the access token is 
+    // needed for this
+    // TODO: if there are no users we have an issue
+    const userToken = userQuery.docs[0].data()["polar_access_token"];
+    if (request.body.event == "EXERCISE") {
+      const headers = {
+        "Accept": "application/json", "Authorization": "Bearer " + userToken,
+      };
+      const options = {
+        url: "https://www.polaraccesslink.com/v3/exercises/" + request.body.entity_id,
+        method: "POST",
+        headers: headers,
+      };
+      const activity = await got.get(options).json();
+      let sanitisedActivity;
+      try {
+        sanitisedActivity = filters.polarSanatise(activity);;
+      } catch (error) {
+        console.log(error.errorMessage);
+        response.status(404);
+        response.send("Error reading Polar Activity");
+        return;
+      }
+      // write sanitised information and raw information to each user and then 
+      // send to developer
+      userDocsList.forEach(async (userDoc)=>{
+        sanitisedActivity["userId"] = userDoc.id;
+        const activityDoc = await userDoc
+            .ref.collection("activities")
+            .doc()
+            .set({"sanitised": sanitisedActivity, "raw": activity});
+      let triesSoFar = 0; // this is our first try to write to developer
+      sendToDeveloper(userDoc, sanitisedActivity, activity, activityDoc, triesSoFar);
+      });
     }
-    devList.forEach((devId)=>{
-      return;
-    });
-    // write sanitised information and raw information to each user
-    userDocsList.forEach(async (userDoc)=>{
-      sanitisedActivity["userTag"] = userDoc.id;
-      await userDoc.ref.collection("activities").doc().set({"sanitised": sanitisedActivity, "raw": activity});
-    });
-    // save info to dev endpoint here.
-
-      /* {
-   "event": "EXERCISE",
-   "user_id": 475,
-   "entity_id": "aQlC83",
-   "timestamp": "2018-05-15T14:22:24Z",
-   "url": "https://www.polaraccesslink.com/v3/exercises/aQlC83"
-}*/
     response.status(200);
     response.send("OK");
   } else {
@@ -621,11 +614,45 @@ exports.polarWebhook = functions.https.onRequest(async (request, response) => {
       query: request.query,
       body: request.body,
     });
-
     response.status(200);
     response.send("OK");
   }
 });
+
+async function sendToDeveloper(userDoc, sanitisedActivity, activity, activityDoc, triesSoFar) {
+  const MaxRetries = 3;
+  waitTime = { 0: 0, 1: 1, 2: 10, 3: 60}; // time in minutes
+  const devId = userDoc.data()["devId"];
+  let datastring = {"sanitised": sanitisedActivity, "raw": activity};
+  developerDoc = await db.collection("developers").doc(devId).get();
+  options = {
+    method: "POST",
+    url: developerDoc.data()["endpoint"],
+    headers:  {
+      "Accept": "application/json", 
+      "Content-type": "application/json", //"Authorization": "Bearer "+ developerDoc.data()["devKey"],
+    },
+    body: JSON.stringify(datastring),
+  };
+  response = await got.post(options);
+  if (response.statusCode == 200) {
+    // the developer accepted the information 
+    userDoc.ref
+        .collection("activities")
+        .doc(activityDoc)
+        .set({status: "sent", timestamp: new Date()}, {merge: true});
+  } else {
+    // call the retry functionality and increment the retry counter
+    if (triesSoFar <= MaxRetries) {
+      console.log("retrying sending to developer");
+      wait(waitTime[triesSoFar]);
+      sendToDeveloper(userDoc, sanitisedActivity, activity, activityDoc, triesSoFar+1);        
+    } else {
+      // max retries email developer
+      console.log("max retries on sending to developer reached - fail");
+    }
+  }
+}
 
 exports.polarWebhookSetup = functions.https.onRequest(async (req, res) => {
   // get the devId and DevKey
@@ -754,3 +781,4 @@ async function oauthCallbackHandlerGarmin(oAuthCallback, db) {
 function onlyUnique(value, index, self) {
   return self.indexOf(value) === index;
 }
+const wait = mins => new Promise(resolve => setTimeout(resolve, mins*60*1000));
