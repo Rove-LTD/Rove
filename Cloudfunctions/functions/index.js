@@ -517,17 +517,14 @@ exports.wahooWebhook = functions.https.onRequest(async (request, response) => {
       response.send("NOT AUTHORISED");
       return;
     }
-    let devList = [];
     const userDocsList = [];
     const userQuery = await db.collection("users")
         .where("wahoo_user_id", "==", request.body.user.id).get();
     userQuery.docs.forEach((doc)=>{
-      devList.push(doc.data()["devId"]);
       userDocsList.push(doc);
     });
-    devList = devList.filter(onlyUnique);
-    // now we have a list of developer Id's that are interested in this
-    // users data
+    // now we have a list of user Id's that are interested in this
+    //  data
     // 1) sanatise and 2) send
     let sanitisedActivity;
     try {
@@ -538,14 +535,15 @@ exports.wahooWebhook = functions.https.onRequest(async (request, response) => {
       response.send("Event type not recognised");
       return;
     }
-    // TODO: Send to webhook for each developer interested in this user
-    devList.forEach((devId)=>{
-      return;
-    });
     // save raw and sanitised activites as a backup for each user
     userDocsList.forEach(async (userDoc)=>{
-      sanitisedActivity["userTag"] = userDoc.id;
-      await userDoc.ref.collection("activities").doc().set({"sanitised": sanitisedActivity, "raw": request.body});
+      sanitisedActivity["userId"] = userDoc.id;
+      await userDoc.ref
+          .collection("activities")
+          .doc()
+          .set({"sanitised": sanitisedActivity, "raw": request.body});
+      let triesSoFar = 0; // this is our first try to write to developer
+      sendToDeveloper(userDoc, sanitisedActivity, activity, activityDoc, triesSoFar);
     });
     response.status(200);
     response.send("EVENT_RECEIVED");
@@ -624,10 +622,16 @@ async function sendToDeveloper(userDoc, sanitisedActivity, activity, activityDoc
   waitTime = { 0: 0, 1: 1, 2: 10, 3: 60}; // time in minutes
   const devId = userDoc.data()["devId"];
   let datastring = {"sanitised": sanitisedActivity, "raw": activity};
-  developerDoc = await db.collection("developers").doc(devId).get();
+  const developerDoc = await db.collection("developers").doc(devId).get();
+  const endpoint = developerDoc.data()["endpoint"];
+  if (endpoint == undefined || endpoint == null) {
+    // cannot send to developer as endpoint does not exist
+    console.log("Cannot send webhook payload to "+devId+" endpoint not provided");
+    return;
+  }
   options = {
     method: "POST",
-    url: developerDoc.data()["endpoint"],
+    url: endpoint,
     headers:  {
       "Accept": "application/json", 
       "Content-type": "application/json", //"Authorization": "Bearer "+ developerDoc.data()["devKey"],
