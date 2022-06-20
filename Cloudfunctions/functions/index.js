@@ -52,20 +52,19 @@ exports.connectService = functions.https.onRequest(async (req, res) => {
     if (!devDoc.exists) {
       url =
         "error: the developerId was badly formatted, missing or not authorised";
-      res.statusCode(400);
       res.send(url);
       return;
     }
     if (devDoc.data().devKey != devKey|| devKey == null) {
       url =
         "error: the developerId was badly formatted, missing or not authorised";
-      res.statusCode(400);
+      // res.status(400);
       res.send(url);
       return;
     }
   } else {
     url = "error: the developerId parameter is missing";
-    res.statusCode(400);
+    // res.status(400);
     res.send(url);
     return;
   }
@@ -73,7 +72,7 @@ exports.connectService = functions.https.onRequest(async (req, res) => {
   // now check the userId has been given
   if (userId == null) {
     url = "error: the userId parameter is missing";
-    res.statusCode(400);
+    // res.status(400);
     res.send(url);
     return;
   }
@@ -97,6 +96,117 @@ exports.connectService = functions.https.onRequest(async (req, res) => {
   res.send(url);
   return;
 });
+
+exports.disconnectService = functions.https.onRequest(async (req, res) => {
+  const provider = (Url.parse(req.url, true).query)["provider"];
+  const devId = (Url.parse(req.url, true).query)["devId"];
+  const userId = (Url.parse(req.url, true).query)["userId"];
+  const devKey = (Url.parse(req.url, true).query)["devKey"];
+
+  let url = "";
+
+  // parameter checks
+  // first check developer exists and the devKey matches
+  if (devId != null) {
+    const devDoc = await admin.firestore()
+        .collection("developers")
+        .doc(devId)
+        .get();
+
+    if (!devDoc.exists) {
+      url =
+        "error: the developerId was badly formatted, missing or not authorised";
+      res.status(400);
+      res.send(url);
+      return;
+    }
+    if (devDoc.data().devKey != devKey|| devKey == null) {
+      url =
+        "error: the developerId was badly formatted, missing or not authorised";
+      res.status(400);
+      res.send(url);
+      return;
+    }
+  } else {
+    url = "error: the developerId parameter is missing";
+    res.status(400);
+    res.send(url);
+    return;
+  }
+
+  // now check the userId has been given
+  if (userId == null) {
+    url = "error: the userId parameter is missing";
+    res.status(400);
+    res.send(url);
+    return;
+  }
+
+  const providers = ["strava", "garmin", "polar", "wahoo"];
+  // stravaOauth componses the request url for the user.
+  if (providers.includes(provider) == true) {
+    (await db.collection("users").where("userId", "==", userId).get()).docs.forEach(async (userDoc) => {
+      if (provider == "strava") {
+        // delete just Strava keys and activities.
+        await db.collection("users").doc(userDoc.id).update({
+          strava_access_token: admin.firestore.FieldValue.delete(),
+          strava_connected: admin.firestore.FieldValue.delete(),
+          strava_refresh_token: admin.firestore.FieldValue.delete(),
+          strava_token_expires_at: admin.firestore.FieldValue.delete(),
+          strava_token_expires_in: admin.firestore.FieldValue.delete(),
+          strava_id: admin.firestore.FieldValue.delete(),
+        });
+      } else if (provider == "garmin") {
+        // delete just garmin keys and activities.
+        await db.collection("users").doc(userDoc.id).update({
+          garmin_access_token: admin.firestore.FieldValue.delete(),
+          garmin_access_token_secret: admin.firestore.FieldValue.delete(),
+        });
+      } else if (provider == "polar") {
+        // delete just polar keys and activities
+        await db.collection("users").doc(userDoc.id).update({
+          polar_access_token: admin.firestore.FieldValue.delete(),
+          polar_connected: admin.firestore.FieldValue.delete(),
+          polar_token_expires_in: admin.firestore.FieldValue.delete(),
+          polar_user_id: admin.firestore.FieldValue.delete(),
+          polar_token_type: admin.firestore.FieldValue.delete(),
+          polar_registration_date: admin.firestore.FieldValue.delete(),
+        });
+      } else if (provider == "wahoo") {
+        // delete just wahoo keys and activities
+        await db.collection("users").doc(userDoc.id).update({
+          wahoo_access_token: admin.firestore.FieldValue.delete(),
+          wahoo_connected: admin.firestore.FieldValue.delete(),
+          wahoo_refresh_token: admin.firestore.FieldValue.delete(),
+          wahoo_token_expires_in: admin.firestore.FieldValue.delete(),
+          wahoo_user_id: admin.firestore.FieldValue.delete(),
+        });
+      }
+      // delete activities from provider.
+      (await db.collection("users").doc(userDoc.id).collection("activities").where("sanitised.data_source", "==", "wahoo").get()).docs.forEach((doc)=>{
+        db.collection("users").doc(userDoc.id).collection("activities").doc(doc.id).delete();
+      });
+      url = "status: complete";
+      res.status(200);
+    });
+    // deauth provider
+  } else if (provider == "all") {
+    // delete all the info for the user doc when no provider is given.
+    (await db.collection("users").where("userId", "==", userId).get()).docs.forEach(async (userDoc) => {
+      await db.collection("users").doc(userDoc.id).delete();
+    });
+    url = "status: complete";
+    res.status(200);
+    // deauth all
+  } else {
+    // the request was badly formatted with incorrect provider parameter
+    url = "error: the provider was badly formatted, missing or not supported";
+    res.status(400);
+  }
+  // send back URL to user device.
+  res.send(url);
+  return;
+}),
 
 exports.oauthCallbackHandlerGarmin = functions.https
     .onRequest(async (req, res) => {

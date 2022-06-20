@@ -33,7 +33,7 @@ const { prototype } = require('mocha');
 
 describe('ROVE Functions - Integration Tests', () => {
     let myFunctions;
-    let testUser = "paulsTestDevSecondUser";    //<----edit user before running 
+    let testUser = "alexTestDev";    //<----edit user before running 
                                                 //the test
     let testDev = "paulsTestDev";
     let devTestData = {email: "paul.testDev@gmail.com", devKey: "test-key", polar_signature_secret_key: "e14f5f33-0ffc-4f38-8f7e-8d243337f986", polar_webhook_id: "wPWwr1P7"};
