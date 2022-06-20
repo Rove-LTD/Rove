@@ -575,7 +575,7 @@ exports.polarWebhook = functions.https.onRequest(async (request, response) => {
     userDocsList.push(doc);
   });
   devList = devList.filter(onlyUnique);
-  // request the exercise information from Polar - the access token is 
+  // request the exercise information from Polar - the access token is
   // needed for this
   const userToken = userQuery.docs[0].data()["polar_access_token"];
   if (request.body.event == "EXERCISE") {
@@ -590,7 +590,7 @@ exports.polarWebhook = functions.https.onRequest(async (request, response) => {
     const activity = await got.get(options).json();
     let sanitisedActivity;
     try {
-      sanitisedActivity = filters.polarSanatise(activity);;
+      sanitisedActivity = filters.polarSanatise(activity);
     } catch (error) {
       console.log(error.errorMessage);
       response.status(404);
@@ -607,7 +607,7 @@ exports.polarWebhook = functions.https.onRequest(async (request, response) => {
     });
     // save info to dev endpoint here.
 
-      /* {
+    /* {
    "event": "EXERCISE",
    "user_id": 475,
    "entity_id": "aQlC83",
