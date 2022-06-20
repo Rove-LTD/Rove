@@ -16,9 +16,6 @@ const strava = require("strava-v3");
 const OauthWahoo = require("./oauthWahoo");
 const contentsOfDotEnvFile = require("./config.json");
 const filters = require("./data-filter");
-const { optionsToEndpoint } = require("firebase-functions");
-const { retryAfterStatusCodes } = require("got/dist/source/core/calculate-retry-delay");
-const { waitForDebugger } = require("inspector");
 
 const configurations = contentsOfDotEnvFile["config"];
 // find a way to decrypt and encrypt this information
@@ -538,12 +535,12 @@ exports.wahooWebhook = functions.https.onRequest(async (request, response) => {
     // save raw and sanitised activites as a backup for each user
     userDocsList.forEach(async (userDoc)=>{
       sanitisedActivity["userId"] = userDoc.id;
-      await userDoc.ref
+      const activityDoc = await userDoc.ref
           .collection("activities")
           .doc()
           .set({"sanitised": sanitisedActivity, "raw": request.body});
-      let triesSoFar = 0; // this is our first try to write to developer
-      sendToDeveloper(userDoc, sanitisedActivity, activity, activityDoc, triesSoFar);
+      const triesSoFar = 0; // this is our first try to write to developer
+      sendToDeveloper(userDoc, sanitisedActivity, request.body, activityDoc, triesSoFar);
     });
     response.status(200);
     response.send("EVENT_RECEIVED");
@@ -570,7 +567,7 @@ exports.polarWebhook = functions.https.onRequest(async (request, response) => {
     userQuery.docs.forEach((doc)=>{
       userDocsList.push(doc);
     });
-    // request the exercise information from Polar - the access token is 
+    // request the exercise information from Polar - the access token is
     // needed for this
     // TODO: if there are no users we have an issue
     const userToken = userQuery.docs[0].data()["polar_access_token"];
@@ -586,14 +583,14 @@ exports.polarWebhook = functions.https.onRequest(async (request, response) => {
       const activity = await got.get(options).json();
       let sanitisedActivity;
       try {
-        sanitisedActivity = filters.polarSanatise(activity);;
+        sanitisedActivity = filters.polarSanatise(activity);
       } catch (error) {
         console.log(error.errorMessage);
         response.status(404);
         response.send("Error reading Polar Activity");
         return;
       }
-      // write sanitised information and raw information to each user and then 
+      // write sanitised information and raw information to each user and then
       // send to developer
       userDocsList.forEach(async (userDoc)=>{
         sanitisedActivity["userId"] = userDoc.id;
@@ -601,8 +598,8 @@ exports.polarWebhook = functions.https.onRequest(async (request, response) => {
             .ref.collection("activities")
             .doc()
             .set({"sanitised": sanitisedActivity, "raw": activity});
-      let triesSoFar = 0; // this is our first try to write to developer
-      sendToDeveloper(userDoc, sanitisedActivity, activity, activityDoc, triesSoFar);
+        const triesSoFar = 0; // this is our first try to write to developer
+        sendToDeveloper(userDoc, sanitisedActivity, activity, activityDoc, triesSoFar);
       });
     }
     response.status(200);
@@ -617,11 +614,14 @@ exports.polarWebhook = functions.https.onRequest(async (request, response) => {
   }
 });
 
-async function sendToDeveloper(userDoc, sanitisedActivity, activity, activityDoc, triesSoFar) {
+async function sendToDeveloper(userDoc,
+    sanitisedActivity,
+    activity,
+    activityDoc,
+    triesSoFar) {
   const MaxRetries = 3;
-  waitTime = { 0: 0, 1: 1, 2: 10, 3: 60}; // time in minutes
   const devId = userDoc.data()["devId"];
-  let datastring = {"sanitised": sanitisedActivity, "raw": activity};
+  const datastring = {"sanitised": sanitisedActivity, "raw": activity};
   const developerDoc = await db.collection("developers").doc(devId).get();
   const endpoint = developerDoc.data()["endpoint"];
   if (endpoint == undefined || endpoint == null) {
@@ -629,18 +629,18 @@ async function sendToDeveloper(userDoc, sanitisedActivity, activity, activityDoc
     console.log("Cannot send webhook payload to "+devId+" endpoint not provided");
     return;
   }
-  options = {
+  const options = {
     method: "POST",
     url: endpoint,
-    headers:  {
-      "Accept": "application/json", 
-      "Content-type": "application/json", //"Authorization": "Bearer "+ developerDoc.data()["devKey"],
+    headers: {
+      "Accept": "application/json",
+      "Content-type": "application/json",
     },
     body: JSON.stringify(datastring),
   };
-  response = await got.post(options);
+  const response = await got.post(options);
   if (response.statusCode == 200) {
-    // the developer accepted the information 
+    // the developer accepted the information
     userDoc.ref
         .collection("activities")
         .doc(activityDoc)
@@ -650,7 +650,7 @@ async function sendToDeveloper(userDoc, sanitisedActivity, activity, activityDoc
     if (triesSoFar <= MaxRetries) {
       console.log("retrying sending to developer");
       wait(waitTime[triesSoFar]);
-      sendToDeveloper(userDoc, sanitisedActivity, activity, activityDoc, triesSoFar+1);        
+      sendToDeveloper(userDoc, sanitisedActivity, activity, activityDoc, triesSoFar+1);
     } else {
       // max retries email developer
       console.log("max retries on sending to developer reached - fail");
@@ -781,8 +781,6 @@ async function oauthCallbackHandlerGarmin(oAuthCallback, db) {
   }
 }
 
-// Utility Functions -----------------------------
-function onlyUnique(value, index, self) {
-  return self.indexOf(value) === index;
-}
-const wait = mins => new Promise(resolve => setTimeout(resolve, mins*60*1000));
+// Utility Functions and Constants -----------------------------
+const waitTime = {0: 0, 1: 1, 2: 10, 3: 60}; // time in minutes
+const wait = (mins) => new Promise((resolve) => setTimeout(resolve, mins*60*1000));
