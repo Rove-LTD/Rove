@@ -142,7 +142,7 @@ for (let i=0; i<activities.length; i++) {
     "average_pace_in_meters_per_second" : parseFloat(activities[i]["average_speed"]).toFixed(1),
     "active_calories" : Math.round(activities[i]["kilojoules"]),
     "activity_duration_in_seconds" : activities[i]["moving_time"],
-    "start_time" : new Date(activities[i]["start_date_local"]),
+    "start_time" : new Date(activities[i]["start_date_local"]).toISOString(),
     "average_heart_rate_bpm" : activities[i]["average_heartrate"],
     "average_cadence" : parseFloat(activities[i]["average_cadence"]).toFixed(1),
     "elevation_gain" : parseFloat(activities[i]["elev_high"]).toFixed(1),
