@@ -771,7 +771,7 @@ describe('ROVE Functions - Integration Tests', () => {
            assert.deepEqual(sanatisedActivity, expectedResults);
            sinon.restore();
         })
-        it.only('Garmin Webhook should get event, sanatise, save and repond with status 200...', async () => {
+        it('Garmin Webhook should get event, sanatise, save and repond with status 200...', async () => {
 
             // set the request object with the webHook payload
             const req = {
