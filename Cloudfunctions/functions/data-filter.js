@@ -130,7 +130,7 @@ class standard_format {
     "protein-percentage": 2
   }*/
 
-function stravaSanitise(activities) {
+exports.stravaSanitise = function(activities) {
 let summaryActivities = [{}];
 
 for (let i=0; i<activities.length; i++) {
@@ -158,7 +158,7 @@ for (let i=0; i<activities.length; i++) {
 }
 return summaryActivities;
 }
-function garminSanitise(activities) {
+exports.garminSanitise = function(activities) {
     let summaryActivities = [{}];
     for (let i=0; i<activities.length; i++) {
         if (activities[i]["activityType"] == "RUNNING") {

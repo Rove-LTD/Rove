@@ -12,7 +12,7 @@ const crypto = require("crypto");
 const encodeparams = require("./encodeparams");
 const got = require("got");
 const request = require("request");
-const strava = require("strava-v3");
+const stravaApi = require("strava-v3");
 const OauthWahoo = require("./oauthWahoo");
 const contentsOfDotEnvFile = require("./config.json");
 const filters = require("./data-filter");
@@ -189,7 +189,7 @@ async function stravaStoreTokens(userId, devId, data, db) {
 }
 async function getStravaAthleteId(userId, devId, data, db) {
   // get athlete id from strava.
-  strava.config({
+  stravaApi.config({
     "client_id": configurations[devId]["stravaClientId"],
     "client_secret": configurations[devId]["stravaClientSecret"],
     "redirect_uri": "https://us-central1-rove-26.cloudfunctions.net/stravaCallback",
@@ -198,7 +198,7 @@ async function getStravaAthleteId(userId, devId, data, db) {
     "access_token": data["access_token"],
   };
   // set tokens for userId doc.
-  const athleteSummary = await strava.athlete.get(parameters);
+  const athleteSummary = await stravaApi.athlete.get(parameters);
   const userRef = db.collection("users").doc(userId);
   await userRef.set({"strava_id": athleteSummary["id"]}, {merge: true});
   return;
@@ -453,6 +453,11 @@ exports.wahooCallback = functions.https.onRequest(async (req, res) => {
 });
 
 exports.stravaWebhook = functions.https.onRequest(async (request, response) => {
+  stravaApi.config({
+    "client_id": configurations["paulsTestDev"]["stravaClientId"],
+    "client_secret": configurations["paulsTestDev"]["stravaClientSecret"],
+    "redirect_uri": "https://us-central1-rove-26.cloudfunctions.net/stravaCallback",
+  });
   if (request.method === "POST") {
     functions.logger.info("webhook event received!", {
       query: request.query,
@@ -460,8 +465,14 @@ exports.stravaWebhook = functions.https.onRequest(async (request, response) => {
     });
     let stravaAccessToken;
     // get userbased on userid. (.where("id" == request.body.owner_id)).
+    // if the status is a delete then do nothing.
+    if (request.body.aspect_type == "delete") {
+      response.status(200);
+      response.send();
+      return;
+    }
     const userDoc = await db.collection("users").where("strava_id", "==", request.body.owner_id).get();
-    const userDocRef = userDoc.docs.at(0);
+    const userDocRef = userDoc.docs[0];
     if (userDoc.docs.length == 1) {
       stravaAccessToken = userDocRef.data()["strava_access_token"];
     } else {
@@ -470,17 +481,29 @@ exports.stravaWebhook = functions.https.onRequest(async (request, response) => {
       return;
     }
     console.log(stravaAccessToken);
-    // TODO: Get strava activity and sanatize
-    const activity = await strava.activities.get({"access_token": stravaAccessToken, "id": request.body.object_id});
-    // console.log(activity);
+    // check the tokens are valid
+    let activity;
+    if (await checkStravaTokens(userDocRef.id, db) == true) {
+      // token out of date, make request for new ones.
+      const payload = await stravaApi.oauth.refreshToken(userDocRef.data()["strava_refresh_token"]);
+      await stravaTokenStorage(userDocRef.id, payload, db);
+      const payloadAccessToken = payload["access_token"];
+      activity = await stravaApi.activities.get({"access_token": payloadAccessToken, "id": request.body.object_id});
+    } else {
+      // token in date, can get activities as required.
+      activity = await stravaApi.activities.get({"access_token": stravaAccessToken, "id": request.body.object_id});
+    }
     const sanitisedActivity = filters.stravaSanitise([activity]);
-    // console.log(sanitisedActivity);
-    // TODO: Send the information to an endpoint specified by the dev registered to a user.
-    const ref = admin.database().ref("activities");
-    const childRef = ref.push();
-    childRef.set(sanitisedActivity[0]);
+    sanitisedActivity[0]["userId"] = userDoc.id;
+    // save to a doc
+    const activityDoc = await userDocRef.ref.collection("activities").doc().set({"raw": activity, "sanitised": sanitisedActivity[0]});
+    // Send the information to an endpoint specified by the dev registered to a user.
+    await sendToDeveloper(userDocRef,
+        sanitisedActivity[0],
+        activity,
+        activityDoc,
+        0);
     response.status(200).send("OK!");
-    response.status(200).send("EVENT_RECEIVED");
   } else if (request.method === "GET") {
     const VERIFY_TOKEN = "STRAVA";
     const mode = request.query["hub.mode"];
@@ -779,6 +802,28 @@ async function oauthCallbackHandlerGarmin(oAuthCallback, db) {
     await db.collection("users").doc(userId).set(firestoreParameters, {merge: true});
     return true;
   }
+}
+
+async function checkStravaTokens(userId, db) {
+  const tokens = await db.collection("users").doc(userId).get();
+  const expiry = tokens.data().strava_token_expires_at;
+  const now = new Date().getTime()/1000; // current epoch in seconds
+  if (now > expiry) {
+    return true;
+  } else {
+    return false;
+  }
+}
+async function stravaTokenStorage(docId, data, db) {
+  const parameters = {
+    "strava_access_token": data["access_token"],
+    "strava_refresh_token": data["refresh_token"],
+    "strava_token_expires_at": data["expires_at"],
+    "strava_token_expires_in": data["expires_in"],
+    "strava_connected": true,
+  };
+  await db.collection("users").doc(docId).set(parameters, {merge: true});
+  return;
 }
 
 // Utility Functions and Constants -----------------------------
