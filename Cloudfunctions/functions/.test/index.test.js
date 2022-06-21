@@ -767,6 +767,84 @@ describe('ROVE Functions - Integration Tests', () => {
            assert.deepEqual(sanatisedActivity, expectedResults);
            sinon.restore();
         })
+        it.only('Strava Webhook should get event, sanatise, save and repond with status 200...', async () => {
+            //set up the stubbed response to mimic polar's response when called with the
+            const stravaExercisePayload = {
+                        "id": 1937529874,
+                        "upload_time": "2008-10-13T10:40:02Z",
+                        "polar_user": "https://www.polaraccesslink/v3/users/1",
+                        "transaction_id": 179879,
+                        "device": "Polar M400",
+                        "device_id": "1111AAAA",
+                        "start_time": "2008-10-13T10:40:02Z",
+                        "start_time_utc_offset": 180,
+                        "duration": "PT2H44M",
+                        "calories": 530,
+                        "distance": 1600,
+                        "heart_rate": {
+                        "average": 129,
+                        "maximum": 147
+                        },
+                        "training_load": 143.22,
+                        "sport": "OTHER",
+                        "has_route": true,
+                        "club_id": 999,
+                        "club_name": "Polar Club",
+                        "detailed_sport_info": "WATERSPORTS_WATERSKI",
+                        "fat_percentage": 60,
+                        "carbohydrate_percentage": 38,
+                        "protein_percentage": 2
+            }
+            stubbedPolarCall = sinon.stub(strava.activities, "get");
+            stubbedPolarCall.onFirstCall().returns(stravaExercisePayload);
+            // set the request object with the correct provider, developerId and userId
+            const req = {
+                url: "https://us-central1-rove-26.cloudfunctions.net/stravaWebhook",
+                method: "POST",
+                "body":{"updates":{},"object_type":"activity","object_id":7345142595,"owner_id":12972711,"subscription_id":217520,"aspect_type":"create","event_time":1655824005}
+            };
+            res = {
+                send: (text)=> {assert.equal(text, "OK");},
+                status: (code)=>{assert.equal(code, 200);},
+            }
+
+            await myFunctions.stravaWebhook(req, res);
+            // check polar was called with the right arguments
+            // assert(stubbedPolarCall.calledWith(), "polar arguments");
+            const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+            await wait(1000);
+            //now check the database was updated correctly
+           const testUserDocs = await admin.firestore()
+           .collection("users")
+           .doc(testUser)
+           .collection("activities")
+           .where("raw.id", "==", 1937529874)
+           .get();
+
+           const sanatisedActivity = testUserDocs.docs[0].data();
+           const expectedResults = { // TODO:
+                sanitised: {
+                    userId: testUser,
+                    activity_id: 1937529874,
+                    activity_name: "WATERSPORTS_WATERSKI",
+                    activity_type: "OTHER",
+                    distance_in_meters: 1600, //float no trailing 0
+                    average_pace_in_meters_per_second: null, //float
+                    active_calories: 530,
+                    activity_duration_in_seconds: 9840,
+                    start_time: '2008-10-13T10:40:02.000Z', //ISO 8601 UTC
+                    average_heart_rate_bpm: 129,
+                    max_heart_rate_bpm: 147,
+                    average_cadence: null,
+                    elevation_gain: null,
+                    elevation_loss: null,
+                    data_source: "polar",
+                },
+                raw: polarExercisePayload.json(),
+            }
+           assert.deepEqual(sanatisedActivity, expectedResults);
+           sinon.restore();
+        })
     }); //End Test 6
 }); //end Integration TEST
 
