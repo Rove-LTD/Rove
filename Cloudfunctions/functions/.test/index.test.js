@@ -6,6 +6,7 @@
 // Chai is a commonly used library for creating unit test suites. It is easily extended with plugins.
 const chai = require('chai');
 const assert = chai.assert;
+const stravaPayload = require('./strava.json');
 
 // Sinon is a library used for mocking or verifying function calls in JavaScript.
 const sinon = require('sinon');
@@ -27,6 +28,7 @@ const admin = require("firebase-admin");
 const request = require('request');
 const got = require('got');
 const strava = require("strava-v3");
+const stravaApi = require("strava-v3");
 const { prototype } = require('mocha');
 const { wahooSanitise } = require('../data-filter.js');
 
@@ -599,7 +601,7 @@ describe('ROVE Functions - Integration Tests', () => {
     }); //End Test 5
     //----------TEST 6---------------
     describe("Testing that the Webhooks work: ", () => {
-        before ('set up the wahoo userId in the test User doc', async () => {
+        before ('set up the userIds in the test User doc', async () => {
             await admin.firestore()
             .collection("users")
             .doc(testUser)
@@ -607,6 +609,10 @@ describe('ROVE Functions - Integration Tests', () => {
                 "wahoo_user_id": "wahoo_test_user",
                 "polar_user_id": "polar_test_user",
                 "polar_access_token": "polar_test_access_token",
+                "strava_id" : "test_strava_id",
+                "strava_access_token": "test_strava_access_token",
+                "strava_refresh_token": "test_strava_refresh_token",
+                "strava_token_expires_at": new Date().getTime()/1000 + 60,
             }, {merge: true});
 
             activityDocs = await admin.firestore()
@@ -767,41 +773,16 @@ describe('ROVE Functions - Integration Tests', () => {
            assert.deepEqual(sanatisedActivity, expectedResults);
            sinon.restore();
         })
-        it.only('Strava Webhook should get event, sanatise, save and repond with status 200...', async () => {
+        it('Strava Webhook should get event, sanatise, save and repond with status 200...', async () => {
             //set up the stubbed response to mimic polar's response when called with the
-            const stravaExercisePayload = {
-                        "id": 1937529874,
-                        "upload_time": "2008-10-13T10:40:02Z",
-                        "polar_user": "https://www.polaraccesslink/v3/users/1",
-                        "transaction_id": 179879,
-                        "device": "Polar M400",
-                        "device_id": "1111AAAA",
-                        "start_time": "2008-10-13T10:40:02Z",
-                        "start_time_utc_offset": 180,
-                        "duration": "PT2H44M",
-                        "calories": 530,
-                        "distance": 1600,
-                        "heart_rate": {
-                        "average": 129,
-                        "maximum": 147
-                        },
-                        "training_load": 143.22,
-                        "sport": "OTHER",
-                        "has_route": true,
-                        "club_id": 999,
-                        "club_name": "Polar Club",
-                        "detailed_sport_info": "WATERSPORTS_WATERSKI",
-                        "fat_percentage": 60,
-                        "carbohydrate_percentage": 38,
-                        "protein_percentage": 2
-            }
-            // stubbedPolarCall = sinon.stub(strava.activities, "get");
-            // stubbedPolarCall.onFirstCall().returns(stravaExercisePayload);
+            const stravaExercisePayload = stravaPayload;
+            stubbedStravaCall = sinon.stub(stravaApi.activities, "get");
+            stubbedStravaCall.onFirstCall().returns(stravaPayload);
             // set the request object with the correct provider, developerId and userId
             const req = {
                 url: "https://us-central1-rove-26.cloudfunctions.net/stravaWebhook",
                 method: "POST",
-                "body":{"updates":{},"object_type":"activity","object_id":7345142595,"owner_id":12972711,"subscription_id":217520,"aspect_type":"create","event_time":1655824005}
+                "body":{"updates":{},"object_type":"activity","object_id":7345142595,"owner_id":"test_strava_id","subscription_id":217520,"aspect_type":"create","event_time":1655824005}
             };
             res = {
                 send: (text)=> {assert.equal(text, "OK!");},
@@ -818,29 +799,26 @@ describe('ROVE Functions - Integration Tests', () => {
            .collection("users")
            .doc(testUser)
            .collection("activities")
-           .where("raw.id", "==", 1937529874)
+           .where("raw.id", "==", 12345678987654321)
            .get();
 
-           const sanatisedActivity = testUserDocs.docs[0].data();
+           const sanatisedActivity = testUserDocs.docs[0].data()["sanitised"];
            const expectedResults = { // TODO:
-                sanitised: {
-                    userId: testUser,
-                    activity_id: 1937529874,
-                    activity_name: "WATERSPORTS_WATERSKI",
-                    activity_type: "OTHER",
-                    distance_in_meters: 1600, //float no trailing 0
-                    average_pace_in_meters_per_second: null, //float
-                    active_calories: 530,
-                    activity_duration_in_seconds: 9840,
-                    start_time: '2008-10-13T10:40:02.000Z', //ISO 8601 UTC
-                    average_heart_rate_bpm: 129,
-                    max_heart_rate_bpm: 147,
-                    average_cadence: null,
-                    elevation_gain: null,
-                    elevation_loss: null,
-                    data_source: "polar",
-                },
-                raw: polarExercisePayload.json(),
+                userId: testUser,
+                activity_id: 12345678987654321,
+                activity_name: "Happy Friday",
+                activity_type: "Ride",
+                distance_in_meters: 28099, //float no trailing 0
+                average_pace_in_meters_per_second:"6.7", //float
+                active_calories: 781,
+                activity_duration_in_seconds: 4207,
+                start_time: '2018-02-16T06:52:54.000Z', //ISO 8601 UTC
+                average_heart_rate_bpm: null,
+               // max_heart_rate_bpm: null,
+                average_cadence: "78.5",
+                elevation_gain: "446.6",
+                elevation_loss:"17.2",
+                data_source: "strava",
             }
            assert.deepEqual(sanatisedActivity, expectedResults);
            sinon.restore();
