@@ -483,18 +483,21 @@ exports.stravaWebhook = functions.https.onRequest(async (request, response) => {
     console.log(stravaAccessToken);
     // check the tokens are valid
     let activity;
+    let sanitisedActivity;
     if (await checkStravaTokens(userDocRef.id, db) == true) {
       // token out of date, make request for new ones.
       const payload = await stravaApi.oauth.refreshToken(userDocRef.data()["strava_refresh_token"]);
       await stravaTokenStorage(userDocRef.id, payload, db);
       const payloadAccessToken = payload["access_token"];
       activity = await stravaApi.activities.get({"access_token": payloadAccessToken, "id": request.body.object_id});
+      sanitisedActivity = filters.stravaSanitise([activity]);
+      sanitisedActivity[0]["userId"] = userDoc.id;
     } else {
       // token in date, can get activities as required.
       activity = await stravaApi.activities.get({"access_token": stravaAccessToken, "id": request.body.object_id});
+      sanitisedActivity = filters.stravaSanitise([activity]);
+      sanitisedActivity[0]["userId"] = userDoc.id;
     }
-    const sanitisedActivity = filters.stravaSanitise([activity]);
-    sanitisedActivity[0]["userId"] = userDoc.id;
     // save to a doc
     const activityDoc = await userDocRef.ref.collection("activities").doc().set({"raw": activity, "sanitised": sanitisedActivity[0]});
     // Send the information to an endpoint specified by the dev registered to a user.
