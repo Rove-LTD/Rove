@@ -158,9 +158,10 @@ for (let i=0; i<activities.length; i++) {
 }
 return summaryActivities;
 }
-function garminSanitise(activities) {
+exports.garminSanitise = function (activities) {
     let summaryActivities = [{}];
     for (let i=0; i<activities.length; i++) {
+      let summaryActivity = {};
         if (activities[i]["activityType"] == "RUNNING") {
             summaryActivity = {
             "activity_id" : activities[i]["activityId"],
@@ -168,10 +169,10 @@ function garminSanitise(activities) {
             "activity_type": activities[i]["activityType"],
             "distance_in_meters" : Math.round(activities[i]["distanceInMeters"]),
             "average_pace_in_meters_per_second" : parseFloat(activities[i]["averageSpeedInMetersPerSecond"]).toFixed(1),
-            "activeKilocalories": Math.round(activities[i]["activeKilocalories"]),
+            "active_calories": Math.round(activities[i]["activeKilocalories"]),
             "activity_duration_in_seconds": activities[i]["durationInSeconds"],
-            "start_time": new Date(activities[i]["startTimeInSeconds"]*1000),
-            "averageHeartRate": activities[i]["averageHeartRateInBeatsPerMinute"],
+            "start_time": new Date(activities[i]["startTimeInSeconds"]*1000).toISOString(),
+            "average_heart_rate_bpm": activities[i]["averageHeartRateInBeatsPerMinute"],
             "average_cadence": parseFloat(activities[i]["averageRunCadenceInStepsPerMinute"]).toFixed(1),
             "elevation_gain": parseFloat(activities[i]["totalElevationGainInMeters"]).toFixed(1),
             "elevation_loss" : parseFloat(activities[i]["totalElevationLossInMeters"]).toFixed(1),
@@ -185,10 +186,10 @@ function garminSanitise(activities) {
                 "activity_type": activities[i]["activityType"],
                 "distance_in_meters" : Math.round(activities[i]["distanceInMeters"]),
                 "average_pace_in_meters_per_second" : parseFloat(activities[i]["averageSpeedInMetersPerSecond"]).toFixed(1),
-                "activeKilocalories": Math.round(activities[i]["activeKilocalories"]),
+                "active_calories": Math.round(activities[i]["activeKilocalories"]),
                 "activity_duration_in_seconds": activities[i]["durationInSeconds"],
-                "start_time": new Date(activities[i]["startTimeInSeconds"]*1000),
-                "averageHeartRate": activities[i][i]["averageHeartRateInBeatsPerMinute"],
+                "start_time": new Date(activities[i]["startTimeInSeconds"]*1000).toISOString(),
+                "average_heart_rate_bpm": activities[i][i]["averageHeartRateInBeatsPerMinute"],
                 "average_cadence": null,
                 "elevation_gain": parseFloat(activities[i]["totalElevationGainInMeters"]).toFixed(1),
                 "elevation_loss" : parseFloat(activities[i]["totalElevationLossInMeters"]).toFixed(1),
@@ -202,10 +203,10 @@ function garminSanitise(activities) {
                 "activity_type": activities[i]["activityType"],
                 "distance_in_meters" : Math.round(activities[i]["distanceInMeters"]),
                 "average_pace_in_meters_per_second" : parseFloat(activities[i]["averageSpeedInMetersPerSecond"]).toFixed(1),
-                "activeKilocalories": Math.round(activities[i]["activeKilocalories"]),
+                "active_calories": Math.round(activities[i]["activeKilocalories"]),
                 "activity_duration_in_seconds": activities[i]["durationInSeconds"],
-                "start_time": new Date(activities[i]["startTimeInSeconds"]*1000),
-                "averageHeartRate": activities[i]["averageHeartRateInBeatsPerMinute"],
+                "start_time": new Date(activities[i]["startTimeInSeconds"]*1000).toISOString(),
+                "average_heart_rate_bpm": activities[i]["averageHeartRateInBeatsPerMinute"],
                 "average_cadence": parseFloat(activities[i]["averageSwimCadenceInStrokesPerMinute"]).toFixed(1),
                 "elevation_gain": null,
                 "elevation_loss" : null,
@@ -218,10 +219,11 @@ function garminSanitise(activities) {
                 "activity_type": activities[i]["activityType"],
                 "distance_in_meters" : Math.round(activities[i]["distanceInMeters"]),
                 "average_pace_in_meters_per_second" : null,
-                "activeKilocalories": Math.round(activities[i]["activeKilocalories"]),
+                "active_calories": Math.round(activities[i]["activeKilocalories"]),
                 "activity_duration_in_seconds": activities[i]["durationInSeconds"],
-                "start_time": new Date(activities[i]["startTimeInSeconds"]*1000),
-                "averageHeartRate": activities[i]["averageHeartRateInBeatsPerMinute"],
+                "start_time": new Date(activities[i]["startTimeInSeconds"]*1000).toISOString(),
+                "average_heart_rate_bpm": activities[i]["averageHeartRateInBeatsPerMinute"],
+                "max_heart_rate_bpm": activities[i]["maxHeartRateInBeatsPerMinute"],
                 "average_cadence": null,
                 "elevation_gain": null,
                 "elevation_loss" : null,
@@ -233,6 +235,7 @@ function garminSanitise(activities) {
             summaryActivity[property] = null;
             }
         }
+        summaryActivity.distance_in_meters = summaryActivity.distance_in_meters || null;
         summaryActivities[i] = summaryActivity
     }
     return summaryActivities
