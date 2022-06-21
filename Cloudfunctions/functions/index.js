@@ -147,7 +147,11 @@ exports.disconnectService = functions.https.onRequest(async (req, res) => {
   // stravaOauth componses the request url for the user.
   if (providers.includes(provider) == true) {
     (await db.collection("users").where("userId", "==", userId).get()).docs.forEach(async (userDoc) => {
+      const userDocData = (await db.collection("users").doc(userDoc.id).get()).data();
       if (provider == "strava") {
+        // deauth for Strava.
+        const deAuthResponse = got.post("https://www.strava.com/oauth/deauthorize", {"access_token": userDocData["strava_access_token"]});
+        console.log(deAuthResponse.body);
         // delete just Strava keys and activities.
         await db.collection("users").doc(userDoc.id).update({
           strava_access_token: admin.firestore.FieldValue.delete(),
@@ -164,6 +168,8 @@ exports.disconnectService = functions.https.onRequest(async (req, res) => {
           garmin_access_token_secret: admin.firestore.FieldValue.delete(),
         });
       } else if (provider == "polar") {
+        const deAuthResponse = got.post("https://www.polaraccesslink.com/v3/users/" + userDocData["polar_user_id"], {"Authorization": "Bearer " + userDocData["polar_access_token"]});
+        console.log(deAuthResponse.body);
         // delete just polar keys and activities
         await db.collection("users").doc(userDoc.id).update({
           polar_access_token: admin.firestore.FieldValue.delete(),
@@ -174,6 +180,8 @@ exports.disconnectService = functions.https.onRequest(async (req, res) => {
           polar_registration_date: admin.firestore.FieldValue.delete(),
         });
       } else if (provider == "wahoo") {
+        const deAuthResponse = got.delete("https://api.wahooligan.com/v1/permissions", {"Authorization": "Bearer " + userDocData["wahoo_access_token"]});
+        console.log(deAuthResponse.body);
         // delete just wahoo keys and activities
         await db.collection("users").doc(userDoc.id).update({
           wahoo_access_token: admin.firestore.FieldValue.delete(),
