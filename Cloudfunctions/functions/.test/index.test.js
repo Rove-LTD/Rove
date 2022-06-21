@@ -795,8 +795,8 @@ describe('ROVE Functions - Integration Tests', () => {
                         "carbohydrate_percentage": 38,
                         "protein_percentage": 2
             }
-            stubbedPolarCall = sinon.stub(strava.activities, "get");
-            stubbedPolarCall.onFirstCall().returns(stravaExercisePayload);
+            // stubbedPolarCall = sinon.stub(strava.activities, "get");
+            // stubbedPolarCall.onFirstCall().returns(stravaExercisePayload);
             // set the request object with the correct provider, developerId and userId
             const req = {
                 url: "https://us-central1-rove-26.cloudfunctions.net/stravaWebhook",
@@ -804,7 +804,7 @@ describe('ROVE Functions - Integration Tests', () => {
                 "body":{"updates":{},"object_type":"activity","object_id":7345142595,"owner_id":12972711,"subscription_id":217520,"aspect_type":"create","event_time":1655824005}
             };
             res = {
-                send: (text)=> {assert.equal(text, "OK");},
+                send: (text)=> {assert.equal(text, "OK!");},
                 status: (code)=>{assert.equal(code, 200);},
             }
 

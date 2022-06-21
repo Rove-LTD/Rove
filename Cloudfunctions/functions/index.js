@@ -491,12 +491,12 @@ exports.stravaWebhook = functions.https.onRequest(async (request, response) => {
       const payloadAccessToken = payload["access_token"];
       activity = await stravaApi.activities.get({"access_token": payloadAccessToken, "id": request.body.object_id});
       sanitisedActivity = filters.stravaSanitise([activity]);
-      sanitisedActivity[0]["userId"] = userDoc.id;
+      sanitisedActivity[0]["userId"] = userDocRef.id;
     } else {
       // token in date, can get activities as required.
       activity = await stravaApi.activities.get({"access_token": stravaAccessToken, "id": request.body.object_id});
       sanitisedActivity = filters.stravaSanitise([activity]);
-      sanitisedActivity[0]["userId"] = userDoc.id;
+      sanitisedActivity[0]["userId"] = userDocRef.id;
     }
     // save to a doc
     const activityDoc = await userDocRef.ref.collection("activities").doc().set({"raw": activity, "sanitised": sanitisedActivity[0]});
@@ -506,7 +506,8 @@ exports.stravaWebhook = functions.https.onRequest(async (request, response) => {
         activity,
         activityDoc,
         0);
-    response.status(200).send("OK!");
+    response.status(200)
+    response.send("OK!");
   } else if (request.method === "GET") {
     const VERIFY_TOKEN = "STRAVA";
     const mode = request.query["hub.mode"];
@@ -666,11 +667,12 @@ async function sendToDeveloper(userDoc,
   };
   const response = await got.post(options);
   if (response.statusCode == 200) {
-    // the developer accepted the information
+    // the developer accepted the information TODO
+    /*
     userDoc.ref
         .collection("activities")
         .doc(activityDoc)
-        .set({status: "sent", timestamp: new Date()}, {merge: true});
+        .set({status: "sent", timestamp: new Date()}, {merge: true}); */
   } else {
     // call the retry functionality and increment the retry counter
     if (triesSoFar <= MaxRetries) {
