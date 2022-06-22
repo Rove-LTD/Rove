@@ -189,7 +189,7 @@ exports.garminSanitise = function(activities) {
                 "active_calories": Math.round(activities[i]["activeKilocalories"]),
                 "activity_duration_in_seconds": activities[i]["durationInSeconds"],
                 "start_time": new Date(activities[i]["startTimeInSeconds"]*1000).toISOString(),
-                "average_heart_rate_bpm": activities[i][i]["averageHeartRateInBeatsPerMinute"],
+                "average_heart_rate_bpm": activities[i]["averageHeartRateInBeatsPerMinute"],
                 "average_cadence": null,
                 "elevation_gain": parseFloat(activities[i]["totalElevationGainInMeters"]).toFixed(1),
                 "elevation_loss" : parseFloat(activities[i]["totalElevationLossInMeters"]).toFixed(1),
