@@ -186,7 +186,7 @@ exports.getActivityData = functions.https.onRequest(async (req, res) => {
       sessions.push([doc.data().sanitised, doc.data().raw]);
     }
   }
-  res.send(200);
+  res.send(200).send(JSON.stringify(sessions));
   return;
 });
 // callback from strava with token in
