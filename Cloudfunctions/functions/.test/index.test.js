@@ -827,6 +827,84 @@ describe('ROVE Functions - Integration Tests', () => {
            assert.deepEqual(sanatisedActivity, expectedResults);
            sinon.restore();
         })
+        it('Garmin Webhook should get event, sanatise, save and repond with status 200...', async () => {
+
+            // set the request object with the webHook payload
+            const req = {
+                url: "https://us-central1-rove-26.cloudfunctions.net/garminWebhook",
+                method: "POST",
+                body: [{
+                    "activeKilocalories": 391,
+                    "activityId": 7698241609,
+                    "activityName": "Indoor Cycling",
+                    "activityType": "INDOOR_CYCLING",
+                    "averageHeartRateInBeatsPerMinute": 139,
+                    "deviceName": "forerunner935",
+                    "durationInSeconds": 1811,
+                    "maxHeartRateInBeatsPerMinute": 178,
+                    "startTimeInSeconds": 1634907261,
+                    "startTimeOffsetInSeconds": 3600,
+                    "summaryId": "7698241609",
+                    "userAccessToken": "garmin-test-access-token",
+                    "userId": "eb24e8e5-110d-4a87-b976-444f40ca27d4"
+                  }],
+            };
+            res = {
+                send: (text)=> {assert.equal(text, "EVENT_RECEIVED");},
+                status: (code)=>{assert.equal(code, 200);},
+            }
+
+            await myFunctions.garminWebhook(req, res);
+            // check polar was called with the right arguments
+            // assert(stubbedPolarCall.calledWith(), "polar arguments");
+            const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+            await wait(1000);
+            //now check the database was updated correctly
+           const testUserDocs = await admin.firestore()
+           .collection("users")
+           .doc(testUser)
+           .collection("activities")
+           .where("raw.activityId", "==", 7698241609)
+           .get();
+
+           const sanatisedActivity = testUserDocs.docs[0].data();
+           const expectedResults = { // TODO:
+                sanitised: {
+                    userId: testUser,
+                    activity_id: 7698241609,
+                    activity_name: "Indoor Cycling",
+                    activity_type: "INDOOR_CYCLING",
+                    distance_in_meters: null, //float no trailing 0
+                    average_pace_in_meters_per_second: null, //float
+                    active_calories: 391,
+                    activity_duration_in_seconds: 1811,
+                    start_time: '2021-10-22T12:54:21.000Z', //ISO 8601 UTC
+                    average_heart_rate_bpm: 139,
+                    max_heart_rate_bpm: 178,
+                    average_cadence: null,
+                    elevation_gain: null,
+                    elevation_loss: null,
+                    data_source: "garmin",
+                },
+                raw: {
+                    "activeKilocalories": 391,
+                    "activityId": 7698241609,
+                    "activityName": "Indoor Cycling",
+                    "activityType": "INDOOR_CYCLING",
+                    "averageHeartRateInBeatsPerMinute": 139,
+                    "deviceName": "forerunner935",
+                    "durationInSeconds": 1811,
+                    "maxHeartRateInBeatsPerMinute": 178,
+                    "startTimeInSeconds": 1634907261,
+                    "startTimeOffsetInSeconds": 3600,
+                    "summaryId": "7698241609",
+                    "userAccessToken": "garmin-test-access-token",
+                    "userId": "eb24e8e5-110d-4a87-b976-444f40ca27d4"
+                  },
+            }
+           assert.deepEqual(sanatisedActivity, expectedResults);
+           sinon.restore();
+        })
     }); //End Test 6
 }); //end Integration TEST
 
