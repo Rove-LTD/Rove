@@ -548,6 +548,10 @@ describe('ROVE Functions - Integration Tests', () => {
                 body: "token=garmin-access-token&secret=garmin-test-secret",
                 expires_in: 21600,
             };
+            const responseObject2 = {
+                statusCode: 200,
+                body: {"userId": "d3315b1072421d0dd7c8f6b8e1de4df8"},
+            };
 
             const expectedTestUserDoc = {
                 devId: devUserData.devId,
@@ -575,8 +579,7 @@ describe('ROVE Functions - Integration Tests', () => {
 
             const stubbedcall = sinon.stub(got, "post");
             stubbedcall.onFirstCall().returns(responseObject1);
-
-            //sinon.stub(polar.athlete, "get").returns({id: 12345678});
+            //sinon.stub(got, "get").returns(responseObject2);
 
             // set the request object with the correct provider, developerId and userId
             const req = {url: "https://us-central1-rove-26.cloudfunctions.net/wahooCallback?oauth_token_secret=testcode-userId="+testUser+"-devId="+testDev+"&oauth_verifier=test-verifyer&oauth_token=test-token"};
@@ -613,6 +616,7 @@ describe('ROVE Functions - Integration Tests', () => {
                 "strava_access_token": "test_strava_access_token",
                 "strava_refresh_token": "test_strava_refresh_token",
                 "strava_token_expires_at": new Date().getTime()/1000 + 60,
+                "garmin_access_token" :"garmin-test-access-token",
             }, {merge: true});
 
             activityDocs = await admin.firestore()

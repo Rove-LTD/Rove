@@ -159,14 +159,49 @@ exports.garminWebhook = functions.https.onRequest(async (req, res) => {
       query: req.query,
       body: req.body,
     });
-    // get userbased on userid. (.where("id" == request.body.id)).
-    // TODO: Get strava activity and sanatize
-    // TODO: Send the information to an endpoint specified by the dev
-    // registered to a user.
-    res.status(200).send("EVENT_RECEIVED");
+    // 1) sanatise
+    let sanitisedActivities = [{}];
+    try {
+      sanitisedActivities = filters.garminSanitise(req.body);
+    } catch (error) {
+      console.log(error.errorMessage);
+      res.status(404);
+      res.send("Garmin Activity type not recognised");
+      return;
+    }
+    // now for each sanitised activity send to relevent developer
+    // users
+    sanitisedActivities.forEach(async (sanitisedActivity, index)=>{
+      const userDocsList = [];
+      const userQuery = await db.collection("users")
+          .where("garmin_access_token", "==", req.body[index].userAccessToken).get();
+      userQuery.docs.forEach(async (doc)=> {
+        userDocsList.push(doc);
+        // take opportunity to fill garmin_userId for future use
+        if (doc.data()["garmin_userId"] == undefined &&
+            req.body[index].userId != undefined) {
+          doc.ref
+              .set({"garmin_userId": req.body[index].userId}, {merge: true});
+        }
+      });
+      // save raw and sanitised activites as a backup for each user
+      userDocsList.forEach(async (userDoc)=>{
+        sanitisedActivity["userId"] = userDoc.id;
+        const activityDoc = await userDoc.ref
+            .collection("activities")
+            .doc()
+            .set({"sanitised": sanitisedActivity, "raw": req.body[index]});
+        const triesSoFar = 0; // this is our first try to write to developer
+        sendToDeveloper(userDoc, sanitisedActivity, req.body[index], activityDoc, triesSoFar);
+      });
+    });
+    res.status(200);
+    res.send("EVENT_RECEIVED");
+    return;
   } else if (req.method === "GET") {
     console.log("garmin not authorized");
-    res.status(400).send("Not Authorized");
+    res.status(400);
+    res.send("Not Authorized");
   }
 });
 
@@ -506,7 +541,7 @@ exports.stravaWebhook = functions.https.onRequest(async (request, response) => {
         activity,
         activityDoc,
         0);
-    response.status(200)
+    response.status(200);
     response.send("OK!");
   } else if (request.method === "GET") {
     const VERIFY_TOKEN = "STRAVA";
@@ -805,6 +840,7 @@ async function oauthCallbackHandlerGarmin(oAuthCallback, db) {
       "garmin_access_token_secret": garminAccessTokenSecret,
     };
     await db.collection("users").doc(userId).set(firestoreParameters, {merge: true});
+    getGarminUserId(consumerSecret, garminAccessToken, garminAccessTokenSecret, devId, userId);
     return true;
   }
 }
@@ -828,9 +864,52 @@ async function stravaTokenStorage(docId, data, db) {
     "strava_connected": true,
   };
   await db.collection("users").doc(docId).set(parameters, {merge: true});
+}
+async function getGarminUserId(consumerSecret, garminAccessToken, garminAccessTokenSecret, devId, userId) {
+  const oauthNonce = crypto.randomBytes(10).toString("hex");
+  // console.log(oauth_nonce);
+  const oauthTimestamp = Math.round(new Date().getTime()/1000);
+  // console.log(oauth_timestamp);
+  const parameters = {
+    oauth_consumer_key: configurations[devId]["oauth_consumer_key"],
+    oauth_token: garminAccessToken,
+    oauth_signature_method: "HMAC-SHA1",
+    oauth_nonce: oauthNonce,
+    oauth_timestamp: oauthTimestamp,
+    oauth_version: "1.0",
+  };
+  const encodedParameters = encodeparams.collectParams(parameters);
+  const baseUrl = "https://apis.garmin.com/wellness-api/rest/user/id";
+  const baseString = encodeparams.baseStringGen(encodedParameters, "GET", baseUrl);
+  const encodingKey = consumerSecret + "&" + garminAccessTokenSecret;
+  const signature = crypto.createHmac("sha1", encodingKey).update(baseString).digest().toString("base64");
+  const encodedSignature = encodeURIComponent(signature);
+  const options = {
+    headers: {
+      "Authorization": {
+        "oauth_consumer_key": configurations[devId]["oauth_consumer_key"],
+        "oauth_token": garminAccessToken,
+        "oauth_signature_method": "HMAC-SHA1",
+        "oauth_signature": encodedSignature,
+        "oauth_nonce": oauthNonce,
+        "oauth_timestamp": oauthTimestamp,
+        "oauth_version": "1.0",
+      },
+      "Accept": "application/json;charset=UTF-8",
+    },
+    method: "GET",
+    url: "https://apis.garmin.com/wellness-api/rest/user/id",
+  };
+  try {
+    const response = await got.get(options);
+    if (response.statusCode == 200) {
+      // put userId in the database TODO:
+    }
+  } catch (error) {
+    console.log("Error getting garmin user Id for "+userId);
+  }
   return;
 }
-
 // Utility Functions and Constants -----------------------------
 const waitTime = {0: 0, 1: 1, 2: 10, 3: 60}; // time in minutes
 const wait = (mins) => new Promise((resolve) => setTimeout(resolve, mins*60*1000));
