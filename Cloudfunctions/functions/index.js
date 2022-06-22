@@ -132,6 +132,15 @@ exports.stravaCallback = functions.https.onRequest(async (req, res) => {
     body: dataString,
   };
 
+  async function successDevCallback(db, devId, respsonse) {
+    const devDoc = db.collection("developers").doc(devId).get();
+
+    const urlString = devDoc("callbackUrl");
+    console.log("callback URL: "+ urlString);
+
+    return urlString;
+  }
+
   // make request to strava for tokens after auth flow and store credentials.
   await request.post(options, async (error, response, body) => {
     if (!error && response.statusCode == 200) {
@@ -141,7 +150,8 @@ exports.stravaCallback = functions.https.onRequest(async (req, res) => {
       // send a response now to endpoint for devId confirming success
       // await sendDevSuccess(devId); //TODO: create dev success post.
       // userResponse = "Some good redirect.";
-      res.send("your authorization was successful please close this window");
+      const urlString = await successDevCallback(db, devId, res);
+      res.send("your authorization was successful please close this window" + urlString);
     } else {
       res.send("Error: "+response.statusCode+
         " please close this window and try again");
