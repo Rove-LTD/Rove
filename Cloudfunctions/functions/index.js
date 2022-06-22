@@ -51,14 +51,14 @@ exports.connectService = functions.https.onRequest(async (req, res) => {
 
     if (!devDoc.exists) {
       url =
-        "error: the developerId was badly formatted, missing or not authorised";
+         "error: the developerId was badly formatted, missing or not authorised";
       res.status(400);
       res.send(url);
       return;
     }
     if (devDoc.data().devKey != devKey|| devKey == null) {
       url =
-        "error: the developerId was badly formatted, missing or not authorised";
+         "error: the developerId was badly formatted, missing or not authorised";
       res.status(400);
       res.send(url);
       return;
@@ -116,16 +116,16 @@ exports.stravaCallback = functions.https.onRequest(async (req, res) => {
   if (userId == null || devId == null || code == null) {
     res.send(
         "Error: missing userId of DevId in callback: an unexpected "+
-        "error has occurred please close this window and try again");
+         "error has occurred please close this window and try again");
     return;
   }
   const dataString = "client_id="+
-    configurations[devId]["stravaClientId"]+
-    "&client_secret="+
-    configurations[devId]["stravaClientSecret"]+
-    "&code="+
-    code+
-    "&grant_type=authorization_code";
+     configurations[devId]["stravaClientId"]+
+     "&client_secret="+
+     configurations[devId]["stravaClientSecret"]+
+     "&code="+
+     code+
+     "&grant_type=authorization_code";
   const options = {
     url: "https://www.strava.com/api/v3/oauth/token",
     method: "POST",
@@ -144,7 +144,7 @@ exports.stravaCallback = functions.https.onRequest(async (req, res) => {
       res.send("your authorization was successful please close this window");
     } else {
       res.send("Error: "+response.statusCode+
-        " please close this window and try again");
+         " please close this window and try again");
       console.log(JSON.parse(body));
       // send an error response to dev.
       // TODO: create dev fail post.
@@ -162,7 +162,7 @@ exports.garminWebhook = functions.https.onRequest(async (req, res) => {
     // 1) sanatise
     let sanitisedActivities = [{}];
     try {
-      sanitisedActivities = filters.garminSanitise(req.body);
+      sanitisedActivities = filters.garminSanitise(req.body.activities);
     } catch (error) {
       console.log(error.errorMessage);
       res.status(404);
@@ -174,14 +174,14 @@ exports.garminWebhook = functions.https.onRequest(async (req, res) => {
     sanitisedActivities.forEach(async (sanitisedActivity, index)=>{
       const userDocsList = [];
       const userQuery = await db.collection("users")
-          .where("garmin_access_token", "==", req.body[index].userAccessToken).get();
+          .where("garmin_access_token", "==", req.body.activities[index].userAccessToken).get();
       userQuery.docs.forEach(async (doc)=> {
         userDocsList.push(doc);
         // take opportunity to fill garmin_userId for future use
         if (doc.data()["garmin_userId"] == undefined &&
-            req.body[index].userId != undefined) {
+             req.body.activities[index].userId != undefined) {
           doc.ref
-              .set({"garmin_userId": req.body[index].userId}, {merge: true});
+              .set({"garmin_userId": req.body.activities[index].userId}, {merge: true});
         }
       });
       // save raw and sanitised activites as a backup for each user
@@ -190,9 +190,9 @@ exports.garminWebhook = functions.https.onRequest(async (req, res) => {
         const activityDoc = await userDoc.ref
             .collection("activities")
             .doc()
-            .set({"sanitised": sanitisedActivity, "raw": req.body[index]});
+            .set({"sanitised": sanitisedActivity, "raw": req.body.activities[index]});
         const triesSoFar = 0; // this is our first try to write to developer
-        sendToDeveloper(userDoc, sanitisedActivity, req.body[index], activityDoc, triesSoFar);
+        sendToDeveloper(userDoc, sanitisedActivity, req.body.activities[index], activityDoc, triesSoFar);
       });
     });
     res.status(200);
@@ -248,9 +248,9 @@ function stravaOauth(req) {
     client_id: configurations[devId]["stravaClientId"],
     response_type: "code",
     redirect_uri: "https://us-central1-rove-26.cloudfunctions.net/stravaCallback?userId="+
-      userId+
-      ":"+
-      devId,
+       userId+
+       ":"+
+       devId,
     approval_prompt: "force",
     scope: "profile:read_all,activity:read_all",
   };
@@ -288,7 +288,7 @@ async function garminOauth(req) {
   };
   const encodedParameters = encodeparams.collectParams(parameters);
   const baseUrl =
-    "https://connectapi.garmin.com/oauth-service/oauth/request_token";
+     "https://connectapi.garmin.com/oauth-service/oauth/request_token";
   const baseString = encodeparams
       .baseStringGen(encodedParameters, "GET", baseUrl);
   const encodingKey = consumerSecret + "&";
@@ -296,15 +296,15 @@ async function garminOauth(req) {
       .update(baseString).digest().toString("base64");
   const encodedSignature = encodeURIComponent(signature);
   const url =
-    "https://connectapi.garmin.com/oauth-service/oauth/request_token?oauth_consumer_key="+
-    configurations[devId]["oauth_consumer_key"]+
-    "&oauth_nonce="+
-    oauthNonce.toString()+
-    "&oauth_signature_method=HMAC-SHA1&oauth_timestamp="+
-    oauthTimestamp.toString()+
-    "&oauth_signature="+
-    encodedSignature+
-    "&oauth_version=1.0";
+     "https://connectapi.garmin.com/oauth-service/oauth/request_token?oauth_consumer_key="+
+     configurations[devId]["oauth_consumer_key"]+
+     "&oauth_nonce="+
+     oauthNonce.toString()+
+     "&oauth_signature_method=HMAC-SHA1&oauth_timestamp="+
+     oauthTimestamp.toString()+
+     "&oauth_signature="+
+     encodedSignature+
+     "&oauth_version=1.0";
   let response = "";
   try {
     // get OAuth tokens from garmin
@@ -316,14 +316,14 @@ async function garminOauth(req) {
   const oauthTokens = response.body.split("&");
   // set callbackURL for garmin Oauth with token and userId and devId.
   const callbackURL =
-    "oauth_callback=https://us-central1-rove-26.cloudfunctions.net/oauthCallbackHandlerGarmin?" +
-    oauthTokens[1] +
-        "-userId=" + userId + "-devId=" + devId;
+     "oauth_callback=https://us-central1-rove-26.cloudfunctions.net/oauthCallbackHandlerGarmin?" +
+     oauthTokens[1] +
+         "-userId=" + userId + "-devId=" + devId;
   // append to oauth garmin url.
   const _url = "https://connect.garmin.com/oauthConfirm?" +
-  oauthTokens[0] +
-        "&" +
-        callbackURL;
+   oauthTokens[0] +
+         "&" +
+         callbackURL;
   return _url;
 }
 
@@ -374,13 +374,13 @@ exports.polarCallback = functions.https.onRequest(async (req, res) => {
     return;
   }
   const clientIdClientSecret = configurations[devId]["polarClientId"]+":"+configurations[devId]["polarSecret"];
-  const buffer = new Buffer.from(clientIdClientSecret); // eslint-disable-line
+   const buffer = new Buffer.from(clientIdClientSecret); // eslint-disable-line
   const base64String = buffer.toString("base64");
 
   const dataString = "code="+
-    code+
-    "&grant_type=authorization_code"+
-    "&redirect_uri=https://us-central1-rove-26.cloudfunctions.net/polarCallback";
+     code+
+     "&grant_type=authorization_code"+
+     "&redirect_uri=https://us-central1-rove-26.cloudfunctions.net/polarCallback";
   const options = {
     url: "https://polarremote.com/v2/oauth2/token",
     method: "POST",
@@ -395,7 +395,7 @@ exports.polarCallback = functions.https.onRequest(async (req, res) => {
   // make request to polar for tokens after auth flow and store credentials.
   await request.post(options, async (error, response, body) => {
     if (!error && response.statusCode == 200) {
-    // this is where the tokens come back.
+      // this is where the tokens come back.
       let message ="";
       message = await registerUserWithPolar(userId, devId, JSON.parse(body), db);
       await polarStoreTokens(userId, devId, JSON.parse(body), db);
@@ -427,7 +427,7 @@ async function registerUserWithPolar(userId, devId, data, db) {
     },
     body: dataString,
   };
-    // make request to polar to register the user.
+  // make request to polar to register the user.
   await request.post(options, async (error, response, body) => {
     if (!error && response.statusCode == 200) {
       const updates = {
@@ -704,10 +704,10 @@ async function sendToDeveloper(userDoc,
   if (response.statusCode == 200) {
     // the developer accepted the information TODO
     /*
-    userDoc.ref
-        .collection("activities")
-        .doc(activityDoc)
-        .set({status: "sent", timestamp: new Date()}, {merge: true}); */
+     userDoc.ref
+         .collection("activities")
+         .doc(activityDoc)
+         .set({status: "sent", timestamp: new Date()}, {merge: true}); */
   } else {
     // call the retry functionality and increment the retry counter
     if (triesSoFar <= MaxRetries) {
@@ -755,7 +755,7 @@ exports.polarWebhookSetup = functions.https.onRequest(async (req, res) => {
 
 async function polarWebhookUtility(devId, action, webhookId) {
   const clientIdClientSecret = configurations[devId]["polarClientId"]+":"+configurations[devId]["polarSecret"];
-  const buffer = new Buffer.from(clientIdClientSecret); // eslint-disable-line
+   const buffer = new Buffer.from(clientIdClientSecret); // eslint-disable-line
   const base64String = buffer.toString("base64");
   const _headers = {
     "Content-Type": "application/json",
@@ -913,3 +913,4 @@ async function getGarminUserId(consumerSecret, garminAccessToken, garminAccessTo
 // Utility Functions and Constants -----------------------------
 const waitTime = {0: 0, 1: 1, 2: 10, 3: 60}; // time in minutes
 const wait = (mins) => new Promise((resolve) => setTimeout(resolve, mins*60*1000));
+

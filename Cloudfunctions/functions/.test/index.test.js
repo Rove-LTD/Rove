@@ -833,7 +833,7 @@ describe('ROVE Functions - Integration Tests', () => {
             const req = {
                 url: "https://us-central1-rove-26.cloudfunctions.net/garminWebhook",
                 method: "POST",
-                body: [{
+                body: {"activities":[{
                     "activeKilocalories": 391,
                     "activityId": 7698241609,
                     "activityName": "Indoor Cycling",
@@ -847,7 +847,7 @@ describe('ROVE Functions - Integration Tests', () => {
                     "summaryId": "7698241609",
                     "userAccessToken": "garmin-test-access-token",
                     "userId": "eb24e8e5-110d-4a87-b976-444f40ca27d4"
-                  }],
+                  }],}
             };
             res = {
                 send: (text)=> {assert.equal(text, "EVENT_RECEIVED");},
