@@ -94,7 +94,8 @@ exports.connectService = functions.https.onRequest(async (req, res) => {
     url = "error: the provider was badly formatted, missing or not supported";
   }
   // send back URL to user device.
-  res.send(url);
+  console.log(url);
+  res.redirect(url);
   return;
 });
 
@@ -133,11 +134,9 @@ exports.stravaCallback = functions.https.onRequest(async (req, res) => {
   };
 
   async function successDevCallback(db, devId, respsonse) {
-    const devDoc = db.collection("developers").doc(devId).get();
-
-    const urlString = devDoc("callbackUrl");
+    const devDoc = await db.collection("developers").doc(devId).get();
+    const urlString = devDoc.data()["callbackURL"];
     console.log("callback URL: "+ urlString);
-
     return urlString;
   }
 
@@ -151,6 +150,7 @@ exports.stravaCallback = functions.https.onRequest(async (req, res) => {
       // await sendDevSuccess(devId); //TODO: create dev success post.
       // userResponse = "Some good redirect.";
       const urlString = await successDevCallback(db, devId, res);
+      res.redirect(urlString);
       res.send("your authorization was successful please close this window" + urlString);
     } else {
       res.send("Error: "+response.statusCode+
