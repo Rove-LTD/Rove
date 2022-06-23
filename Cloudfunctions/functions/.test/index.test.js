@@ -6,6 +6,7 @@
 // Chai is a commonly used library for creating unit test suites. It is easily extended with plugins.
 const chai = require('chai');
 const assert = chai.assert;
+const stravaPayload = require('./strava.json');
 
 // Sinon is a library used for mocking or verifying function calls in JavaScript.
 const sinon = require('sinon');
@@ -27,6 +28,7 @@ const admin = require("firebase-admin");
 const request = require('request');
 const got = require('got');
 const strava = require("strava-v3");
+const stravaApi = require("strava-v3");
 const { prototype } = require('mocha');
 const { wahooSanitise } = require('../data-filter.js');
 
@@ -37,7 +39,12 @@ describe('ROVE Functions - Integration Tests', () => {
     let testUser = "paulsTestDevSecondUser";    //<----edit user before running 
                                                 //the test
     let testDev = "paulsTestDev";
-    let devTestData = {email: "paul.testDev@gmail.com", devKey: "test-key", polar_signature_secret_key: "e14f5f33-0ffc-4f38-8f7e-8d243337f986", polar_webhook_id: "wPWwr1P7"};
+    let devTestData = {
+        email: "paul.testDev@gmail.com", devKey: "test-key",
+        polar_signature_secret_key: "e14f5f33-0ffc-4f38-8f7e-8d243337f986",
+        polar_webhook_id: "wPWwr1P7",
+        endpoint: "https://roveapitestdatabase-default-rtdb.firebaseio.com/newmessage.json"
+    };
     let devUserData = {devId: testDev, email: "paul.userTest@gmail.com"};
     let recievedGarminUrl = "";
     let recievedStravaUrl = "";
@@ -541,6 +548,10 @@ describe('ROVE Functions - Integration Tests', () => {
                 body: "token=garmin-access-token&secret=garmin-test-secret",
                 expires_in: 21600,
             };
+            const responseObject2 = {
+                statusCode: 200,
+                body: {"userId": "d3315b1072421d0dd7c8f6b8e1de4df8"},
+            };
 
             const expectedTestUserDoc = {
                 devId: devUserData.devId,
@@ -568,8 +579,7 @@ describe('ROVE Functions - Integration Tests', () => {
 
             const stubbedcall = sinon.stub(got, "post");
             stubbedcall.onFirstCall().returns(responseObject1);
-
-            //sinon.stub(polar.athlete, "get").returns({id: 12345678});
+            //sinon.stub(got, "get").returns(responseObject2);
 
             // set the request object with the correct provider, developerId and userId
             const req = {url: "https://us-central1-rove-26.cloudfunctions.net/wahooCallback?oauth_token_secret=testcode-userId="+testUser+"-devId="+testDev+"&oauth_verifier=test-verifyer&oauth_token=test-token"};
@@ -594,7 +604,7 @@ describe('ROVE Functions - Integration Tests', () => {
     }); //End Test 5
     //----------TEST 6---------------
     describe("Testing that the Webhooks work: ", () => {
-        before ('set up the wahoo userId in the test User doc', async () => {
+        before ('set up the userIds in the test User doc', async () => {
             await admin.firestore()
             .collection("users")
             .doc(testUser)
@@ -602,6 +612,11 @@ describe('ROVE Functions - Integration Tests', () => {
                 "wahoo_user_id": "wahoo_test_user",
                 "polar_user_id": "polar_test_user",
                 "polar_access_token": "polar_test_access_token",
+                "strava_id" : "test_strava_id",
+                "strava_access_token": "test_strava_access_token",
+                "strava_refresh_token": "test_strava_refresh_token",
+                "strava_token_expires_at": new Date().getTime()/1000 + 60,
+                "garmin_access_token" :"garmin-test-access-token",
             }, {merge: true});
 
             activityDocs = await admin.firestore()
@@ -640,7 +655,7 @@ describe('ROVE Functions - Integration Tests', () => {
            const sanatisedActivity = testUserDocs.docs[0].data();
            const expectedResults = {
                 sanitised: {
-                    userTag: "paulsTestDevSecondUser",
+                    userId: "paulsTestDevSecondUser",
                     activity_id: 140473420,
                     activity_name: "Cycling",
                     activity_type: "BIKING",
@@ -741,7 +756,7 @@ describe('ROVE Functions - Integration Tests', () => {
            const sanatisedActivity = testUserDocs.docs[0].data();
            const expectedResults = { // TODO:
                 sanitised: {
-                    userTag: testUser,
+                    userId: testUser,
                     activity_id: 1937529874,
                     activity_name: "WATERSPORTS_WATERSKI",
                     activity_type: "OTHER",
@@ -758,6 +773,134 @@ describe('ROVE Functions - Integration Tests', () => {
                     data_source: "polar",
                 },
                 raw: polarExercisePayload.json(),
+            }
+           assert.deepEqual(sanatisedActivity, expectedResults);
+           sinon.restore();
+        })
+        it('Strava Webhook should get event, sanatise, save and repond with status 200...', async () => {
+            //set up the stubbed response to mimic polar's response when called with the
+            const stravaExercisePayload = stravaPayload;
+            stubbedStravaCall = sinon.stub(stravaApi.activities, "get");
+            stubbedStravaCall.onFirstCall().returns(stravaPayload);
+            // set the request object with the correct provider, developerId and userId
+            const req = {
+                url: "https://us-central1-rove-26.cloudfunctions.net/stravaWebhook",
+                method: "POST",
+                "body":{"updates":{},"object_type":"activity","object_id":7345142595,"owner_id":"test_strava_id","subscription_id":217520,"aspect_type":"create","event_time":1655824005}
+            };
+            res = {
+                send: (text)=> {assert.equal(text, "OK!");},
+                status: (code)=>{assert.equal(code, 200);},
+            }
+
+            await myFunctions.stravaWebhook(req, res);
+            // check polar was called with the right arguments
+            // assert(stubbedPolarCall.calledWith(), "polar arguments");
+            const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+            await wait(1000);
+            //now check the database was updated correctly
+           const testUserDocs = await admin.firestore()
+           .collection("users")
+           .doc(testUser)
+           .collection("activities")
+           .where("raw.id", "==", 12345678987654321)
+           .get();
+
+           const sanatisedActivity = testUserDocs.docs[0].data()["sanitised"];
+           const expectedResults = { // TODO:
+                userId: testUser,
+                activity_id: 12345678987654321,
+                activity_name: "Happy Friday",
+                activity_type: "Ride",
+                distance_in_meters: 28099, //float no trailing 0
+                average_pace_in_meters_per_second:"6.7", //float
+                active_calories: 781,
+                activity_duration_in_seconds: 4207,
+                start_time: '2018-02-16T06:52:54.000Z', //ISO 8601 UTC
+                average_heart_rate_bpm: null,
+               // max_heart_rate_bpm: null,
+                average_cadence: "78.5",
+                elevation_gain: "446.6",
+                elevation_loss:"17.2",
+                data_source: "strava",
+            }
+           assert.deepEqual(sanatisedActivity, expectedResults);
+           sinon.restore();
+        })
+        it('Garmin Webhook should get event, sanatise, save and repond with status 200...', async () => {
+
+            // set the request object with the webHook payload
+            const req = {
+                url: "https://us-central1-rove-26.cloudfunctions.net/garminWebhook",
+                method: "POST",
+                body: {"activities":[{
+                    "activeKilocalories": 391,
+                    "activityId": 7698241609,
+                    "activityName": "Indoor Cycling",
+                    "activityType": "INDOOR_CYCLING",
+                    "averageHeartRateInBeatsPerMinute": 139,
+                    "deviceName": "forerunner935",
+                    "durationInSeconds": 1811,
+                    "maxHeartRateInBeatsPerMinute": 178,
+                    "startTimeInSeconds": 1634907261,
+                    "startTimeOffsetInSeconds": 3600,
+                    "summaryId": "7698241609",
+                    "userAccessToken": "garmin-test-access-token",
+                    "userId": "eb24e8e5-110d-4a87-b976-444f40ca27d4"
+                  }],}
+            };
+            res = {
+                send: (text)=> {assert.equal(text, "EVENT_RECEIVED");},
+                status: (code)=>{assert.equal(code, 200);},
+            }
+
+            await myFunctions.garminWebhook(req, res);
+            // check polar was called with the right arguments
+            // assert(stubbedPolarCall.calledWith(), "polar arguments");
+            const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+            await wait(1000);
+            //now check the database was updated correctly
+           const testUserDocs = await admin.firestore()
+           .collection("users")
+           .doc(testUser)
+           .collection("activities")
+           .where("raw.activityId", "==", 7698241609)
+           .get();
+
+           const sanatisedActivity = testUserDocs.docs[0].data();
+           const expectedResults = { // TODO:
+                sanitised: {
+                    userId: testUser,
+                    activity_id: 7698241609,
+                    activity_name: "Indoor Cycling",
+                    activity_type: "INDOOR_CYCLING",
+                    distance_in_meters: null, //float no trailing 0
+                    average_pace_in_meters_per_second: null, //float
+                    active_calories: 391,
+                    activity_duration_in_seconds: 1811,
+                    start_time: '2021-10-22T12:54:21.000Z', //ISO 8601 UTC
+                    average_heart_rate_bpm: 139,
+                    max_heart_rate_bpm: 178,
+                    average_cadence: null,
+                    elevation_gain: null,
+                    elevation_loss: null,
+                    data_source: "garmin",
+                },
+                raw: {
+                    "activeKilocalories": 391,
+                    "activityId": 7698241609,
+                    "activityName": "Indoor Cycling",
+                    "activityType": "INDOOR_CYCLING",
+                    "averageHeartRateInBeatsPerMinute": 139,
+                    "deviceName": "forerunner935",
+                    "durationInSeconds": 1811,
+                    "maxHeartRateInBeatsPerMinute": 178,
+                    "startTimeInSeconds": 1634907261,
+                    "startTimeOffsetInSeconds": 3600,
+                    "summaryId": "7698241609",
+                    "userAccessToken": "garmin-test-access-token",
+                    "userId": "eb24e8e5-110d-4a87-b976-444f40ca27d4"
+                  },
             }
            assert.deepEqual(sanatisedActivity, expectedResults);
            sinon.restore();
