@@ -12,15 +12,16 @@ const sinon = require('sinon');
 // Require and initialize firebase-functions-test in "online mode" with your project's
 // credentials and service account key.
 const firebaseConfig = {
-    apiKey: "AIzaSyCVM54BYAKS9vXqRdK_a3yAt4By-CZByCA",
-    authDomain: "rove-26.firebaseapp.com",
-    projectId: "rove-26",
-    storageBucket: "rove-26.appspot.com",
-    messagingSenderId: "945964823577",
-    appId: "1:945964823577:web:11b548bf6c322bf6d5a688",
-    measurementId: "G-ESZ9SQS6ZX"
-};
-const test = require('firebase-functions-test')(firebaseConfig, '.test/keys/rove-26-firebase-adminsdk-key.json');
+    apiKey: "AIzaSyCiMcMwrKgSKu6w5XW8hdCrWnLeI8CtGY4",
+    authDomain: "rovetest-beea7.firebaseapp.com",
+    databaseURL: "https://rovetest-beea7-default-rtdb.firebaseio.com",
+    projectId: "rovetest-beea7",
+    storageBucket: "rovetest-beea7.appspot.com",
+    messagingSenderId: "1020717595214",
+    appId: "1:1020717595214:web:3767a026d5bc2101b7211f",
+    measurementId: "G-C9DDQXGVGD"
+  };
+  const test = require('firebase-functions-test')(firebaseConfig, '.test/keys/rovetest-beea7-firebase-adminsdk-key.json');
 
 
 const admin = require("firebase-admin");
