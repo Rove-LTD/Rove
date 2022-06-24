@@ -81,7 +81,7 @@ exports.connectService = functions.https.onRequest(async (req, res) => {
 
   // stravaOauth componses the request url for the user.
   if (provider == "strava") {
-    url = stravaOauth(req);
+    url = await stravaOauth(req);
   } else if (provider == "garmin") {
     // TODO: Make the garmin request async and returnable.
     url = await garminOauth(req);
@@ -94,15 +94,18 @@ exports.connectService = functions.https.onRequest(async (req, res) => {
     url = "error: the provider was badly formatted, missing or not supported";
   }
   // send back URL to user device.
-  console.log(url);
+  console.send(url);
   res.redirect(url);
-  return;
 });
 
 exports.oauthCallbackHandlerGarmin = functions.https
     .onRequest(async (req, res) => {
       const oAuthCallback = Url.parse(req.url, true).query;
+      const oauthTokenSecret = oAuthCallback["oauth_token_secret"].split("-");
+      const devId = oauthTokenSecret[2].split("=")[1];
       await oauthCallbackHandlerGarmin(oAuthCallback, db);
+      const urlString = await successDevCallback(db, devId);
+      res.redirect(urlString);
       res.send("THANKS, YOU CAN NOW CLOSE THIS WINDOW");
     }),
 
@@ -133,13 +136,6 @@ exports.stravaCallback = functions.https.onRequest(async (req, res) => {
     body: dataString,
   };
 
-  async function successDevCallback(db, devId, respsonse) {
-    const devDoc = await db.collection("developers").doc(devId).get();
-    const urlString = devDoc.data()["callbackURL"];
-    console.log("callback URL: "+ urlString);
-    return urlString;
-  }
-
   // make request to strava for tokens after auth flow and store credentials.
   await request.post(options, async (error, response, body) => {
     if (!error && response.statusCode == 200) {
@@ -149,7 +145,7 @@ exports.stravaCallback = functions.https.onRequest(async (req, res) => {
       // send a response now to endpoint for devId confirming success
       // await sendDevSuccess(devId); //TODO: create dev success post.
       // userResponse = "Some good redirect.";
-      const urlString = await successDevCallback(db, devId, res);
+      const urlString = await successDevCallback(db, devId);
       res.redirect(urlString);
       res.send("your authorization was successful please close this window" + urlString);
     } else {
@@ -162,6 +158,13 @@ exports.stravaCallback = functions.https.onRequest(async (req, res) => {
     }
   });
 });
+
+async function successDevCallback(db, devId) {
+  const devDoc = await db.collection("developers").doc(devId).get();
+  const urlString = devDoc.data()["callbackURL"];
+  console.log("callback URL: "+ urlString);
+  return urlString;
+}
 
 exports.garminWebhook = functions.https.onRequest(async (req, res) => {
   if (req.method === "POST") {
@@ -412,7 +415,9 @@ exports.polarCallback = functions.https.onRequest(async (req, res) => {
       // send a response now to endpoint for devId confirming success
       // await sendDevSuccess(devId); //TODO: create dev success post.
       // userResponse = "Some good redirect.";
-      res.send("your authorization was successful please close this window: "+message);
+      const urlString = await successDevCallback(db, devId);
+      res.redirect(urlString);
+      res.send("your authorization was successful please close this window: "+ urlString + ": " + message);
     } else {
       res.send("Error: "+response.statusCode+":"+body.toString()+" please close this window and try again");
       console.log(JSON.parse(body));
@@ -491,6 +496,8 @@ exports.wahooCallback = functions.https.onRequest(async (req, res) => {
     await oauthWahoo.getAndSaveAccessCodes();
   }
   if (!oauthWahoo.error) {
+    const urlString = await successDevCallback(db, oauthWahoo.devId);
+    res.redirect(urlString);
     res.send("your authorization was successful please close this window");
   } else {
     res.send(oauthWahoo.errorMessage);
