@@ -1,0 +1,25 @@
+{ "testDev" :  "paulsTestDev",
+  "testUser": "paulsTestDevSecondUser",
+  "firebaseConfig": {
+    "apiKey": "AIzaSyCiMcMwrKgSKu6w5XW8hdCrWnLeI8CtGY4",
+    "authDomain": "rovetest-beea7.firebaseapp.com",
+    "databaseURL": "https://rovetest-beea7-default-rtdb.firebaseio.com",
+    "projectId": "rovetest-beea7",
+    "storageBucket": "rovetest-beea7.appspot.com",
+    "messagingSenderId": "1020717595214",
+    "appId": "1:1020717595214:web:3767a026d5bc2101b7211f",
+    "measurementId": "G-C9DDQXGVGD"
+  },
+  "testKeyFile": ".test/keys/rovetest-beea7-firebase-adminsdk-key.json",
+  "devTestData": {
+    "email": "paul.testDev@gmail.com",
+    "devKey": "test-key",
+    "polar_signature_secret_key": "e14f5f33-0ffc-4f38-8f7e-8d243337f986",
+    "polar_webhook_id": "wPWwr1P7",
+    "endpoint": "https://rovetest-beea7-default-rtdb.firebaseio.com/newmessage.json"
+  },
+  "devUserData": {
+    "devId": "paulsTestDev",
+    "email": "paul.userTest@gmail.com"
+  }
+}
