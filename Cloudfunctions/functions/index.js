@@ -104,7 +104,8 @@ exports.disconnectService = functions.https.onRequest(async (req, res) => {
   const userId = (Url.parse(req.url, true).query)["userId"];
   const devKey = (Url.parse(req.url, true).query)["devKey"];
 
-  let url = "";
+  let message = "";
+  let userDoc;
 
   // parameter checks
   // first check developer exists and the devKey matches
@@ -115,42 +116,56 @@ exports.disconnectService = functions.https.onRequest(async (req, res) => {
         .get();
 
     if (!devDoc.exists) {
-      url =
+      message =
         "error: the developerId was badly formatted, missing or not authorised";
       res.status(400);
-      res.send(url);
+      res.send(message);
       return;
     }
     if (devDoc.data().devKey != devKey|| devKey == null) {
-      url =
+      message =
         "error: the developerId was badly formatted, missing or not authorised";
       res.status(400);
-      res.send(url);
+      res.send(message);
       return;
     }
   } else {
-    url = "error: the developerId parameter is missing";
+    message = "error: the developerId parameter is missing";
     res.status(400);
-    res.send(url);
+    res.send(message);
     return;
   }
-
   // now check the userId has been given
-  if (userId == null) {
-    url = "error: the userId parameter is missing";
+  if (userId != null) {
+    userDoc = await admin.firestore()
+    .collection("users")
+    .doc(userId)
+    .get();
+
+    if (!userDoc.exists) {
+      message =
+        "error: the userId was badly formatted or does not exist";
+      res.status(400);
+      res.send(message);
+      return;
+    }
+  } else {
+    message = "error: the userId parameter is missing";
     res.status(400);
-    res.send(url);
+    res.send(message);
     return;
   }
 
   const providers = ["strava", "garmin", "polar", "wahoo"];
-  // stravaOauth componses the request url for the user.
+  // check if this user is authorized already
+  // if they are then deauthorize and respond with success/failure message
+  // if they are not then error - user not authorised with this provider
+  // 1. check user id authorized already
   if (providers.includes(provider) == true) {
-    (await db.collection("users").where("userId", "==", userId).get()).docs.forEach(async (userDoc) => {
-      const userDocData = (await db.collection("users").doc(userDoc.id).get()).data();
+    const userDocData = userDoc.data();
       if (provider == "strava") {
         // deauth for Strava.
-        const deAuthResponse = got.post("https://www.strava.com/oauth/deauthorize", {"access_token": userDocData["strava_access_token"]});
+        const deAuthResponse = await got.post("https://www.strava.com/oauth/deauthorize", {"access_token": userDocData["strava_access_token"]});
         console.log(deAuthResponse.body);
         // delete just Strava keys and activities.
         await db.collection("users").doc(userDoc.id).update({
@@ -168,7 +183,7 @@ exports.disconnectService = functions.https.onRequest(async (req, res) => {
           garmin_access_token_secret: admin.firestore.FieldValue.delete(),
         });
       } else if (provider == "polar") {
-        const deAuthResponse = got.post("https://www.polaraccesslink.com/v3/users/" + userDocData["polar_user_id"], {"Authorization": "Bearer " + userDocData["polar_access_token"]});
+        const deAuthResponse = await got.post("https://www.polaraccesslink.com/v3/users/" + userDocData["polar_user_id"], {"Authorization": "Bearer " + userDocData["polar_access_token"]});
         console.log(deAuthResponse.body);
         // delete just polar keys and activities
         await db.collection("users").doc(userDoc.id).update({
@@ -180,7 +195,7 @@ exports.disconnectService = functions.https.onRequest(async (req, res) => {
           polar_registration_date: admin.firestore.FieldValue.delete(),
         });
       } else if (provider == "wahoo") {
-        const deAuthResponse = got.delete("https://api.wahooligan.com/v1/permissions", {"Authorization": "Bearer " + userDocData["wahoo_access_token"]});
+        const deAuthResponse = await got.delete("https://api.wahooligan.com/v1/permissions", {"Authorization": "Bearer " + userDocData["wahoo_access_token"]});
         console.log(deAuthResponse.body);
         // delete just wahoo keys and activities
         await db.collection("users").doc(userDoc.id).update({
@@ -190,30 +205,32 @@ exports.disconnectService = functions.https.onRequest(async (req, res) => {
           wahoo_token_expires_in: admin.firestore.FieldValue.delete(),
           wahoo_user_id: admin.firestore.FieldValue.delete(),
         });
+        // delete activities from provider.
+        (await userDoc.ref.collection("activities")
+          .where("sanitised.data_source", "==", "wahoo")
+          .get())
+          .docs.forEach((doc)=>{
+            doc.ref.delete();
+        });
       }
-      // delete activities from provider.
-      (await db.collection("users").doc(userDoc.id).collection("activities").where("sanitised.data_source", "==", "wahoo").get()).docs.forEach((doc)=>{
-        db.collection("users").doc(userDoc.id).collection("activities").doc(doc.id).delete();
-      });
-      url = "status: complete";
+      message = "status: complete";
       res.status(200);
-    });
     // deauth provider
   } else if (provider == "all") {
     // delete all the info for the user doc when no provider is given.
     (await db.collection("users").where("userId", "==", userId).get()).docs.forEach(async (userDoc) => {
       await db.collection("users").doc(userDoc.id).delete();
     });
-    url = "status: complete";
+    message = "status: complete";
     res.status(200);
     // deauth all
   } else {
     // the request was badly formatted with incorrect provider parameter
-    url = "error: the provider was badly formatted, missing or not supported";
+    message = "error: the provider was badly formatted, missing or not supported";
     res.status(400);
   }
-  // send back URL to user device.
-  res.send(url);
+  // send back message to user device.
+  res.send(message);
   return;
 }),
 
