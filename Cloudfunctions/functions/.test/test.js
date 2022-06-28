@@ -54,7 +54,7 @@ describe('ROVE full integration test scripts', () => {
     require ('./test-modules/garminCallback.test.js');
     require ('./test-modules/webhooks.test.js');
     require ('./test-modules/utility.test.js');
-    require ('./test-modules/wahooDeauthorise.test.js');
+    require ('./test-modules/disconnectServiceFailure.test.js');
 });
 // require ('./test-modules/index.test.js');
 // require ('./test-modules/utility.test.js');
