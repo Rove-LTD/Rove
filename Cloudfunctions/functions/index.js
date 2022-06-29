@@ -399,6 +399,17 @@ async function successDevCallback(db, devId) {
   console.log("callback URL: "+ urlString);
   return urlString;
 }
+exports.garminDeregistrations = functions.https.onRequest(async (req, res) => {
+  // here we are handed a list of de-registrations with userIds and userAccessTokens.
+  const deRegistrations = req.body["deregistrations"];
+  for (let i=0; i<deRegistrations.length; i++) {
+    const userQuery = await db.collection("users").where("garmin_access_token", "==", deRegistrations[i]["userAccessToken"]).get();
+    userQuery.docs.forEach(async (doc) =>{
+      const response = await deleteGarminActivity(doc, true);
+      res.send(response);
+    });
+  }
+});
 
 exports.garminWebhook = functions.https.onRequest(async (req, res) => {
   if (req.method === "POST") {
@@ -756,14 +767,15 @@ exports.stravaWebhook = functions.https.onRequest(async (request, response) => {
       response.send();
       return;
     }
+    const userDoc = await db.collection("users").where("strava_id", "==", request.body.owner_id).get();
+    // if user de-authorizing.
     if ("authorized" in request.body.updates) {
       console.log("de-auth event");
-      await deleteStravaActivity();
-      response.status(200);
+      response = await deleteStravaActivity(userDoc, true);
+      response.status(response);
       response.send();
       return;
     }
-    const userDoc = await db.collection("users").where("strava_id", "==", request.body.owner_id).get();
     const userDocRef = userDoc.docs[0];
     if (userDoc.docs.length == 1) {
       stravaAccessToken = userDocRef.data()["strava_access_token"];
