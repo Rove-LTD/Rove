@@ -1,3 +1,4 @@
+/* eslint-disable no-multi-str */
 /* eslint-disable no-unused-vars */
 /* eslint-disable require-jsdoc */
 /* eslint-disable max-len */
@@ -32,20 +33,27 @@ const oauthWahoo = new OauthWahoo(configurations, db);
 // tokens stored under userId
 
 exports.redirectPage = functions.https.onRequest(async (req, res) => {
+  const provider = (Url.parse(req.url, true).query)["provider"];
+  const devId = (Url.parse(req.url, true).query)["devId"];
+  const userId = (Url.parse(req.url, true).query)["userId"];
+  const devKey = (Url.parse(req.url, true).query)["devKey"];
+  const params = "?devId="+devId+"&userId="+userId+"&devKey="+devKey+"&provider="+provider+"&isRedirect=true";
   fs.readFile("redirectPage.html", function(err, html) {
     if (err) {
       throw err;
     }
-    res.writeHeader(200, {"Content-Type": "text/html"});
+    res.writeHead(200, {"Content-Type": "text/html"});
     res.write(html);
+    res.write("<h2 style='text-align: center;font-family:DM Sans'>Data integrations provider for "+devId+"</h2>\
+    <h2 style='text-align: center;font-family:DM Sans'>To authenticate "+provider+" click <a href=/connectService"+params+">here</a></h2>");
     res.end();
-  }).listen(8000);
+  });
 });
 
 exports.connectService = functions.https.onRequest(async (req, res) => {
   // Dev calls this service with parameters: user-id, dev-id, and service to
   // authenticate.
-  // in form:  us-central1-rove.cloudfunctions.net/authenticateStrava?
+  // in form:  us-central1-rove.cloudfunctions.net/connectService?
   // userId=***&devId=***&devKey=***&provider=***
   const provider = (Url.parse(req.url, true).query)["provider"];
   const devId = (Url.parse(req.url, true).query)["devId"];
@@ -54,7 +62,7 @@ exports.connectService = functions.https.onRequest(async (req, res) => {
 
   const isRedirect = (Url.parse(req.url, true).query)["isRedirect"];
   if (isRedirect == undefined) {
-    res.redirect("../redirectPage?provier="+provider+"&devId="+devId+"&userId="+userId+"&devKey="+devKey);
+    res.redirect("../redirectPage?provider="+provider+"&devId="+devId+"&userId="+userId+"&devKey="+devKey);
   }
   let url = "";
 
