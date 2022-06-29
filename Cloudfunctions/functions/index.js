@@ -746,13 +746,19 @@ exports.stravaWebhook = functions.https.onRequest(async (request, response) => {
   });
   if (request.method === "POST") {
     functions.logger.info("webhook event received!", {
-      query: request.query,
       body: request.body,
     });
     let stravaAccessToken;
     // get userbased on userid. (.where("id" == request.body.owner_id)).
     // if the status is a delete then do nothing.
     if (request.body.aspect_type == "delete") {
+      response.status(200);
+      response.send();
+      return;
+    }
+    if ("authorized" in request.body.updates) {
+      console.log("de-auth event");
+      await deleteStravaActivity();
       response.status(200);
       response.send();
       return;
