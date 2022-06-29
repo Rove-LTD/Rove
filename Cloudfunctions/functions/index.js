@@ -1,3 +1,5 @@
+/* eslint-disable no-multi-str */
+/* eslint-disable no-unused-vars */
 /* eslint-disable require-jsdoc */
 /* eslint-disable max-len */
 /**
@@ -16,7 +18,7 @@ const stravaApi = require("strava-v3");
 const OauthWahoo = require("./oauthWahoo");
 const contentsOfDotEnvFile = require("./config.json");
 const filters = require("./data-filter");
-const {get} = require("request");
+const fs = require("fs");
 
 const configurations = contentsOfDotEnvFile["config"];
 // find a way to decrypt and encrypt this information
@@ -30,16 +32,38 @@ const oauthWahoo = new OauthWahoo(configurations, db);
 // we recieve auth token from strava to stravaCallBack.
 // tokens stored under userId
 
+exports.redirectPage = functions.https.onRequest(async (req, res) => {
+  const provider = (Url.parse(req.url, true).query)["provider"];
+  const devId = (Url.parse(req.url, true).query)["devId"];
+  const userId = (Url.parse(req.url, true).query)["userId"];
+  const devKey = (Url.parse(req.url, true).query)["devKey"];
+  const params = "?devId="+devId+"&userId="+userId+"&devKey="+devKey+"&provider="+provider+"&isRedirect=true";
+  fs.readFile("redirectPage.html", function(err, html) {
+    if (err) {
+      throw err;
+    }
+    res.writeHead(200, {"Content-Type": "text/html"});
+    res.write(html);
+    res.write("<h2 style='text-align: center;font-family:DM Sans'>Data integrations provider for "+devId+"</h2>\
+    <h2 style='text-align: center;font-family:DM Sans'>To authenticate "+provider+" click <a href=/connectService"+params+">here</a></h2>");
+    res.end();
+  });
+});
+
 exports.connectService = functions.https.onRequest(async (req, res) => {
   // Dev calls this service with parameters: user-id, dev-id, and service to
   // authenticate.
-  // in form:  us-central1-rove.cloudfunctions.net/authenticateStrava?
+  // in form:  us-central1-rove.cloudfunctions.net/connectService?
   // userId=***&devId=***&devKey=***&provider=***
   const provider = (Url.parse(req.url, true).query)["provider"];
   const devId = (Url.parse(req.url, true).query)["devId"];
   const userId = (Url.parse(req.url, true).query)["userId"];
   const devKey = (Url.parse(req.url, true).query)["devKey"];
 
+  const isRedirect = (Url.parse(req.url, true).query)["isRedirect"];
+  if (isRedirect == undefined) {
+    res.redirect("../redirectPage?provider="+provider+"&devId="+devId+"&userId="+userId+"&devKey="+devKey);
+  }
   let url = "";
 
   // parameter checks
@@ -82,7 +106,7 @@ exports.connectService = functions.https.onRequest(async (req, res) => {
 
   // stravaOauth componses the request url for the user.
   if (provider == "strava") {
-    url = stravaOauth(req);
+    url = await stravaOauth(req);
   } else if (provider == "garmin") {
     // TODO: Make the garmin request async and returnable.
     url = await garminOauth(req);
@@ -95,8 +119,7 @@ exports.connectService = functions.https.onRequest(async (req, res) => {
     url = "error: the provider was badly formatted, missing or not supported";
   }
   // send back URL to user device.
-  res.send(url);
-  return;
+  res.redirect(url);
 });
 
 exports.disconnectService = functions.https.onRequest(async (req, res) => {
@@ -162,6 +185,7 @@ exports.disconnectService = functions.https.onRequest(async (req, res) => {
   // if they are then deauthorize and respond with success/failure message
   // if they are not then error - user not authorised with this provider
   if (providers.includes(provider) == true) {
+    let result;
     const userDocData = userDoc.data();
     if (provider == "strava") {
       // deauth for Strava.
@@ -211,7 +235,7 @@ exports.disconnectService = functions.https.onRequest(async (req, res) => {
   // send back message to user device.
   res.send(message);
   return;
-}),
+});
 
 async function deleteStravaActivity(userDoc, webhookCall) {
   // delete activities
@@ -245,7 +269,7 @@ async function deleteStravaActivity(userDoc, webhookCall) {
   // userId, provider, status: deauthorised
   sendToDeauthoriseWebhook(userDoc);
   return 200; // 200 success, 400 failure
-};
+}
 
 async function deleteGarminActivity(userDoc, webhookCall) {
   const userDocData = await userDoc.data();
@@ -274,7 +298,7 @@ async function deleteGarminActivity(userDoc, webhookCall) {
 }
 
 async function deletePolarActivity(userDoc, webhookCall) {
-  const deAuthResponse = await got.post("https://www.polaraccesslink.com/v3/users/" + userDocData["polar_user_id"], {"Authorization": "Bearer " + userDocData["polar_access_token"]});
+  const deAuthResponse = await got.post("https://www.polaraccesslink.com/v3/users/" + userDoc["polar_user_id"], {"Authorization": "Bearer " + userDoc["polar_access_token"]});
   console.log(deAuthResponse.body);
   // delete polar keys and activities
   await db.collection("users").doc(userDoc.id).update({
@@ -290,7 +314,7 @@ async function deletePolarActivity(userDoc, webhookCall) {
 }
 
 async function deleteWahooActivity(userDoc, webhookCall) {
-  const deAuthResponse = await got.delete("https://api.wahooligan.com/v1/permissions", {"Authorization": "Bearer " + userDocData["wahoo_access_token"]});
+  const deAuthResponse = await got.delete("https://api.wahooligan.com/v1/permissions", {"Authorization": "Bearer " + userDoc["wahoo_access_token"]});
   console.log(deAuthResponse.body);
   // delete wahoo keys and activities
   await db.collection("users").doc(userDoc.id).update({
@@ -311,7 +335,11 @@ function sendToDeauthoriseWebhook(userDoc) {
 exports.oauthCallbackHandlerGarmin = functions.https
     .onRequest(async (req, res) => {
       const oAuthCallback = Url.parse(req.url, true).query;
+      const oauthTokenSecret = oAuthCallback["oauth_token_secret"].split("-");
+      const devId = oauthTokenSecret[2].split("=")[1];
       await oauthCallbackHandlerGarmin(oAuthCallback, db);
+      const urlString = await successDevCallback(db, devId);
+      res.redirect(urlString);
       res.send("THANKS, YOU CAN NOW CLOSE THIS WINDOW");
     }),
 
@@ -351,7 +379,9 @@ exports.stravaCallback = functions.https.onRequest(async (req, res) => {
       // send a response now to endpoint for devId confirming success
       // await sendDevSuccess(devId); //TODO: create dev success post.
       // userResponse = "Some good redirect.";
-      res.send("your authorization was successful please close this window");
+      const urlString = await successDevCallback(db, devId);
+      res.redirect(urlString);
+      res.send("your authorization was successful please close this window" + urlString);
     } else {
       res.send("Error: "+response.statusCode+
          " please close this window and try again");
@@ -362,6 +392,13 @@ exports.stravaCallback = functions.https.onRequest(async (req, res) => {
     }
   });
 });
+
+async function successDevCallback(db, devId) {
+  const devDoc = await db.collection("developers").doc(devId).get();
+  const urlString = devDoc.data()["callbackURL"];
+  console.log("callback URL: "+ urlString);
+  return urlString;
+}
 
 exports.garminWebhook = functions.https.onRequest(async (req, res) => {
   if (req.method === "POST") {
@@ -612,7 +649,9 @@ exports.polarCallback = functions.https.onRequest(async (req, res) => {
       // send a response now to endpoint for devId confirming success
       // await sendDevSuccess(devId); //TODO: create dev success post.
       // userResponse = "Some good redirect.";
-      res.send("your authorization was successful please close this window: "+message);
+      const urlString = await successDevCallback(db, devId);
+      res.redirect(urlString);
+      res.send("your authorization was successful please close this window: "+ urlString + ": " + message);
     } else {
       res.send("Error: "+response.statusCode+":"+body.toString()+" please close this window and try again");
       console.log(JSON.parse(body));
@@ -691,6 +730,8 @@ exports.wahooCallback = functions.https.onRequest(async (req, res) => {
     await oauthWahoo.getAndSaveAccessCodes();
   }
   if (!oauthWahoo.error) {
+    const urlString = await successDevCallback(db, oauthWahoo.devId);
+    res.redirect(urlString);
     res.send("your authorization was successful please close this window");
   } else {
     res.send(oauthWahoo.errorMessage);
@@ -1123,4 +1164,3 @@ async function getGarminUserId(consumerSecret, garminAccessToken, garminAccessTo
 // Utility Functions and Constants -----------------------------
 const waitTime = {0: 0, 1: 1, 2: 10, 3: 60}; // time in minutes
 const wait = (mins) => new Promise((resolve) => setTimeout(resolve, mins*60*1000));
-
