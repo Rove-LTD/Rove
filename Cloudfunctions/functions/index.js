@@ -216,16 +216,19 @@ exports.disconnectService = functions.https.onRequest(async (req, res) => {
 async function deleteStravaActivity(userDoc, webhookCall) {
   // delete activities
   // check if this is the last user with this stravaId and this is not a call from the webhook
-
+  const userDocData = await userDoc.data();
   if (!webhookCall) {
     const userQueryList = db.collection("users").
-        where("strava_id", "==", userDoc.data()["strava_id"])
+        where("strava_id", "==", userDocData["strava_id"])
         .get();
     if ( userQueryList.docs.length == 1) {
-      const deAuthResponse = await got
+      const response = await got
           .post("https://www.strava.com/oauth/deauthorize",
               {"access_token": userDocData["strava_access_token"]});
         // check success if fail return 400
+      if (response.statusCode != 200) {
+        return 400;
+      }
     }
   }
   // Delete Strava keys and activities.
@@ -245,6 +248,22 @@ async function deleteStravaActivity(userDoc, webhookCall) {
 };
 
 async function deleteGarminActivity(userDoc, webhookCall) {
+  const userDocData = await userDoc.data();
+  if (!webhookCall) {
+    const userQueryList = db.collection("users").
+        where("garmin_userId", "==", userDocData["garmin_userId"])
+        .get();
+    if ( userQueryList.docs.length == 1) {
+    // send post to garmin to de-auth.
+      const response = await got
+          .delete("https://apis.garmin.com/wellness-api/rest/user/registration",
+              {"Authorization": "Bearer " + userDocData["garmin_access_token"]});
+      // check success if fail return 400
+      if (response.statusCode != 204) {
+        return 400;
+      }
+    }
+  }
   // delete garmin keys and activities.
   await db.collection("users").doc(userDoc.id).update({
     garmin_access_token: admin.firestore.FieldValue.delete(),
