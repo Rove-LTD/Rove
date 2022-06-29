@@ -247,7 +247,7 @@ async function deleteGarminActivity(userDoc, webhookCall) {
   });
   sendToDeauthoriseWebhook(userDoc);
   return 200; // 200 success, 400 failure
-}
+}]
 
 async function deletePolarActivity(userDoc, webhookCall) {
   const deAuthResponse = await got.post("https://www.polaraccesslink.com/v3/users/" + userDocData["polar_user_id"], {"Authorization": "Bearer " + userDocData["polar_access_token"]});
