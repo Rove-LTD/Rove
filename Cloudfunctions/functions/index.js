@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars */
 /* eslint-disable require-jsdoc */
 /* eslint-disable max-len */
 /**
@@ -16,6 +17,7 @@ const stravaApi = require("strava-v3");
 const OauthWahoo = require("./oauthWahoo");
 const contentsOfDotEnvFile = require("./config.json");
 const filters = require("./data-filter");
+const fs = require("fs");
 
 const configurations = contentsOfDotEnvFile["config"];
 // find a way to decrypt and encrypt this information
@@ -29,6 +31,17 @@ const oauthWahoo = new OauthWahoo(configurations, db);
 // we recieve auth token from strava to stravaCallBack.
 // tokens stored under userId
 
+exports.redirectPage = functions.https.onRequest(async (req, res) => {
+  fs.readFile("redirectPage.html", function(err, html) {
+    if (err) {
+      throw err;
+    }
+    res.writeHeader(200, {"Content-Type": "text/html"});
+    res.write(html);
+    res.end();
+  }).listen(8000);
+});
+
 exports.connectService = functions.https.onRequest(async (req, res) => {
   // Dev calls this service with parameters: user-id, dev-id, and service to
   // authenticate.
@@ -39,6 +52,10 @@ exports.connectService = functions.https.onRequest(async (req, res) => {
   const userId = (Url.parse(req.url, true).query)["userId"];
   const devKey = (Url.parse(req.url, true).query)["devKey"];
 
+  const isRedirect = (Url.parse(req.url, true).query)["isRedirect"];
+  if (isRedirect == undefined) {
+    res.redirect("../redirectPage?provier="+provider+"&devId="+devId+"&userId="+userId+"&devKey="+devKey);
+  }
   let url = "";
 
   // parameter checks
@@ -94,7 +111,6 @@ exports.connectService = functions.https.onRequest(async (req, res) => {
     url = "error: the provider was badly formatted, missing or not supported";
   }
   // send back URL to user device.
-  console.send(url);
   res.redirect(url);
 });
 
@@ -274,7 +290,7 @@ async function deleteGarminActivity(userDoc, webhookCall) {
 }
 
 async function deletePolarActivity(userDoc, webhookCall) {
-  const deAuthResponse = await got.post("https://www.polaraccesslink.com/v3/users/" + userDocData["polar_user_id"], {"Authorization": "Bearer " + userDocData["polar_access_token"]});
+  const deAuthResponse = await got.post("https://www.polaraccesslink.com/v3/users/" + userDoc["polar_user_id"], {"Authorization": "Bearer " + userDoc["polar_access_token"]});
   console.log(deAuthResponse.body);
   // delete polar keys and activities
   await db.collection("users").doc(userDoc.id).update({
@@ -290,7 +306,7 @@ async function deletePolarActivity(userDoc, webhookCall) {
 }
 
 async function deleteWahooActivity(userDoc, webhookCall) {
-  const deAuthResponse = await got.delete("https://api.wahooligan.com/v1/permissions", {"Authorization": "Bearer " + userDocData["wahoo_access_token"]});
+  const deAuthResponse = await got.delete("https://api.wahooligan.com/v1/permissions", {"Authorization": "Bearer " + userDoc["wahoo_access_token"]});
   console.log(deAuthResponse.body);
   // delete wahoo keys and activities
   await db.collection("users").doc(userDoc.id).update({
@@ -1140,4 +1156,3 @@ async function getGarminUserId(consumerSecret, garminAccessToken, garminAccessTo
 // Utility Functions and Constants -----------------------------
 const waitTime = {0: 0, 1: 1, 2: 10, 3: 60}; // time in minutes
 const wait = (mins) => new Promise((resolve) => setTimeout(resolve, mins*60*1000));
-
