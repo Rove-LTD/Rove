@@ -90,6 +90,9 @@ describe("Testing that the Wahoo callbacks work: ", () => {
           send: (text) => {
               assert.equal(text, "your authorization was successful please close this window")
           },
+          redirect: (url) => {
+            assert.equal(url, "https://paulsTest.com/callbackURL");
+          },
       }
       await myFunctions.wahooCallback(req, res);
 

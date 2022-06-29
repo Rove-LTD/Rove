@@ -47,6 +47,10 @@ describe('ROVE full integration test scripts', () => {
         test.cleanup();
     }); //end after
 
+    afterEach(async() => {
+      sinon.restore();
+    })
+
     require ('./test-modules/connectService.test.js');
     require ('./test-modules/stravaCallback.test.js');
     require ('./test-modules/polarCallback.test.js');

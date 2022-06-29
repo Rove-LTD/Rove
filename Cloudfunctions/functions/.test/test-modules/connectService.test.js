@@ -38,6 +38,9 @@ describe("Testing that the developer can call API to connectService() and receiv
           send: (url) => {
               assert.equal(url, "error: the provider was badly formatted, missing or not supported");
           },
+          redirect: (url) => {
+
+          },
           status: (code) => {
               assert.equal(code, 400);
           }
@@ -55,6 +58,9 @@ describe("Testing that the developer can call API to connectService() and receiv
           send: (url) => {
               assert.equal(url, "error: the developerId was badly formatted, missing or not authorised");
           },
+          redirect: (url) => {
+
+          },
           status: (code) => {
               assert.equal(code, 400);
           }
@@ -65,11 +71,14 @@ describe("Testing that the developer can call API to connectService() and receiv
 
   it("Should get an error if the developer is not correctly authorised", async () => {
       // set the request object with the correct provider, developerId and userId
-      const req = {url: 'https//test.com/?devId='+testDev+'&userId='+testUser+'&devKey=wrong-key&provider=wahoo'};
+      const req = {url: 'https//test.com/?devId='+testDev+'&userId='+testUser+'&devKey=wrong-key&provider=wahoo&isRedirect=false'};
       // set the assertions for the expected response object
       const res = {
           send: (url) => {
               assert.equal(url, "error: the developerId was badly formatted, missing or not authorised");
+          },
+          redirect: (url) => {
+
           },
           status: (code) => {
               assert.equal(code, 400);
@@ -81,11 +90,14 @@ describe("Testing that the developer can call API to connectService() and receiv
 
   it("Should get an error if the userId is not provided", async () => {
       // set the request object with the correct provider, developerId and userId
-      const req = {url: 'https//test.com/?devId='+testDev+'&devKey=test-key&provider=wahoo'};
+      const req = {url: 'https//test.com/?devId='+testDev+'&devKey=test-key&provider=wahoo&isRedirect=false'};
       // set the assertions for the expected response object
       const res = {
           send: (url) => {
               assert.equal(url, "error: the userId parameter is missing");
+          },
+          redirect: (url) => {
+
           },
           status: (code) => {
               assert.equal(code, 400);
@@ -97,12 +109,15 @@ describe("Testing that the developer can call API to connectService() and receiv
   
   it('should get a properly formatted strava redirect url...', async () => {
       // set the request object with the correct provider, developerId and userId
-      const req = {url: 'https//test.com/?devId='+testDev+'&userId='+testUser+'&devKey=test-key&provider=strava'};
+      const req = {url: 'https//test.com/?devId='+testDev+'&userId='+testUser+'&devKey=test-key&provider=strava&isRedirect=false'};
       // set the assertions for the expected response object
       const res = {
           send: (url) => {
               assert.equal(url, "https://www.strava.com/oauth/authorize?client_id=72486&response_type=code&redirect_uri=https://us-central1-rove-26.cloudfunctions.net/stravaCallback?userId="+testUser+":"+testDev+"&approval_prompt=force&scope=profile:read_all,activity:read_all");
               recievedStravaUrl = url;
+          },
+          redirect: (url) => {
+
           }
       }
 
@@ -111,7 +126,7 @@ describe("Testing that the developer can call API to connectService() and receiv
   })
   it('should get a properly formatted garmin redirect url...', async () => {
       // set the request object with the correct provider, developerId and userId
-      const req = {url: 'https//test.com/?devId='+testDev+'&userId='+testUser+'&devKey=test-key&provider=garmin'};
+      const req = {url: 'https//test.com/?devId='+testDev+'&userId='+testUser+'&devKey=test-key&provider=garmin&isRedirect=false'};
       // set the assertions for the expected response object
       const res = {
           send: (url) => {
@@ -120,6 +135,9 @@ describe("Testing that the developer can call API to connectService() and receiv
               assert.include(url, "-userId="+testUser);
               assert.include(url, "-devId="+testDev);
               recievedGarminUrl = url;
+          },
+          redirect: (url) => {
+
           }
       }
       // set up the stub to mimic the response to the Garmin service
@@ -144,12 +162,15 @@ describe("Testing that the developer can call API to connectService() and receiv
   })
   it('should get a properly formatted polar redirect url...', async () => {
       // set the request object with the correct provider, developerId and userId
-      const req = {url: 'https//test.com/?devId='+testDev+'&userId='+testUser+'&devKey=test-key&provider=polar'};
+      const req = {url: 'https//test.com/?devId='+testDev+'&userId='+testUser+'&devKey=test-key&provider=polar&isRedirect=false'};
       // set the assertions for the expected response object
       const res = {
           send: (url) => {
               assert.equal(url, "https://flow.polar.com/oauth2/authorization?client_id=654623e7-7191-4cfe-aab5-0bc24785fdee&response_type=code&redirect_uri=https://us-central1-rove-26.cloudfunctions.net/polarCallback&scope=accesslink.read_all&state="+testUser+":"+testDev);
               recievedPolarUrl = url;
+          },
+          redirect: (url) => {
+
           }
       }
 
@@ -159,7 +180,7 @@ describe("Testing that the developer can call API to connectService() and receiv
 
   it('should get a properly formatted wahoo redirect url...', async () => {
       // set the request object with the correct provider, developerId and userId
-      const req = {url: 'https//test.com/?devId='+testDev+'&userId='+testUser+'&devKey=test-key&provider=wahoo'};
+      const req = {url: 'https//test.com/?devId='+testDev+'&userId='+testUser+'&devKey=test-key&provider=wahoo&isRedirect=false'};
       // set the assertions for the expected response object
       const res = {
           send: (url) => {
@@ -167,6 +188,9 @@ describe("Testing that the developer can call API to connectService() and receiv
               assert.include(url, "client_id=iA2JRS_dBkikcb0uEnHPtb6IDt1vDYNbityEEhp801I");
               assert.include(url, "&redirect_uri=https://us-central1-rove-26.cloudfunctions.net/wahooCallback?state=");
               assert.include(url, "state="+testUser+":"+testDev);
+          },
+          redirect: (url) => {
+
           }
       }
 

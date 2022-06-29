@@ -80,6 +80,9 @@ describe("Testing that the Garmin callbacks work: ", () => {
           send: (text) => {
               assert.equal(text, "THANKS, YOU CAN NOW CLOSE THIS WINDOW")
           },
+          redirect: (url) => {
+            assert.equal(url, "https://paulsTest.com/callbackURL");
+          },
       }
       await myFunctions.oauthCallbackHandlerGarmin(req, res);
 

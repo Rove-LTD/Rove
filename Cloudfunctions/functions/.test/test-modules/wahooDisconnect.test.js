@@ -29,14 +29,17 @@ myFunctions = require('../../index.js');
 // name as in the function we are testing
 const got = require('got');
 //-------------TEST 2--- Test Callbacks from Strava-------
- describe.only("Check the Wahoo Disconnect Service works: ", () => {
+ describe("Check the Wahoo Disconnect Service works: ", () => {
   before(async () => {
     await admin.firestore()
         .collection("users")
         .doc(testUser)
-        .set({"wahoo_connected": true,
+        .set({
+            "devId": testDev,
+            "email": "paul.userTest@gmail.com",
+            "wahoo_connected": true,
             "wahoo_access_token": "test_access_token",
-            "wahoo_user_id": "test_id"}, {merge: true});
+            "wahoo_user_id": "test_id"});
 
     await admin.firestore()
         .collection("users")

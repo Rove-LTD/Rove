@@ -67,6 +67,9 @@ const strava = require("strava-v3");
           send: (text) => {
               assert.equal(text, "your authorization was successful please close this window")
           },
+          redirect: (url) => {
+            assert.equal(url, "https://paulsTest.com/callbackURL");
+          },
       }
       await myFunctions.stravaCallback(req, res);
 
