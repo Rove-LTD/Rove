@@ -313,7 +313,7 @@ async function deleteWahooActivity(userDoc, webhookCall) {
         activities.forEach(async (doc)=>{
           await doc.ref.delete();
         });
-        await sendToDeauthoriseWebhook(userDoc, "wahoo");
+        await sendToDeauthoriseWebhook(userDoc, "wahoo", 0);
         return 200;
       } catch (error) {
         if (error == 401) { // unauthorised
@@ -325,11 +325,53 @@ async function deleteWahooActivity(userDoc, webhookCall) {
   }
 }
 
-function sendToDeauthoriseWebhook(userDoc) {
+async function sendToDeauthoriseWebhook(userDoc, provider, triesSoFar) {
   // get endpoint
   // send message to endpoint
   // retry if do not get 200 ok back
-
+  const MaxRetries = 3;
+  const devId = userDoc.data()["devId"];
+  const datastring = {
+        provider: provider,
+        status: "disconnected",
+        userId: userDoc.id
+      };
+  const developerDoc = await db.collection("developers").doc(devId).get();
+  const endpoint = developerDoc.data()["deauthorise_endpoint"];
+  if (endpoint == undefined || endpoint == null) {
+    // cannot send to developer as endpoint does not exist
+    console.log("Cannot send deauthorise payload to "+devId+" endpoint not provided");
+    return;
+  }
+  const options = {
+    method: "POST",
+    url: endpoint,
+    headers: {
+      "Accept": "application/json",
+      "Content-type": "application/json",
+    },
+    body: JSON.stringify(datastring),
+  };
+  const response = await got.post(options);
+  if (response.statusCode == 200) {
+    // the developer accepted the information TODO
+    /*
+     userDoc.ref
+         .collection("activities")
+         .doc(activityDoc)
+         .set({status: "sent", timestamp: new Date()}, {merge: true}); */
+  } else {
+    // call the retry functionality and increment the retry counter
+    if (triesSoFar <= MaxRetries) {
+      console.log("retrying sending to developer");
+      wait(waitTime[triesSoFar]);
+      sendToDeauthoriseWebhook(userDoc,triesSoFar+1);
+    } else {
+      // max retries email developer
+      console.log("max retries on sending deauthorisation to developer reached - fail");
+    }
+  }
+}
 }
 
 exports.oauthCallbackHandlerGarmin = functions.https
