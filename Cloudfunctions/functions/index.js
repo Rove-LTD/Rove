@@ -16,7 +16,6 @@ const stravaApi = require("strava-v3");
 const OauthWahoo = require("./oauthWahoo");
 const contentsOfDotEnvFile = require("./config.json");
 const filters = require("./data-filter");
-const {get} = require("request");
 
 const configurations = contentsOfDotEnvFile["config"];
 // find a way to decrypt and encrypt this information
@@ -162,6 +161,7 @@ exports.disconnectService = functions.https.onRequest(async (req, res) => {
   // if they are then deauthorize and respond with success/failure message
   // if they are not then error - user not authorised with this provider
   if (providers.includes(provider) == true) {
+    let result;
     const userDocData = userDoc.data();
     if (provider == "strava") {
       // deauth for Strava.
@@ -211,7 +211,7 @@ exports.disconnectService = functions.https.onRequest(async (req, res) => {
   // send back message to user device.
   res.send(message);
   return;
-}),
+});
 
 async function deleteStravaActivity(userDoc, webhookCall) {
   // delete activities
@@ -245,7 +245,7 @@ async function deleteStravaActivity(userDoc, webhookCall) {
   // userId, provider, status: deauthorised
   sendToDeauthoriseWebhook(userDoc);
   return 200; // 200 success, 400 failure
-};
+}
 
 async function deleteGarminActivity(userDoc, webhookCall) {
   const userDocData = await userDoc.data();
