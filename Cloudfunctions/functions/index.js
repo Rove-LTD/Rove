@@ -189,20 +189,14 @@ exports.disconnectService = functions.https.onRequest(async (req, res) => {
     } else if (provider == "wahoo") {
       if (userDocData["wahoo_connected"] == true) {
         result = deleteWahooActivity(userDoc, false);
-        // check success or fail. result 200 is success 400 is failure     
+        // check success or fail. result 200 is success 400 is failure   
+        res.status(result);  
       } else {
+        res.status(400);
+        message = "error: the userId was not authorised for this provider";
         // error the user is not authorizes already
       }
-      // delete activities from provider.
-      (await userDoc.ref.collection("activities")
-        .where("sanitised.data_source", "==", "wahoo")
-        .get())
-        .docs.forEach((doc)=>{
-          doc.ref.delete();
-      });
     }
-    message = "status: complete";
-    res.status(200);
   } else {
     // the request was badly formatted with incorrect provider parameter
     message = "error: the provider was badly formatted, missing or not supported";
@@ -272,6 +266,24 @@ async function deletePolarActivity(userDoc, webhookCall) {
 }
 
 async function deleteWahooActivity(userDoc, webhookCall) {
+  if (!webhookCall) {
+    const userQueryList = await db.collection("users").
+        where("wahoo_user_id","==",userDoc.data()["wahoo_user_id"])
+        .get();
+    if ( userQueryList.docs.length == 1) {
+      try {
+        const deAuthResponse = await got
+            .post("https://www.strava.com/oauth/deauthorize",
+                {"access_token": userDoc.data()["strava_access_token"]});
+        // check success if fail return 400        
+      } catch (error) {
+        if (error == 401) { // unauthorised
+          // consider refreshing the access code and trying again
+        }
+        return 400;
+      }
+    }
+  }
   const deAuthResponse = await got.delete("https://api.wahooligan.com/v1/permissions", {"Authorization": "Bearer " + userDocData["wahoo_access_token"]});
   console.log(deAuthResponse.body);
   // delete wahoo keys and activities
@@ -281,6 +293,13 @@ async function deleteWahooActivity(userDoc, webhookCall) {
     wahoo_refresh_token: admin.firestore.FieldValue.delete(),
     wahoo_token_expires_in: admin.firestore.FieldValue.delete(),
     wahoo_user_id: admin.firestore.FieldValue.delete(),
+  });
+    // delete activities from provider.
+    await userDoc.ref.collection("activities")
+    .where("sanitised.data_source", "==", "wahoo")
+    .get()
+    .docs.forEach((doc)=>{
+      doc.ref.delete();
   });
   sendToDeauthoriseWebhook(userDoc);
   return 200; //200 success, 400 failure
