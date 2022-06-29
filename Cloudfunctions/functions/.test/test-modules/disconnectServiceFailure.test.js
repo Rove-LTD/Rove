@@ -30,7 +30,7 @@ myFunctions = require('../../index.js');
 const request = require('request');
 const strava = require("strava-v3");
 //-------------TEST 2--- Test Callbacks from Strava-------
- describe.only("Check that the deauthorise call fails when parameters are incorrect: ", () => {
+ describe("Check that the deauthorise call fails when parameters are incorrect: ", () => {
   it('call deauthorise and get an error if the devId doesnt exist', async () => {
     req = {
       url: "https://ourDomain.com?devId=incorrect&userId="+testUser+"&provider=wahoo&devKey=test-key",
