@@ -50,6 +50,58 @@ const got = require('got');
             sanitised: {data_source: "wahoo"}});
 
   });
+  it('Check that service returns with error if user is not already authorised', async () => {
+    req = {
+      url: "https://ourDomain.com?devId="+testDev+"&userId="+testUser+"&provider=wahoo&devKey=test-key",
+    };
+    res = {
+      status: (code) => {
+        assert.equal(code, 400);
+      },
+      send: (message) => {
+        assert.equal(message, "error: unexpected problem");
+      }
+    }
+
+    // set up stubbed functions
+    testResponse = {
+      json: ()=>{
+        return {"error":"Access Token not authorised"};
+      }
+    }
+
+   const stubbedGot = sinon.stub(got, "delete");
+   stubbedGot.onFirstCall().returns(testResponse);
+    
+    await myFunctions.disconnectService(req, res);
+    // check the got function was called with the correct options
+    // check the wahoo fields were deleted from the database
+    // check the wahoo activities were deleted from the database only for this user
+    const userDoc = await admin.firestore()
+        .collection("users")
+        .doc(testUser)
+        .get();
+      
+    const activities = await admin.firestore()
+        .collection("users")
+        .doc(testUser)
+        .collection("activities")
+        .where("sanitised.data_source","==","wahoo")
+        .get();
+    
+    const expectedUserResults = {
+      "devId": testDev,
+      "email": "paul.userTest@gmail.com",
+      "wahoo_connected": true,
+      "wahoo_access_token": "test_access_token",
+      "wahoo_user_id": "test_id",
+    };
+    
+    assert.deepEqual(userDoc.data(), expectedUserResults);
+    assert.isAbove(activities.docs.length, 0);
+
+    sinon.restore();
+  });
   it('Check that service succeeds if user authorised already', async () => {
     req = {
       url: "https://ourDomain.com?devId="+testDev+"&userId="+testUser+"&provider=wahoo&devKey=test-key",
@@ -86,7 +138,7 @@ const got = require('got');
         .collection("users")
         .doc(testUser)
         .collection("activities")
-        .where("sanatised.data_source","==","wahoo")
+        .where("sanitised.data_source","==","wahoo")
         .get();
     
     const expectedUserResults = {
@@ -98,9 +150,6 @@ const got = require('got');
     assert.equal(activities.docs.length, 0);
 
     sinon.restore();
-  })
-  it('describe what this specific test does', async () => {
-
   })
   // etc...
 
