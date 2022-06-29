@@ -405,7 +405,8 @@ exports.garminDeregistrations = functions.https.onRequest(async (req, res) => {
   for (let i=0; i<deRegistrations.length; i++) {
     const userQuery = await db.collection("users").where("garmin_access_token", "==", deRegistrations[i]["userAccessToken"]).get();
     userQuery.docs.forEach(async (doc) =>{
-      await deleteGarminActivity(doc, true);
+      const response = await deleteGarminActivity(doc, true);
+      res.send(response);
     });
   }
 });
