@@ -16,7 +16,8 @@
     "devKey": "test-key",
     "polar_signature_secret_key": "e14f5f33-0ffc-4f38-8f7e-8d243337f986",
     "polar_webhook_id": "wPWwr1P7",
-    "endpoint": "https://rovetest-beea7-default-rtdb.firebaseio.com/newmessage.json"
+    "endpoint": "https://rovetest-beea7-default-rtdb.firebaseio.com/newmessage.json",
+    "deauthorise_endpoint": "https://rovetest-beea7-default-rtdb.firebaseio.com/deauthMessage.json"
   },
   "devUserData": {
     "devId": "paulsTestDev",

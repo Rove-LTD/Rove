@@ -332,10 +332,10 @@ async function sendToDeauthoriseWebhook(userDoc, provider, triesSoFar) {
   const MaxRetries = 3;
   const devId = userDoc.data()["devId"];
   const datastring = {
-        provider: provider,
-        status: "disconnected",
-        userId: userDoc.id
-      };
+    provider: provider,
+    status: "disconnected",
+    userId: userDoc.id,
+  };
   const developerDoc = await db.collection("developers").doc(devId).get();
   const endpoint = developerDoc.data()["deauthorise_endpoint"];
   if (endpoint == undefined || endpoint == null) {
@@ -371,7 +371,6 @@ async function sendToDeauthoriseWebhook(userDoc, provider, triesSoFar) {
       console.log("max retries on sending deauthorisation to developer reached - fail");
     }
   }
-}
 }
 
 exports.oauthCallbackHandlerGarmin = functions.https
