@@ -191,7 +191,7 @@ exports.disconnectService = functions.https.onRequest(async (req, res) => {
       // deauth for Strava.
       // TODO check user is already authorised
       if (userDocData["strava_connected"] == true) {
-        result = deleteStravaActivity(userDoc, false);
+        result = await deleteStravaActivity(userDoc, false);
         // check success or fail. result 200 is success 400 is failure
       } else {
         // error the user is not authorizes already
@@ -242,7 +242,7 @@ async function deleteStravaActivity(userDoc, webhookCall) {
   // check if this is the last user with this stravaId and this is not a call from the webhook
 
   if (!webhookCall) {
-    const userQueryList = db.collection("users").
+    const userQueryList = await db.collection("users").
         where("strava_id", "==", userDoc.data()["strava_id"])
         .get();
     if ( userQueryList.docs.length == 1) {
@@ -316,51 +316,50 @@ async function deletePolarActivity(userDoc, webhookCall) {
   }
 }
 
-async function deleteWahooActivity(userDoc, webhookCall) {
-  if (!webhookCall) {
-    const userQueryList = await db.collection("users").
-        where("wahoo_user_id", "==", userDoc.data()["wahoo_user_id"])
-        .get();
-    if (userQueryList.docs.length == 1) {
-      try {
-        const accessToken = userDoc.data()["wahoo_access_token"];
-        const options = {
-          url: "https://api.wahooligan.com/v1/permissions",
-          method: "DELETE",
-          headers: {
-            "Accept": "application/json",
-            "Authorization": "Bearer " + accessToken,
-          },
-        };
-        const deAuthResponse = await got.delete(options).json();
-        if (deAuthResponse.success != "Application has been revoked") {
-          return 400;
-        }
-        // delete wahoo keys and activities
-        await db.collection("users").doc(userDoc.id).update({
-          wahoo_access_token: admin.firestore.FieldValue.delete(),
-          wahoo_connected: admin.firestore.FieldValue.delete(),
-          wahoo_refresh_token: admin.firestore.FieldValue.delete(),
-          wahoo_token_expires_in: admin.firestore.FieldValue.delete(),
-          wahoo_user_id: admin.firestore.FieldValue.delete(),
-        });
-        // delete activities from provider.
-        const activities = await userDoc.ref.collection("activities")
-            .where("sanitised.data_source", "==", "wahoo")
-            .get();
-        activities.forEach(async (doc)=>{
-          await doc.ref.delete();
-        });
-        await sendToDeauthoriseWebhook(userDoc, "wahoo", 0);
-        return 200;
-      } catch (error) {
-        if (error == 401) { // unauthorised
-          // consider refreshing the access code and trying again
-        }
+async function deleteWahooActivity(userDoc) {
+  const userQueryList = await db.collection("users").
+      where("wahoo_user_id", "==", userDoc.data()["wahoo_user_id"])
+      .get();
+  if (userQueryList.docs.length == 1) {
+    try {
+      const accessToken = userDoc.data()["wahoo_access_token"];
+      const options = {
+        url: "https://api.wahooligan.com/v1/permissions",
+        method: "DELETE",
+        headers: {
+          "Accept": "application/json",
+          "Authorization": "Bearer " + accessToken,
+        },
+      };
+      const deAuthResponse = await got.delete(options).json();
+      if (deAuthResponse.success != "Application has been revoked") {
         return 400;
       }
+      // delete wahoo keys and activities
+      await db.collection("users").doc(userDoc.id).update({
+        wahoo_access_token: admin.firestore.FieldValue.delete(),
+        wahoo_connected: admin.firestore.FieldValue.delete(),
+        wahoo_refresh_token: admin.firestore.FieldValue.delete(),
+        wahoo_token_expires_in: admin.firestore.FieldValue.delete(),
+        wahoo_user_id: admin.firestore.FieldValue.delete(),
+      });
+      // delete activities from provider.
+      const activities = await userDoc.ref.collection("activities")
+          .where("sanitised.data_source", "==", "wahoo")
+          .get();
+      activities.forEach(async (doc)=>{
+        await doc.ref.delete();
+      });
+      await sendToDeauthoriseWebhook(userDoc, "wahoo", 0);
+      return 200;
+    } catch (error) {
+      if (error == 401) { // unauthorised
+        // consider refreshing the access code and trying again
+      }
+      return 400;
     }
   }
+
 }
 
 async function sendToDeauthoriseWebhook(userDoc, provider, triesSoFar) {
