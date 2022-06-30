@@ -30,6 +30,13 @@ myFunctions = require('../../index.js');
 const got = require('got');
 //-------------TEST --- Test Callbacks from Garmin-------
 describe("Testing that the Garmin callbacks work: ", () => {
+  before(async () => {
+    // reset the user doc before testing polar
+    await admin.firestore()
+      .collection("users")
+      .doc(testUser)
+      .set(devUserData);
+  });
   it('Garmin callback should check userId and DevId and write the access tokens to the database...', async () => {
       //set up the stubbed response to mimic polar's response when called with the
       //code to get the token
@@ -49,23 +56,6 @@ describe("Testing that the Garmin callbacks work: ", () => {
       const expectedTestUserDoc = {
           devId: devUserData.devId,
           email: devUserData.email,
-          strava_id: 12345678,
-          polar_access_token: 'test-polar-access-token',
-          polar_token_type: 'bearer',
-          polar_registration_date: "2011-10-14T12:50:37.000Z",
-          polar_token_expires_in: 21600,
-          polar_connected: true,
-          polar_user_id: '123456polar',
-          strava_access_token: 'test-long-access-token',
-          strava_refresh_token: 'test-refresh_token',
-          strava_token_expires_at: 1654014114,
-          strava_token_expires_in: 21600,
-          strava_connected: true,
-          wahoo_access_token: 'test-wahoo-access-token',
-          wahoo_refresh_token: 'test-wahoo-refresh-token',
-          wahoo_token_expires_in: 21600,
-          wahoo_user_id: 60462,
-          wahoo_connected: true,
           garmin_access_token: "garmin-access-token",
           garmin_access_token_secret: "garmin-test-secret",
       }

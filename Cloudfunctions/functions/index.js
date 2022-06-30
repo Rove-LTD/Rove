@@ -205,9 +205,18 @@ exports.disconnectService = functions.https.onRequest(async (req, res) => {
       }
     } else if (provider == "polar") {
       if (userDocData["polar_connected"] == true) {
-        result = deletePolarActivity(userDoc, false);
+        result = await deletePolarActivity(userDoc, false);
         // check success or fail. result 200 is success 400 is failure
+        if (result == 200) {
+          res.status(200);
+          message = JSON.stringify({status: "disconnected"});
+        } else {
+          res.status(result);
+          message = "error: unexpected problem";
+        }
       } else {
+        res.status(400);
+        message = "error: the userId was not authorised for this provider";
         // error the user is not authorizes already
       }
     } else if (provider == "wahoo") {
@@ -298,21 +307,51 @@ async function deleteGarminActivity(userDoc, webhookCall) {
 }
 
 async function deletePolarActivity(userDoc, webhookCall) {
-  const deAuthResponse = await got.post("https://www.polaraccesslink.com/v3/users/" + userDoc.data()["polar_user_id"], {"Authorization": "Bearer " + userDoc.data()["polar_access_token"]});
-  if (deAuthResponse == "OK") {// replace with actual test
-    // delete polar keys and activities
-    await db.collection("users").doc(userDoc.id).update({
-      polar_access_token: admin.firestore.FieldValue.delete(),
-      polar_connected: admin.firestore.FieldValue.delete(),
-      polar_token_expires_in: admin.firestore.FieldValue.delete(),
-      polar_user_id: admin.firestore.FieldValue.delete(),
-      polar_token_type: admin.firestore.FieldValue.delete(),
-      polar_registration_date: admin.firestore.FieldValue.delete(),
-    });
-    sendToDeauthoriseWebhook(userDoc);
-    return 200;
-  } else {
-    return 400;
+  const userQueryList = await db.collection("users").
+      where("polar_user_id", "==", userDoc.data()["polar_user_id"])
+      .get();
+  if (userQueryList.docs.length == 1) {
+    try {
+      const accessToken = userDoc.data()["polar_access_token"];
+      const options = {
+        url: "https://www.polaraccesslink.com/v3/users/"+
+            userDoc.data()["polar_user_id"],
+        method: "DELETE",
+        headers: {
+          "Accept": "application/json",
+          "Authorization": "Bearer " + accessToken,
+        },
+      };
+      const deAuthResponse = await got.delete(options);
+      if (deAuthResponse.statusCode != 204) {
+        return 400;
+      }
+      // delete polar keys and activities
+      await userDoc.ref.update({
+        polar_access_token: admin.firestore.FieldValue.delete(),
+        polar_connected: admin.firestore.FieldValue.delete(),
+        polar_refresh_token: admin.firestore.FieldValue.delete(),
+        polar_token_expires_in: admin.firestore.FieldValue.delete(),
+        polar_token_expires_at: admin.firestore.FieldValue.delete(),
+        polar_user_id: admin.firestore.FieldValue.delete(),
+        polar_registration_date: admin.firestore.FieldValue.delete(),
+        polar_token_type: admin.firestore.FieldValue.delete(),
+      });
+      // delete activities from provider.
+      const activities = await userDoc.ref.collection("activities")
+          .where("sanitised.data_source", "==", "polar")
+          .get();
+      activities.forEach(async (doc)=>{
+        await doc.ref.delete();
+      });
+      await sendToDeauthoriseWebhook(userDoc, "polar", 0);
+      return 200;
+    } catch (error) {
+      if (error == 401) { // unauthorised
+        // consider refreshing the access code and trying again
+      }
+      return 400;
+    }
   }
 }
 
@@ -359,7 +398,6 @@ async function deleteWahooActivity(userDoc) {
       return 400;
     }
   }
-
 }
 
 async function sendToDeauthoriseWebhook(userDoc, provider, triesSoFar) {
@@ -397,6 +435,7 @@ async function sendToDeauthoriseWebhook(userDoc, provider, triesSoFar) {
          .collection("activities")
          .doc(activityDoc)
          .set({status: "sent", timestamp: new Date()}, {merge: true}); */
+    return 200;
   } else {
     // call the retry functionality and increment the retry counter
     if (triesSoFar <= MaxRetries) {
@@ -782,10 +821,12 @@ async function registerUserWithPolar(userId, devId, data, db) {
 }
 
 async function polarStoreTokens(userId, devId, data, db) {
+  const now = new Date();
   const parameters = {
     "polar_access_token": data["access_token"],
     "polar_token_type": data["token_type"],
-    // "polar_token_expires_at": data["expires_at"], PVTODO: need to calculate from the expires in which is in seconds from now.
+    "polar_token_expires_at": Math.round(now/1000)+data["expires_in"],
+    // need to calculate from the expires in which is in seconds from now.
     "polar_token_expires_in": data["expires_in"],
     "polar_connected": true,
     "polar_user_id": data["x_user_id"],

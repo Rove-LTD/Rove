@@ -29,7 +29,7 @@ myFunctions = require('../../index.js');
 // name as in the function we are testing
 const got = require('got');
 //-------------TEST 2--- Test Callbacks from Strava-------
- describe("Check the Wahoo Disconnect Service works: ", () => {
+ describe("Check the Polar Disconnect Service works: ", () => {
   before(async () => {
     await admin.firestore()
         .collection("users")
@@ -37,9 +37,12 @@ const got = require('got');
         .set({
             "devId": testDev,
             "email": "paul.userTest@gmail.com",
-            "wahoo_connected": true,
-            "wahoo_access_token": "test_access_token",
-            "wahoo_user_id": "test_id"});
+            "polar_connected": true,
+            "polar_access_token": "test_access_token",
+            "polar_refresh_token": "test_refresh_token",
+            "polar_token_expires_in": 1100,
+            "polar_token_type": "bearer",
+            "polar_user_id": "test_id"});
 
     await admin.firestore()
         .collection("users")
@@ -47,12 +50,12 @@ const got = require('got');
         .collection("activities")
         .doc()
         .set({raw: {field1: "somedata"},
-            sanitised: {data_source: "wahoo"}});
+            sanitised: {data_source: "polar"}});
 
   });
   it('Check that service returns with error if user is not already authorised', async () => {
     req = {
-      url: "https://ourDomain.com?devId="+testDev+"&userId="+testUser+"&provider=wahoo&devKey=test-key",
+      url: "https://ourDomain.com?devId="+testDev+"&userId="+testUser+"&provider=polar&devKey=test-key",
     };
     res = {
       status: (code) => {
@@ -75,7 +78,7 @@ const got = require('got');
     
     await myFunctions.disconnectService(req, res);
     // check the got function was called with the correct options
-    // check the wahoo fields were deleted from the database
+    // check the polar fields were deleted from the database
     // check the wahoo activities were deleted from the database only for this user
     const userDoc = await admin.firestore()
         .collection("users")
@@ -86,15 +89,18 @@ const got = require('got');
         .collection("users")
         .doc(testUser)
         .collection("activities")
-        .where("sanitised.data_source","==","wahoo")
+        .where("sanitised.data_source","==","polar")
         .get();
     
     const expectedUserResults = {
       "devId": testDev,
       "email": "paul.userTest@gmail.com",
-      "wahoo_connected": true,
-      "wahoo_access_token": "test_access_token",
-      "wahoo_user_id": "test_id",
+      "polar_connected": true,
+      "polar_access_token": "test_access_token",
+      "polar_refresh_token": "test_refresh_token",
+      "polar_token_expires_in": 1100,
+      "polar_token_type": "bearer",
+      "polar_user_id": "test_id"
     };
     
     assert.deepEqual(userDoc.data(), expectedUserResults);
@@ -104,7 +110,7 @@ const got = require('got');
   });
   it('Check that service succeeds if user authorised already', async () => {
     req = {
-      url: "https://ourDomain.com?devId="+testDev+"&userId="+testUser+"&provider=wahoo&devKey=test-key",
+      url: "https://ourDomain.com?devId="+testDev+"&userId="+testUser+"&provider=polar&devKey=test-key",
     };
     res = {
       status: (code) => {
@@ -117,18 +123,19 @@ const got = require('got');
 
     // set up stubbed functions
     testResponse = {
+      statusCode: 204,
       json: ()=>{
         return {"success":"Application has been revoked"};
       }
     }
 
-   const stubbedGot = sinon.stub(got, "delete");
-   stubbedGot.onFirstCall().returns(testResponse);
+    const stubbedGot = sinon.stub(got, "delete");
+    stubbedGot.onFirstCall().returns(testResponse);
     
     await myFunctions.disconnectService(req, res);
     // check the got function was called with the correct options
-    // check the wahoo fields were deleted from the database
-    // check the wahoo activities were deleted from the database only for this user
+    // check the polar fields were deleted from the database
+    // check the polar activities were deleted from the database only for this user
     const userDoc = await admin.firestore()
         .collection("users")
         .doc(testUser)
@@ -138,7 +145,7 @@ const got = require('got');
         .collection("users")
         .doc(testUser)
         .collection("activities")
-        .where("sanitised.data_source","==","wahoo")
+        .where("sanitised.data_source","==","polar")
         .get();
     
     const expectedUserResults = {

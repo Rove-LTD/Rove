@@ -29,7 +29,7 @@ myFunctions = require('../../index.js');
 // name as in the function we are testing
 const got = require('got');
 //-------------TEST 2--- Test Callbacks from Strava-------
- describe("Check the Wahoo Disconnect Service works: ", () => {
+ describe("Check the Strava Disconnect Service works: ", () => {
   before(async () => {
     await admin.firestore()
         .collection("users")
@@ -74,8 +74,8 @@ const got = require('got');
       }
     }
 
-   //const stubbedGot = sinon.stub(got, "delete");
-   //stubbedGot.onFirstCall().returns(testResponse);
+    const stubbedGot = sinon.stub(got, "delete");
+    stubbedGot.onFirstCall().returns(testResponse);
     
     await myFunctions.stravaWebhook(req, res);
     // check the got function was called with the correct options

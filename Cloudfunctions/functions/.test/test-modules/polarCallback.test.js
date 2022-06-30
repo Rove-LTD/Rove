@@ -30,6 +30,13 @@ myFunctions = require('../../index.js');
 const request = require('request');
     //-------------TEST 2--- Test Callbacks for Polar-------
     describe("Testing the polar callback...", async () => {
+      before(async () => {
+        // reset the user doc before testing polar
+        await admin.firestore()
+          .collection("users")
+          .doc(testUser)
+          .set(devUserData);
+      });
       it('polar callback should report error if user already registered', async () => {
           //set up the stubbed response to mimic polar's response when called with the
           //code to get the token
@@ -52,21 +59,18 @@ const request = require('request');
               }
             };
           const responseBody2 = {};
-          
+
+          const testDate = new Date();
+          const expected_expiry_date = Math.round(testDate/1000+21600);
           const expectedTestUserDoc = {
               devId: devUserData.devId,
               email: devUserData.email,
-              strava_id: 12345678,
               polar_access_token: 'test-polar-access-token',
               polar_token_type: 'bearer',
               polar_token_expires_in: 21600,
+              polar_token_expires_at: expected_expiry_date,
               polar_connected: true,
               polar_user_id: '123456polar',
-              strava_access_token: 'test-long-access-token',
-              strava_refresh_token: 'test-refresh_token',
-              strava_token_expires_at: 1654014114,
-              strava_token_expires_in: 21600,
-              strava_connected: true,
           }
 
           const clientIdClientSecret =
@@ -88,9 +92,8 @@ const request = require('request');
               },
               body: dataString,
             };
-
-          const stubbedcall = sinon.stub(request, "post")
-          stubbedcall.onFirstCall().yields(null, responseObject1, JSON.stringify(responseBody1));
+            const stubbedcall = sinon.stub(request, "post");
+            stubbedcall.onFirstCall().yields(null, responseObject1, JSON.stringify(responseBody1));
           stubbedcall.onSecondCall().yields(null, responseObject2, JSON.stringify(responseBody2));
 
           // set the request object with the correct provider, developerId and userId
@@ -114,7 +117,7 @@ const request = require('request');
           assert.deepEqual(testUserDoc.data(), expectedTestUserDoc);
           assert(stubbedcall.calledWith(options), "the call to polar had the wrong arguments");
 
-          await sinon.restore();
+          sinon.restore();
 
       });
       it('polar callback should check userId and DevId and write the access tokens to the database...', async () => {
@@ -156,22 +159,19 @@ const request = require('request');
                 }
               ]
             };
-          
+
+          const testDate = new Date();
+          const expected_expiry_date = Math.round(testDate/1000+21600);
           const expectedTestUserDoc = {
               devId: devUserData.devId,
               email: devUserData.email,
-              strava_id: 12345678,
               polar_access_token: 'test-polar-access-token',
               polar_token_type: 'bearer',
               polar_token_expires_in: 21600,
+              polar_token_expires_at: expected_expiry_date,
               polar_connected: true,
               polar_registration_date: "2011-10-14T12:50:37.000Z",
               polar_user_id: '123456polar',
-              strava_access_token: 'test-long-access-token',
-              strava_refresh_token: 'test-refresh_token',
-              strava_token_expires_at: 1654014114,
-              strava_token_expires_in: 21600,
-              strava_connected: true,
           }
 
           const stubbedcall = sinon.stub(request, "post")

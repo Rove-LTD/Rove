@@ -82,7 +82,7 @@ describe("Testing that the Webhooks work: ", () => {
      const sanatisedActivity = testUserDocs.docs[0].data();
      const expectedResults = {
           sanitised: {
-              userId: "paulsTestDevSecondUser",
+              userId: testUser,
               activity_id: 140473420,
               activity_name: "Cycling",
               activity_type: "BIKING",

@@ -1,5 +1,5 @@
-{ "testDev" :  "paulsTestDev",
-  "testUser": "paulsTestDevSecondUser",
+{ "testDev" :  "anotherTestDev",
+  "testUser": "anotherTestUser",
   "firebaseConfig": {
     "apiKey": "AIzaSyCiMcMwrKgSKu6w5XW8hdCrWnLeI8CtGY4",
     "authDomain": "rovetest-beea7.firebaseapp.com",
@@ -21,7 +21,7 @@
     "callbackURL": "https://paulsTest.com/callbackURL"
   },
   "devUserData": {
-    "devId": "paulsTestDev",
+    "devId": "anotherTestDev",
     "email": "paul.userTest@gmail.com"
   }
 }
