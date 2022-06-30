@@ -99,6 +99,9 @@ const request = require('request');
               send: (text) => {
                   assert.equal(text, "your authorization was successful please close this window: you are already registered with Polar - there is no need to re-register")
               },
+              redirect: (url) => {
+                assert.equal(url, "https://paulsTest.com/callbackURL");
+              },
           }
           await myFunctions.polarCallback(req, res);
 
@@ -180,6 +183,9 @@ const request = require('request');
           const res = {
               send: (text) => {
                   assert.equal(text, "your authorization was successful please close this window: ")
+              },
+              redirect: (url) => {
+                assert.equal(url, "https://paulsTest.com/callbackURL");
               },
           }
           await myFunctions.polarCallback(req, res);

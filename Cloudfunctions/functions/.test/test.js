@@ -47,6 +47,10 @@ describe('ROVE full integration test scripts', () => {
         test.cleanup();
     }); //end after
 
+    afterEach(async() => {
+      sinon.restore();
+    })
+
     require ('./test-modules/connectService.test.js');
     require ('./test-modules/stravaCallback.test.js');
     require ('./test-modules/polarCallback.test.js');
@@ -55,6 +59,7 @@ describe('ROVE full integration test scripts', () => {
     require ('./test-modules/webhooks.test.js');
     require ('./test-modules/utility.test.js');
     require ('./test-modules/disconnectServiceFailure.test.js');
+    require ('./test-modules/wahooDisconnect.test.js');
 });
 // require ('./test-modules/index.test.js');
 // require ('./test-modules/utility.test.js');

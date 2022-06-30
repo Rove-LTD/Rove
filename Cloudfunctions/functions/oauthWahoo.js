@@ -14,6 +14,7 @@ class OauthWahoo {
     this.db = firebaseDb;
     this.config = config;
     this.provider = "wahoo";
+    this.callbackBaseUrl = "https://us-central1-rove-26.cloudfunctions.net/wahooCallback";
   }
   /**
    * @param {String} devId
@@ -65,8 +66,6 @@ class OauthWahoo {
   getRedirect() {
     this.clientId = this.config[this.devId]["whaooClientId"];
     this.clientSecret = this.config[this.devId]["wahooSecret"];
-    this.callbackBaseUrl =
-      "https://us-central1-rove-26.cloudfunctions.net/wahooCallback";
     this.scope = "email%20user_read%20workouts_read%20offline_data";
     this.state = this.userId+":"+this.devId;
     this.baseUrl = "https://api.wahooligan.com/oauth/authorize?";
@@ -170,7 +169,7 @@ class OauthWahoo {
     "&client_id="+this.config[this.devId]["whaooClientId"]+
     "&client_secret="+this.config[this.devId]["wahooSecret"]+
     "&grant_type=authorization_code"+
-    "&redirect_uri=https://us-central1-rove-26.cloudfunctions.net/wahooCallback?state="+this.userId+":"+this.devId;
+    "&redirect_uri="+this.callbackBaseUrl+"?state="+this.userId+":"+this.devId;
     return {
       url: "https://api.wahooligan.com/oauth/token?"+_dataString,
       method: "POST",

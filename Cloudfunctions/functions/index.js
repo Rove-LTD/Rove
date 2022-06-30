@@ -185,8 +185,8 @@ exports.disconnectService = functions.https.onRequest(async (req, res) => {
   // if they are then deauthorize and respond with success/failure message
   // if they are not then error - user not authorised with this provider
   if (providers.includes(provider) == true) {
-    let result;
     const userDocData = userDoc.data();
+    let result;
     if (provider == "strava") {
       // deauth for Strava.
       // TODO check user is already authorised
@@ -212,21 +212,21 @@ exports.disconnectService = functions.https.onRequest(async (req, res) => {
       }
     } else if (provider == "wahoo") {
       if (userDocData["wahoo_connected"] == true) {
-        result = deleteWahooActivity(userDoc, false);
+        result = await deleteWahooActivity(userDoc, false);
         // check success or fail. result 200 is success 400 is failure
+        if (result == 200) {
+          res.status(200);
+          message = JSON.stringify({status: "disconnected"});
+        } else {
+          res.status(result);
+          message = "error: unexpected problem";
+        }
       } else {
+        res.status(400);
+        message = "error: the userId was not authorised for this provider";
         // error the user is not authorizes already
       }
-      // delete activities from provider.
-      (await userDoc.ref.collection("activities")
-          .where("sanitised.data_source", "==", "wahoo")
-          .get())
-          .docs.forEach((doc)=>{
-            doc.ref.delete();
-          });
     }
-    message = "status: complete";
-    res.status(200);
   } else {
     // the request was badly formatted with incorrect provider parameter
     message = "error: the provider was badly formatted, missing or not supported";
@@ -240,17 +240,19 @@ exports.disconnectService = functions.https.onRequest(async (req, res) => {
 async function deleteStravaActivity(userDoc, webhookCall) {
   // delete activities
   // check if this is the last user with this stravaId and this is not a call from the webhook
-  const userDocData = await userDoc.data();
+
   if (!webhookCall) {
     const userQueryList = db.collection("users").
-        where("strava_id", "==", userDocData["strava_id"])
+        where("strava_id", "==", userDoc.data()["strava_id"])
         .get();
     if ( userQueryList.docs.length == 1) {
-      const response = await got
+      const deAuthResponse = await got
           .post("https://www.strava.com/oauth/deauthorize",
-              {"access_token": userDocData["strava_access_token"]});
+              {"access_token": userDoc.data()["strava_access_token"]});
         // check success if fail return 400
-      if (response.statusCode != 200) {
+      if (deAuthResponse == "OK") {// replace with actual test
+        return 200;
+      } else {
         return 400;
       }
     }
@@ -298,38 +300,117 @@ async function deleteGarminActivity(userDoc, webhookCall) {
 }
 
 async function deletePolarActivity(userDoc, webhookCall) {
-  const deAuthResponse = await got.post("https://www.polaraccesslink.com/v3/users/" + userDoc["polar_user_id"], {"Authorization": "Bearer " + userDoc["polar_access_token"]});
-  console.log(deAuthResponse.body);
-  // delete polar keys and activities
-  await db.collection("users").doc(userDoc.id).update({
-    polar_access_token: admin.firestore.FieldValue.delete(),
-    polar_connected: admin.firestore.FieldValue.delete(),
-    polar_token_expires_in: admin.firestore.FieldValue.delete(),
-    polar_user_id: admin.firestore.FieldValue.delete(),
-    polar_token_type: admin.firestore.FieldValue.delete(),
-    polar_registration_date: admin.firestore.FieldValue.delete(),
-  });
-  sendToDeauthoriseWebhook(userDoc);
-  return 200; // 200 success, 400 failure
+  const deAuthResponse = await got.post("https://www.polaraccesslink.com/v3/users/" + userDoc.data()["polar_user_id"], {"Authorization": "Bearer " + userDoc.data()["polar_access_token"]});
+  if (deAuthResponse == "OK") {// replace with actual test
+    // delete polar keys and activities
+    await db.collection("users").doc(userDoc.id).update({
+      polar_access_token: admin.firestore.FieldValue.delete(),
+      polar_connected: admin.firestore.FieldValue.delete(),
+      polar_token_expires_in: admin.firestore.FieldValue.delete(),
+      polar_user_id: admin.firestore.FieldValue.delete(),
+      polar_token_type: admin.firestore.FieldValue.delete(),
+      polar_registration_date: admin.firestore.FieldValue.delete(),
+    });
+    sendToDeauthoriseWebhook(userDoc);
+    return 200;
+  } else {
+    return 400;
+  }
 }
 
 async function deleteWahooActivity(userDoc, webhookCall) {
-  const deAuthResponse = await got.delete("https://api.wahooligan.com/v1/permissions", {"Authorization": "Bearer " + userDoc["wahoo_access_token"]});
-  console.log(deAuthResponse.body);
-  // delete wahoo keys and activities
-  await db.collection("users").doc(userDoc.id).update({
-    wahoo_access_token: admin.firestore.FieldValue.delete(),
-    wahoo_connected: admin.firestore.FieldValue.delete(),
-    wahoo_refresh_token: admin.firestore.FieldValue.delete(),
-    wahoo_token_expires_in: admin.firestore.FieldValue.delete(),
-    wahoo_user_id: admin.firestore.FieldValue.delete(),
-  });
-  sendToDeauthoriseWebhook(userDoc);
-  return 200; // 200 success, 400 failure
+  if (!webhookCall) {
+    const userQueryList = await db.collection("users").
+        where("wahoo_user_id", "==", userDoc.data()["wahoo_user_id"])
+        .get();
+    if (userQueryList.docs.length == 1) {
+      try {
+        const accessToken = userDoc.data()["wahoo_access_token"];
+        const options = {
+          url: "https://api.wahooligan.com/v1/permissions",
+          method: "DELETE",
+          headers: {
+            "Accept": "application/json",
+            "Authorization": "Bearer " + accessToken,
+          },
+        };
+        const deAuthResponse = await got.delete(options).json();
+        if (deAuthResponse.success != "Application has been revoked") {
+          return 400;
+        }
+        // delete wahoo keys and activities
+        await db.collection("users").doc(userDoc.id).update({
+          wahoo_access_token: admin.firestore.FieldValue.delete(),
+          wahoo_connected: admin.firestore.FieldValue.delete(),
+          wahoo_refresh_token: admin.firestore.FieldValue.delete(),
+          wahoo_token_expires_in: admin.firestore.FieldValue.delete(),
+          wahoo_user_id: admin.firestore.FieldValue.delete(),
+        });
+        // delete activities from provider.
+        const activities = await userDoc.ref.collection("activities")
+            .where("sanitised.data_source", "==", "wahoo")
+            .get();
+        activities.forEach(async (doc)=>{
+          await doc.ref.delete();
+        });
+        await sendToDeauthoriseWebhook(userDoc, "wahoo", 0);
+        return 200;
+      } catch (error) {
+        if (error == 401) { // unauthorised
+          // consider refreshing the access code and trying again
+        }
+        return 400;
+      }
+    }
+  }
 }
 
-function sendToDeauthoriseWebhook(userDoc) {
-
+async function sendToDeauthoriseWebhook(userDoc, provider, triesSoFar) {
+  // get endpoint
+  // send message to endpoint
+  // retry if do not get 200 ok back
+  const MaxRetries = 3;
+  const devId = userDoc.data()["devId"];
+  const datastring = {
+    provider: provider,
+    status: "disconnected",
+    userId: userDoc.id,
+  };
+  const developerDoc = await db.collection("developers").doc(devId).get();
+  const endpoint = developerDoc.data()["deauthorise_endpoint"];
+  if (endpoint == undefined || endpoint == null) {
+    // cannot send to developer as endpoint does not exist
+    console.log("Cannot send deauthorise payload to "+devId+" endpoint not provided");
+    return;
+  }
+  const options = {
+    method: "POST",
+    url: endpoint,
+    headers: {
+      "Accept": "application/json",
+      "Content-type": "application/json",
+    },
+    body: JSON.stringify(datastring),
+  };
+  const response = await got.post(options);
+  if (response.statusCode == 200) {
+    // the developer accepted the information TODO
+    /*
+     userDoc.ref
+         .collection("activities")
+         .doc(activityDoc)
+         .set({status: "sent", timestamp: new Date()}, {merge: true}); */
+  } else {
+    // call the retry functionality and increment the retry counter
+    if (triesSoFar <= MaxRetries) {
+      console.log("retrying sending to developer");
+      wait(waitTime[triesSoFar]);
+      sendToDeauthoriseWebhook(userDoc, provider, triesSoFar+1);
+    } else {
+      // max retries email developer
+      console.log("max retries on sending deauthorisation to developer reached - fail");
+    }
+  }
 }
 
 exports.oauthCallbackHandlerGarmin = functions.https
@@ -381,7 +462,7 @@ exports.stravaCallback = functions.https.onRequest(async (req, res) => {
       // userResponse = "Some good redirect.";
       const urlString = await successDevCallback(db, devId);
       res.redirect(urlString);
-      res.send("your authorization was successful please close this window" + urlString);
+      res.send("your authorization was successful please close this window " + urlString);
     } else {
       res.send("Error: "+response.statusCode+
          " please close this window and try again");
