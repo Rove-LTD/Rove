@@ -517,7 +517,7 @@ exports.stravaCallback = functions.https.onRequest(async (req, res) => {
     } else {
       res.send("Error: "+response.statusCode+
          " please close this window and try again");
-      console.log(JSON.parse(body));
+      // console.log(JSON.parse(body));
       // send an error response to dev.
       // TODO: create dev fail post.
       // userResponse = "Some bad redirect";
@@ -528,7 +528,7 @@ exports.stravaCallback = functions.https.onRequest(async (req, res) => {
 async function successDevCallback(db, devId) {
   const devDoc = await db.collection("developers").doc(devId).get();
   const urlString = devDoc.data()["callbackURL"];
-  console.log("callback URL: "+ urlString);
+  // console.log("callback URL: "+ urlString);
   return urlString;
 }
 exports.garminDeregistrations = functions.https.onRequest(async (req, res) => {
@@ -545,10 +545,12 @@ exports.garminDeregistrations = functions.https.onRequest(async (req, res) => {
 
 exports.garminWebhook = functions.https.onRequest(async (req, res) => {
   if (req.method === "POST") {
-    functions.logger.info("garmin webhook event received!", {
-      query: req.query,
-      body: req.body,
-    });
+    if (!req.debug) {
+      functions.logger.info("garmin webhook event received!", {
+        query: req.query,
+        body: req.body,
+      });
+    }
     // 1) sanatise
     let sanitisedActivities = [{}];
     try {
@@ -889,9 +891,11 @@ exports.stravaWebhook = functions.https.onRequest(async (request, response) => {
     "redirect_uri": "https://us-central1-rove-26.cloudfunctions.net/stravaCallback",
   });
   if (request.method === "POST") {
-    functions.logger.info("webhook event received!", {
-      body: request.body,
-    });
+    if (!request.debug) {
+      functions.logger.info("webhook event received!", {
+        body: request.body,
+      });
+    }
     let stravaAccessToken;
     // get userbased on userid. (.where("id" == request.body.owner_id)).
     // if the status is a delete then do nothing.
@@ -910,7 +914,7 @@ exports.stravaWebhook = functions.https.onRequest(async (request, response) => {
       console.log("error in number of users registered to strava webhook: " + request.body.owner_id);
       return;
     }
-    console.log(stravaAccessToken);
+    // console.log(stravaAccessToken);
     // check the tokens are valid
     let activity;
     let sanitisedActivity;
@@ -975,10 +979,12 @@ exports.stravaWebhook = functions.https.onRequest(async (request, response) => {
 
 exports.wahooWebhook = functions.https.onRequest(async (request, response) => {
   if (request.method === "POST") {
-    functions.logger.info("---> Wahoo 'POST' webhook event received!", {
-      query: request.query,
-      body: request.body,
-    });
+    if (!request.debug) {
+      functions.logger.info("---> Wahoo 'POST' webhook event received!", {
+        query: request.query,
+        body: request.body,
+      });
+    }
     // check the webhook token is correct
     // TODO: parameterise - should be a lookup in a collection("wahooWebhookTokens")
     if (request.body.webhook_token != "97661c16-6359-4854-9498-a49c07b6ec11") {
@@ -1019,10 +1025,12 @@ exports.wahooWebhook = functions.https.onRequest(async (request, response) => {
     response.send("EVENT_RECEIVED");
     return;
   } else {
-    functions.logger.info("---> Wahoo 'GET' webhook event received!", {
-      query: request.query,
-      body: request.body,
-    });
+    if (!request.debug) {
+      functions.logger.info("---> Wahoo 'GET' webhook event received!", {
+        query: request.query,
+        body: request.body,
+      });
+    }
     response.status(200);
     response.send("EVENT_RECEIVED");
   }
@@ -1030,10 +1038,12 @@ exports.wahooWebhook = functions.https.onRequest(async (request, response) => {
 
 exports.polarWebhook = functions.https.onRequest(async (request, response) => {
   if (request.method === "POST") {
-    functions.logger.info("---> polar 'POST' webhook event received!", {
-      query: request.query,
-      body: request.body,
-    });
+    if (!request.debug) {
+      functions.logger.info("---> polar 'POST' webhook event received!", {
+        query: request.query,
+        body: request.body,
+      });
+    }
     const userDocsList = [];
     const userQuery = await db.collection("users")
         .where("polar_user_id", "==", request.body.user_id).get();
@@ -1078,10 +1088,12 @@ exports.polarWebhook = functions.https.onRequest(async (request, response) => {
     response.status(200);
     response.send("OK");
   } else {
-    functions.logger.info("---> polar 'GET' webhook event received!", {
-      query: request.query,
-      body: request.body,
-    });
+    if (!request.debug) {
+      functions.logger.info("---> polar 'GET' webhook event received!", {
+        query: request.query,
+        body: request.body,
+      });
+    }
     response.status(200);
     response.send("OK");
   }

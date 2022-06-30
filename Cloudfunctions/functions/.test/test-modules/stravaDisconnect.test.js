@@ -54,6 +54,7 @@ const got = require('got');
   });
   it('Check Strava De-auth webhook works.', async () => {
     req = {
+      debug: true,
       url: "https://ourDomain.com",
       method: "POST",
       query:{},
@@ -106,6 +107,7 @@ const got = require('got');
   })
   it('Check Strava de-auth http works.', async () => {
     req = {
+      debug: true,
       url: "https://ourDomain.com?devId="+testDev+"&userId="+testUser+"&provider=strava&devKey=test-key",
     };
     res = {

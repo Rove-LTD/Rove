@@ -62,10 +62,13 @@ describe("Testing that the Garmin callbacks work: ", () => {
 
       const stubbedcall = sinon.stub(got, "post");
       stubbedcall.onFirstCall().returns(responseObject1);
-      //sinon.stub(got, "get").returns(responseObject2);
+      sinon.stub(got, "get").returns(responseObject2);
 
       // set the request object with the correct provider, developerId and userId
-      const req = {url: "https://us-central1-rove-26.cloudfunctions.net/wahooCallback?oauth_token_secret=testcode-userId="+testUser+"-devId="+testDev+"&oauth_verifier=test-verifyer&oauth_token=test-token"};
+      const req = {url: "https://us-central1-rove-26.cloudfunctions.net/wahooCallback?oauth_token_secret=testcode-userId="+testUser+"-devId="+testDev+"&oauth_verifier=test-verifyer&oauth_token=test-token",
+          debug: true
+      };
+
       const res = {
           send: (text) => {
               assert.equal(text, "THANKS, YOU CAN NOW CLOSE THIS WINDOW")

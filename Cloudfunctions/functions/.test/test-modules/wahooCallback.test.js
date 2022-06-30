@@ -80,7 +80,9 @@ describe("Testing that the Wahoo callbacks work: ", () => {
       stubbedget.onFirstCall().returns(responseObject2);
 
       // set the request object with the correct provider, developerId and userId
-      const req = {url: "https://us-central1-rove-26.cloudfunctions.net/wahooCallback?state="+testUser+":"+testDev+"&code=testcode"};
+      const req = {url: "https://us-central1-rove-26.cloudfunctions.net/wahooCallback?state="+testUser+":"+testDev+"&code=testcode",
+      debug: true
+      };
       const res = {
           send: (text) => {
               assert.equal(text, "your authorization was successful please close this window")
