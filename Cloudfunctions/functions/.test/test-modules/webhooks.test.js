@@ -59,6 +59,7 @@ describe("Testing that the Webhooks work: ", () => {
   it('Webhooks should log event and repond with status 200...', async () => {
       // set the request object with the correct provider, developerId and userId
       const req = {
+          debug: true,
           url: "https://us-central1-rove-26.cloudfunctions.net/wahooWebhook",
           method: "POST",
           body:{"user":{"id": "wahoo_test_user"},"event_type":"workout_summary","workout_summary":{"duration_active_accum":"9.0","workout":{"name":"Cycling","workout_token":"ELEMNT AE48:274","workout_type_id":0,"id":147564736,"updated_at":"2022-06-13T16:39:08.000Z","plan_id":null,"minutes":0,"starts":"2022-06-13T16:38:51.000Z","created_at":"2022-06-13T16:39:08.000Z"},"speed_avg":"0.0","duration_total_accum":"9.0","cadence_avg":"0.0","id":140473420,"work_accum":"0.0","power_bike_tss_last":null,"ascent_accum":"0.0","power_bike_np_last":null,"duration_paused_accum":"0.0","created_at":"2022-06-13T16:39:09.000Z","updated_at":"2022-06-13T16:39:09.000Z","power_avg":"0.0","file":{"url":"https://cdn.wahooligan.com/wahoo-cloud/production/uploads/workout_file/file/WpHvKL3irWsv2vHzGzGF_Q/2022-06-13-163851-ELEMNT_AE48-274-0.fit"},"distance_accum":"0.0","heart_rate_avg":"0.0","calories_accum":"0.0"},"webhook_token":"97661c16-6359-4854-9498-a49c07b6ec11"}
@@ -82,7 +83,7 @@ describe("Testing that the Webhooks work: ", () => {
      const sanatisedActivity = testUserDocs.docs[0].data();
      const expectedResults = {
           sanitised: {
-              userId: "paulsTestDevSecondUser",
+              userId: testUser,
               activity_id: 140473420,
               activity_name: "Cycling",
               activity_type: "BIKING",
@@ -152,6 +153,7 @@ describe("Testing that the Webhooks work: ", () => {
       stubbedPolarCall.onFirstCall().returns(polarExercisePayload);
       // set the request object with the correct provider, developerId and userId
       const req = {
+          debug: true,
           url: "https://us-central1-rove-26.cloudfunctions.net/wahooWebhook",
           method: "POST",
           body: {
@@ -211,6 +213,7 @@ describe("Testing that the Webhooks work: ", () => {
       stubbedStravaCall.onFirstCall().returns(stravaExercisePayload);
       // set the request object with the correct provider, developerId and userId
       const req = {
+          debug: true,
           url: "https://us-central1-rove-26.cloudfunctions.net/stravaWebhook",
           method: "POST",
           "body":{"updates":{},"object_type":"activity","object_id":7345142595,"owner_id":"test_strava_id","subscription_id":217520,"aspect_type":"create","event_time":1655824005}
@@ -258,6 +261,7 @@ describe("Testing that the Webhooks work: ", () => {
 
       // set the request object with the webHook payload
       const req = {
+          debug: true,
           url: "https://us-central1-rove-26.cloudfunctions.net/garminWebhook",
           method: "POST",
           body: {"activities":[{

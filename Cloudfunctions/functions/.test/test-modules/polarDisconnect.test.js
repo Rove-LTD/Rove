@@ -29,7 +29,7 @@ myFunctions = require('../../index.js');
 // name as in the function we are testing
 const got = require('got');
 //-------------TEST 2--- Test Callbacks from Strava-------
- describe("Check the Strava Disconnect Service works: ", () => {
+ describe("Check the Polar Disconnect Service works: ", () => {
   before(async () => {
     await admin.firestore()
         .collection("users")
@@ -37,11 +37,12 @@ const got = require('got');
         .set({
             "devId": testDev,
             "email": "paul.userTest@gmail.com",
-            "strava_connected": true,
-            "strava_access_token": "4c68a65e19eb899b8f68aa21e760b074bf035a95",
-            "strava_refresh_token": "78ba71c103106141ea7030ce60ff1ee3d599b7ba",
-            "strava_token_expires_at": 1656517735,
-            "strava_id": 12972711});
+            "polar_connected": true,
+            "polar_access_token": "test_access_token",
+            "polar_refresh_token": "test_refresh_token",
+            "polar_token_expires_in": 1100,
+            "polar_token_type": "bearer",
+            "polar_user_id": "test_id"});
 
     await admin.firestore()
         .collection("users")
@@ -49,28 +50,80 @@ const got = require('got');
         .collection("activities")
         .doc()
         .set({raw: {field1: "somedata"},
-            sanitised: {data_source: "strava"}});
+            sanitised: {data_source: "polar"}});
 
   });
-  it('Check Strava De-auth webhook works.', async () => {
+  it('Check that service returns with error if user is not already authorised', async () => {
     req = {
-      debug: true,
-      url: "https://ourDomain.com",
-      method: "POST",
-      query:{},
-      body:{"owner_id":12972711,"object_type":"athlete","aspect_type":"update","subscription_id":217520,"object_id":12972711,"updates":{"authorized":"false"},"event_time":1656517720}
+      url: "https://ourDomain.com?devId="+testDev+"&userId="+testUser+"&provider=polar&devKey=test-key",
+    };
+    res = {
+      status: (code) => {
+        assert.equal(code, 400);
+      },
+      send: (message) => {
+        assert.equal(message, "error: unexpected problem");
+      }
+    }
+
+    // set up stubbed functions
+    testResponse = {
+      json: ()=>{
+        return {"error":"Access Token not authorised"};
+      }
+    }
+
+   const stubbedGot = sinon.stub(got, "delete");
+   stubbedGot.onFirstCall().returns(testResponse);
+    
+    await myFunctions.disconnectService(req, res);
+    // check the got function was called with the correct options
+    // check the polar fields were deleted from the database
+    // check the wahoo activities were deleted from the database only for this user
+    const userDoc = await admin.firestore()
+        .collection("users")
+        .doc(testUser)
+        .get();
+      
+    const activities = await admin.firestore()
+        .collection("users")
+        .doc(testUser)
+        .collection("activities")
+        .where("sanitised.data_source","==","polar")
+        .get();
+    
+    const expectedUserResults = {
+      "devId": testDev,
+      "email": "paul.userTest@gmail.com",
+      "polar_connected": true,
+      "polar_access_token": "test_access_token",
+      "polar_refresh_token": "test_refresh_token",
+      "polar_token_expires_in": 1100,
+      "polar_token_type": "bearer",
+      "polar_user_id": "test_id"
+    };
+    
+    assert.deepEqual(userDoc.data(), expectedUserResults);
+    assert.isAbove(activities.docs.length, 0);
+
+    sinon.restore();
+  });
+  it('Check that service succeeds if user authorised already', async () => {
+    req = {
+      url: "https://ourDomain.com?devId="+testDev+"&userId="+testUser+"&provider=polar&devKey=test-key",
     };
     res = {
       status: (code) => {
         assert.equal(code, 200);
       },
       send: (message) => {
-        assert.equal(message,)
+        assert.equal(message, '{"status":"disconnected"}')
       }
     }
 
     // set up stubbed functions
     testResponse = {
+      statusCode: 204,
       json: ()=>{
         return {"success":"Application has been revoked"};
       }
@@ -79,60 +132,10 @@ const got = require('got');
     const stubbedGot = sinon.stub(got, "delete");
     stubbedGot.onFirstCall().returns(testResponse);
     
-    await myFunctions.stravaWebhook(req, res);
-    // check the got function was called with the correct options
-    // check the wahoo fields were deleted from the database
-    // check the wahoo activities were deleted from the database only for this user
-    const userDoc = await admin.firestore()
-        .collection("users")
-        .doc(testUser)
-        .get();
-      
-    const activities = await admin.firestore()
-        .collection("users")
-        .doc(testUser)
-        .collection("activities")
-        .where("sanitised.data_source","==","strava")
-        .get();
-    
-    const expectedUserResults = {
-      "devId": testDev,
-      "email": "paul.userTest@gmail.com",
-    };
-    
-    assert.deepEqual(userDoc.data(), expectedUserResults);
-    assert.equal(activities.docs.length, 0);
-
-    sinon.restore();
-  })
-  it('Check Strava de-auth http works.', async () => {
-    req = {
-      debug: true,
-      url: "https://ourDomain.com?devId="+testDev+"&userId="+testUser+"&provider=strava&devKey=test-key",
-    };
-    res = {
-      status: (code) => {
-        assert.equal(code, 200);
-      },
-      send: (message) => {
-        assert.equal(message, '')
-      }
-    }
-
-    // set up stubbed functions
-    testResponse = {
-      json: ()=>{
-        return {"success":"Application has been revoked"};
-      }
-    }
-
-   //const stubbedGot = sinon.stub(got, "delete");
-   //stubbedGot.onFirstCall().returns(testResponse);
-    
     await myFunctions.disconnectService(req, res);
     // check the got function was called with the correct options
-    // check the wahoo fields were deleted from the database
-    // check the wahoo activities were deleted from the database only for this user
+    // check the polar fields were deleted from the database
+    // check the polar activities were deleted from the database only for this user
     const userDoc = await admin.firestore()
         .collection("users")
         .doc(testUser)
@@ -142,7 +145,7 @@ const got = require('got');
         .collection("users")
         .doc(testUser)
         .collection("activities")
-        .where("sanitised.data_source","==","strava")
+        .where("sanitised.data_source","==","polar")
         .get();
     
     const expectedUserResults = {

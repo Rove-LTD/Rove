@@ -142,7 +142,7 @@ const got = require('got');
         .get();
     
     const expectedUserResults = {
-      "devId": "paulsTestDev",
+      "devId": testDev,
       "email": "paul.userTest@gmail.com",
     };
     

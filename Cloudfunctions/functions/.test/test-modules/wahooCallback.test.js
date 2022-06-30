@@ -30,6 +30,13 @@ myFunctions = require('../../index.js');
 const got = require('got');
 //-------------TEST 2--- Test Callbacks from Strava-------
 describe("Testing that the Wahoo callbacks work: ", () => {
+  before(async () => {
+    // reset the user doc before testing polar
+    await admin.firestore()
+      .collection("users")
+      .doc(testUser)
+      .set(devUserData);
+  });
   it('wahoo callback should check userId and DevId and write the access tokens to the database...', async () => {
       //set up the stubbed response to mimic wahoo's response when called with the
       //code to get the token
@@ -60,18 +67,6 @@ describe("Testing that the Wahoo callbacks work: ", () => {
       const expectedTestUserDoc = {
           devId: devUserData.devId,
           email: devUserData.email,
-          strava_id: 12345678,
-          polar_access_token: 'test-polar-access-token',
-          polar_token_type: 'bearer',
-          polar_registration_date: "2011-10-14T12:50:37.000Z",
-          polar_token_expires_in: 21600,
-          polar_connected: true,
-          polar_user_id: '123456polar',
-          strava_access_token: 'test-long-access-token',
-          strava_refresh_token: 'test-refresh_token',
-          strava_token_expires_at: 1654014114,
-          strava_token_expires_in: 21600,
-          strava_connected: true,
           wahoo_access_token: 'test-wahoo-access-token',
           wahoo_refresh_token: 'test-wahoo-refresh-token',
           wahoo_token_expires_in: 21600,
@@ -85,7 +80,9 @@ describe("Testing that the Wahoo callbacks work: ", () => {
       stubbedget.onFirstCall().returns(responseObject2);
 
       // set the request object with the correct provider, developerId and userId
-      const req = {url: "https://us-central1-rove-26.cloudfunctions.net/wahooCallback?state="+testUser+":"+testDev+"&code=testcode"};
+      const req = {url: "https://us-central1-rove-26.cloudfunctions.net/wahooCallback?state="+testUser+":"+testDev+"&code=testcode",
+      debug: true
+      };
       const res = {
           send: (text) => {
               assert.equal(text, "your authorization was successful please close this window")
