@@ -250,9 +250,7 @@ async function deleteStravaActivity(userDoc, webhookCall) {
           .post("https://www.strava.com/oauth/deauthorize",
               {"access_token": userDoc.data()["strava_access_token"]});
         // check success if fail return 400
-      if (deAuthResponse == "OK") {// replace with actual test
-        return 200;
-      } else {
+      if (deAuthResponse != "OK") {// replace with actual test
         return 400;
       }
     }
@@ -269,8 +267,8 @@ async function deleteStravaActivity(userDoc, webhookCall) {
 
   // if all successful send to developers sendToDeauthoriseWebhook.
   // userId, provider, status: deauthorised
-  sendToDeauthoriseWebhook(userDoc);
-  return 200; // 200 success, 400 failure
+  const response = await sendToDeauthoriseWebhook(userDoc, "strava", 0);
+  return response; // 200 success, 400 failure
 }
 
 async function deleteGarminActivity(userDoc, webhookCall) {
@@ -462,7 +460,6 @@ exports.stravaCallback = functions.https.onRequest(async (req, res) => {
       // userResponse = "Some good redirect.";
       const urlString = await successDevCallback(db, devId);
       res.redirect(urlString);
-      res.send("your authorization was successful please close this window " + urlString);
     } else {
       res.send("Error: "+response.statusCode+
          " please close this window and try again");
@@ -743,7 +740,6 @@ exports.polarCallback = functions.https.onRequest(async (req, res) => {
       // userResponse = "Some good redirect.";
       const urlString = await successDevCallback(db, devId);
       res.redirect(urlString);
-      res.send("your authorization was successful please close this window: "+ urlString + ": " + message);
     } else {
       res.send("Error: "+response.statusCode+":"+body.toString()+" please close this window and try again");
       console.log(JSON.parse(body));
@@ -886,13 +882,13 @@ exports.stravaWebhook = functions.https.onRequest(async (request, response) => {
     // save to a doc
     const activityDoc = await userDocRef.ref.collection("activities").doc().set({"raw": activity, "sanitised": sanitisedActivity[0]});
     // Send the information to an endpoint specified by the dev registered to a user.
+    response.status(200);
+    response.send("OK!");
     await sendToDeveloper(userDocRef,
         sanitisedActivity[0],
         activity,
         activityDoc,
         0);
-    response.status(200);
-    response.send("OK!");
   } else if (request.method === "GET") {
     const VERIFY_TOKEN = "STRAVA";
     const mode = request.query["hub.mode"];
