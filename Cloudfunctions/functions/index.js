@@ -247,31 +247,47 @@ exports.disconnectService = functions.https.onRequest(async (req, res) => {
 });
 
 async function deleteStravaActivity(userDoc, webhookCall) {
+  stravaApi.config({
+    "client_id": configurations["paulsTestDev"]["stravaClientId"],
+    "client_secret": configurations["paulsTestDev"]["stravaClientSecret"],
+    "redirect_uri": "https://us-central1-rove-26.cloudfunctions.net/stravaCallback",
+  });
   // delete activities
   // check if this is the last user with this stravaId and this is not a call from the webhook
-
+  let accessToken = userDoc.data()["strava_access_token"];
   if (!webhookCall) {
     const userQueryList = await db.collection("users").
         where("strava_id", "==", userDoc.data()["strava_id"])
         .get();
     if ( userQueryList.docs.length == 1) {
-      const deAuthResponse = await got
-          .post("https://www.strava.com/oauth/deauthorize",
-              {"access_token": userDoc.data()["strava_access_token"]});
-        // check success if fail return 400
-      if (deAuthResponse != "OK") {// replace with actual test
+      if (await checkStravaTokens(userDoc.id, db) == true) {
+        // token out of date, make request for new ones.
+        const payload = await stravaApi.oauth.refreshToken(userDoc.data()["strava_refresh_token"]);
+        await stravaTokenStorage(userDoc.id, payload, db);
+        accessToken = payload["access_token"];
+      }
+      const deAuthResponse = await stravaApi.oauth.deauthorize({"access_token": accessToken});
+      // response contains just the access_token from strava to verify success
+      if (deAuthResponse.access_token != accessToken) {
         return 400;
       }
     }
   }
   // Delete Strava keys and activities.
-  await db.collection("users").doc(userDoc.id).update({
+  await userDoc.ref.update({
     strava_access_token: admin.firestore.FieldValue.delete(),
     strava_connected: admin.firestore.FieldValue.delete(),
     strava_refresh_token: admin.firestore.FieldValue.delete(),
     strava_token_expires_at: admin.firestore.FieldValue.delete(),
     strava_token_expires_in: admin.firestore.FieldValue.delete(),
     strava_id: admin.firestore.FieldValue.delete(),
+  });
+
+  const activities = await userDoc.ref.collection("activities")
+      .where("sanitised.data_source", "==", "strava")
+      .get();
+  activities.forEach(async (doc)=>{
+    await doc.ref.delete();
   });
 
   // if all successful send to developers sendToDeauthoriseWebhook.
@@ -886,13 +902,6 @@ exports.stravaWebhook = functions.https.onRequest(async (request, response) => {
     }
     const userDoc = await db.collection("users").where("strava_id", "==", request.body.owner_id).get();
     // if user de-authorizing.
-    if ("authorized" in request.body.updates) {
-      console.log("de-auth event");
-      response = await deleteStravaActivity(userDoc, true);
-      response.status(response);
-      response.send();
-      return;
-    }
     const userDocRef = userDoc.docs[0];
     if (userDoc.docs.length == 1) {
       stravaAccessToken = userDocRef.data()["strava_access_token"];
@@ -910,14 +919,30 @@ exports.stravaWebhook = functions.https.onRequest(async (request, response) => {
       const payload = await stravaApi.oauth.refreshToken(userDocRef.data()["strava_refresh_token"]);
       await stravaTokenStorage(userDocRef.id, payload, db);
       const payloadAccessToken = payload["access_token"];
-      activity = await stravaApi.activities.get({"access_token": payloadAccessToken, "id": request.body.object_id});
-      sanitisedActivity = filters.stravaSanitise([activity]);
-      sanitisedActivity[0]["userId"] = userDocRef.id;
+      if ("authorized" in request.body.updates) {
+        console.log("de-auth event");
+        const result = await deleteStravaActivity(userDocRef, true);
+        response.status(result);
+        response.send();
+        return;
+      } else {
+        activity = await stravaApi.activities.get({"access_token": payloadAccessToken, "id": request.body.object_id});
+        sanitisedActivity = filters.stravaSanitise([activity]);
+        sanitisedActivity[0]["userId"] = userDocRef.id;
+      }
     } else {
       // token in date, can get activities as required.
-      activity = await stravaApi.activities.get({"access_token": stravaAccessToken, "id": request.body.object_id});
-      sanitisedActivity = filters.stravaSanitise([activity]);
-      sanitisedActivity[0]["userId"] = userDocRef.id;
+      if ("authorized" in request.body.updates) {
+        console.log("de-auth event");
+        const result = await deleteStravaActivity(userDocRef, true);
+        response.status(result);
+        response.send();
+        return;
+      } else {
+        activity = await stravaApi.activities.get({"access_token": stravaAccessToken, "id": request.body.object_id});
+        sanitisedActivity = filters.stravaSanitise([activity]);
+        sanitisedActivity[0]["userId"] = userDocRef.id;
+      }
     }
     // save to a doc
     const activityDoc = await userDocRef.ref.collection("activities").doc().set({"raw": activity, "sanitised": sanitisedActivity[0]});
