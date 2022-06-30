@@ -191,7 +191,7 @@ exports.disconnectService = functions.https.onRequest(async (req, res) => {
       // deauth for Strava.
       // TODO check user is already authorised
       if (userDocData["strava_connected"] == true) {
-        result = deleteStravaActivity(userDoc, false);
+        result = await deleteStravaActivity(userDoc, false);
         // check success or fail. result 200 is success 400 is failure
       } else {
         // error the user is not authorizes already
@@ -242,7 +242,7 @@ async function deleteStravaActivity(userDoc, webhookCall) {
   // check if this is the last user with this stravaId and this is not a call from the webhook
 
   if (!webhookCall) {
-    const userQueryList = db.collection("users").
+    const userQueryList = await db.collection("users").
         where("strava_id", "==", userDoc.data()["strava_id"])
         .get();
     if ( userQueryList.docs.length == 1) {

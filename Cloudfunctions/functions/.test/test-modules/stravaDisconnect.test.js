@@ -40,7 +40,7 @@ const got = require('got');
             "strava_connected": true,
             "strava_access_token": "5aaf99adfa5a8c1c09c257b4dd892a2f56864c11",
             "strava_refresh_token": "0502b0478ab5374c578e022fb88a3ab30cfa9f88",
-            "strava_user_id": "12972711"});
+            "strava_id": "12972711"});
 
     await admin.firestore()
         .collection("users")
@@ -54,8 +54,9 @@ const got = require('got');
   it('Check that service succeeds if user authorised already', async () => {
     req = {
       url: "https://ourDomain.com",
-    query:{},
-    body:{"owner_id":12972711,"object_type":"athlete","aspect_type":"update","subscription_id":217520,"object_id":12972711,"updates":{"authorized":"false"},"event_time":1656517720}
+      method: "POST",
+      query:{},
+      body:{"owner_id":12972711,"object_type":"athlete","aspect_type":"update","subscription_id":217520,"object_id":12972711,"updates":{"authorized":"false"},"event_time":1656517720}
     };
     res = {
       status: (code) => {
@@ -77,6 +78,55 @@ const got = require('got');
    //stubbedGot.onFirstCall().returns(testResponse);
     
     await myFunctions.stravaWebhook(req, res);
+    // check the got function was called with the correct options
+    // check the wahoo fields were deleted from the database
+    // check the wahoo activities were deleted from the database only for this user
+    const userDoc = await admin.firestore()
+        .collection("users")
+        .doc(testUser)
+        .get();
+      
+    const activities = await admin.firestore()
+        .collection("users")
+        .doc(testUser)
+        .collection("activities")
+        .where("sanitised.data_source","==","strava")
+        .get();
+    
+    const expectedUserResults = {
+      "devId": "paulsTestDev",
+      "email": "paul.userTest@gmail.com",
+    };
+    
+    assert.deepEqual(userDoc.data(), expectedUserResults);
+    assert.equal(activities.docs.length, 0);
+
+    sinon.restore();
+  })
+  it('Check that service succeeds if user authorised already', async () => {
+    req = {
+      url: "https://ourDomain.com?devId="+testDev+"&userId="+testUser+"&provider=strava&devKey=test-key",
+    };
+    res = {
+      status: (code) => {
+        assert.equal(code, 200);
+      },
+      send: (message) => {
+        assert.equal(message, '')
+      }
+    }
+
+    // set up stubbed functions
+    testResponse = {
+      json: ()=>{
+        return {"success":"Application has been revoked"};
+      }
+    }
+
+   //const stubbedGot = sinon.stub(got, "delete");
+   //stubbedGot.onFirstCall().returns(testResponse);
+    
+    await myFunctions.disconnectService(req, res);
     // check the got function was called with the correct options
     // check the wahoo fields were deleted from the database
     // check the wahoo activities were deleted from the database only for this user
