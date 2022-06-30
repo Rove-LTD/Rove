@@ -29,7 +29,7 @@ myFunctions = require('../../index.js');
 // name as in the function we are testing
 const got = require('got');
 //-------------TEST 2--- Test Callbacks from Strava-------
- describe("Check the Wahoo Disconnect Service works: ", () => {
+ describe("Check the Strava Disconnect Service works: ", () => {
   before(async () => {
     await admin.firestore()
         .collection("users")
@@ -38,9 +38,10 @@ const got = require('got');
             "devId": testDev,
             "email": "paul.userTest@gmail.com",
             "strava_connected": true,
-            "strava_access_token": "5aaf99adfa5a8c1c09c257b4dd892a2f56864c11",
-            "strava_refresh_token": "0502b0478ab5374c578e022fb88a3ab30cfa9f88",
-            "strava_id": "12972711"});
+            "strava_access_token": "4c68a65e19eb899b8f68aa21e760b074bf035a95",
+            "strava_refresh_token": "78ba71c103106141ea7030ce60ff1ee3d599b7ba",
+            "strava_token_expires_at": 1656517735,
+            "strava_id": 12972711});
 
     await admin.firestore()
         .collection("users")
@@ -51,7 +52,7 @@ const got = require('got');
             sanitised: {data_source: "strava"}});
 
   });
-  it('Check that service succeeds if user authorised already', async () => {
+  it('Check Strava De-auth webhook works.', async () => {
     req = {
       url: "https://ourDomain.com",
       method: "POST",
@@ -63,7 +64,7 @@ const got = require('got');
         assert.equal(code, 200);
       },
       send: (message) => {
-        assert.equal(message, '')
+        assert.equal(message,)
       }
     }
 
@@ -103,7 +104,7 @@ const got = require('got');
 
     sinon.restore();
   })
-  it('Check that service succeeds if user authorised already', async () => {
+  it('Check Strava de-auth http works.', async () => {
     req = {
       url: "https://ourDomain.com?devId="+testDev+"&userId="+testUser+"&provider=strava&devKey=test-key",
     };
