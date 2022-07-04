@@ -30,7 +30,7 @@ myFunctions = require('../../index.js');
 const got = require('got');
 //-------------TEST 2--- Test Callbacks from Strava-------
  describe("Check the Garmin Disconnect Service works: ", () => {
-  before(async () => {
+  beforeEach(async () => {
     await admin.firestore()
         .collection("users")
         .doc(testUser)
@@ -52,7 +52,7 @@ const got = require('got');
             sanitised: {data_source: "garmin"}});
 
   });
-  it.only('Check Garmin De-auth webhook works.', async () => {
+  it('Check Garmin De-auth webhook works.', async () => {
     req = {
       debug: true,
       url: "https://ourDomain.com",
@@ -136,6 +136,8 @@ const got = require('got');
    //stubbedGot.onFirstCall().returns(testResponse);
     
     await myFunctions.disconnectService(req, res);
+    // const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+    // await wait(1000);
     // check the got function was called with the correct options
     // check the wahoo fields were deleted from the database
     // check the wahoo activities were deleted from the database only for this user
