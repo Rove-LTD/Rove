@@ -84,6 +84,8 @@ const got = require('got');
     stubbedGot.onFirstCall().returns(testResponse);
     
     await myFunctions.garminDeregistrations(req, res);
+    const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+    await wait(1000);
     // check the got function was called with the correct options
     // check the wahoo fields were deleted from the database
     // check the wahoo activities were deleted from the database only for this user

@@ -10,7 +10,7 @@
     "appId": "1:1020717595214:web:3767a026d5bc2101b7211f",
     "measurementId": "G-C9DDQXGVGD"
   },
-  "testKeyFile": "keys/rovetest-beea7-firebase-adminsdk-key.json",
+  "testKeyFile": ".test/keys/rovetest-beea7-firebase-adminsdk-key.json",
   "devTestData": {
     "email": "paul.testDev@gmail.com",
     "devKey": "test-key",
