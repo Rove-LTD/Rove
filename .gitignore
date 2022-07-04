@@ -1,5 +1,5 @@
-
 Cloudfunctions/functions/package-lock.json
 Cloudfunctions/functions/.test/keys/*
 .DS_Store
 Cloudfunctions/functions/.env.yml
+Cloudfunctions/functions/.test/testParameters.json

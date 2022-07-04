@@ -554,11 +554,12 @@ exports.garminDeregistrations = functions.https.onRequest(async (req, res) => {
     userQuery.docs.forEach(async (doc) =>{
       const response = await deleteGarminActivity(doc, true);
       if (response == 400) {
-        res.send(response);
+        res.status(response).send();
       }
     });
   }
-  res.send(200);
+  res.status(200);
+  res.send();
 });
 
 exports.garminWebhook = functions.https.onRequest(async (req, res) => {
