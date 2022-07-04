@@ -49,7 +49,7 @@ const request = require('request');
           const responseBody1 = {
               access_token: 'test-polar-access-token',
               token_type: 'bearer',
-              expires_in: 21600,
+              expires_in: 461375999,
               x_user_id: '123456polar',
             };
           const responseObject2 = {
@@ -61,13 +61,13 @@ const request = require('request');
           const responseBody2 = {};
 
           const testDate = new Date();
-          const expected_expiry_date = Math.round(testDate/1000+21600);
+          const expected_expiry_date = Math.round(testDate/1000+461375999);
           const expectedTestUserDoc = {
               devId: devUserData.devId,
               email: devUserData.email,
               polar_access_token: 'test-polar-access-token',
               polar_token_type: 'bearer',
-              polar_token_expires_in: 21600,
+              polar_token_expires_in: 461375999,
               polar_token_expires_at: expected_expiry_date,
               polar_connected: true,
               polar_user_id: '123456polar',
