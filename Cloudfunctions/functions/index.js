@@ -198,7 +198,14 @@ exports.disconnectService = functions.https.onRequest(async (req, res) => {
       }
     } else if (provider == "garmin") {
       if (userDocData["garmin_connected"] == true) {
-        result = deleteGarminActivity(userDoc, false);
+        result = await deleteGarminActivity(userDoc, false);
+        if (result == 200) {
+          res.status(200);
+          message = JSON.stringify({status: "disconnected"});
+        } else {
+          res.status(result);
+          message = "error: unexpected problem";
+        }
         // check success or fail. result 200 is success 400 is failure
       } else {
         // error the user is not authorizes already
@@ -299,26 +306,34 @@ async function deleteStravaActivity(userDoc, webhookCall) {
 async function deleteGarminActivity(userDoc, webhookCall) {
   const userDocData = await userDoc.data();
   if (!webhookCall) {
-    const userQueryList = db.collection("users").
+    const userQueryList = await db.collection("users").
         where("garmin_userId", "==", userDocData["garmin_userId"])
         .get();
     if ( userQueryList.docs.length == 1) {
     // send post to garmin to de-auth.
-      const response = await got
-          .delete("https://apis.garmin.com/wellness-api/rest/user/registration",
-              {"Authorization": "Bearer " + userDocData["garmin_access_token"]});
+      // const response = await got
+      //    .post("https://apis.garmin.com/wellness-api/rest/user/registration",
+      //        {headers: {"Authorization": "Bearer " + userDocData["garmin_access_token"]}});
       // check success if fail return 400
-      if (response.statusCode != 204) {
-        return 400;
-      }
+      // if (response.statusCode != 204) {
+      //   return 400;
+      // }
     }
   }
   // delete garmin keys and activities.
-  await db.collection("users").doc(userDoc.id).update({
+  await userDoc.ref.update({
     garmin_access_token: admin.firestore.FieldValue.delete(),
     garmin_access_token_secret: admin.firestore.FieldValue.delete(),
+    garmin_userId: admin.firestore.FieldValue.delete(),
+    garmin_connected: admin.firestore.FieldValue.delete(),
   });
-  sendToDeauthoriseWebhook(userDoc);
+  const activities = await userDoc.ref.collection("activities")
+      .where("sanitised.data_source", "==", "garmin")
+      .get();
+  activities.forEach(async (doc)=>{
+    await doc.ref.delete();
+  });
+  sendToDeauthoriseWebhook(userDoc, "garmin", 0);
   return 200; // 200 success, 400 failure
 }
 
@@ -538,9 +553,12 @@ exports.garminDeregistrations = functions.https.onRequest(async (req, res) => {
     const userQuery = await db.collection("users").where("garmin_access_token", "==", deRegistrations[i]["userAccessToken"]).get();
     userQuery.docs.forEach(async (doc) =>{
       const response = await deleteGarminActivity(doc, true);
-      res.send(response);
+      if (response == 400) {
+        res.send(response);
+      }
     });
   }
+  res.send(200);
 });
 
 exports.garminWebhook = functions.https.onRequest(async (req, res) => {
@@ -1261,6 +1279,7 @@ async function oauthCallbackHandlerGarmin(oAuthCallback, db) {
       "devId": devId,
       "garmin_access_token": garminAccessToken,
       "garmin_access_token_secret": garminAccessTokenSecret,
+      "garmin_connected": true,
     };
     await db.collection("users").doc(userId).set(firestoreParameters, {merge: true});
     getGarminUserId(consumerSecret, garminAccessToken, garminAccessTokenSecret, devId, userId);
