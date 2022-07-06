@@ -29,7 +29,7 @@ const got = require('got');
 // ------------------------END OF STUB FUNCTIONS----------------------------//
 
 // --------------START CONNECTSERVICE TESTS----------------------------------//
-describe.only("Testing that the developer can call API to connectService() and receive redirection URL: ", () => {
+describe("Testing that the developer can call API to connectService() and receive redirection URL: ", () => {
   it('should get error if the provider is not correct...', async () => {
       // set the request object with the incorrect provider, correct developerId, devKey and userId
       const req = {url: 'https//test.com/?devId='+testDev+'&userId='+testUser+'&devKey=test-key&provider=badFormat&isredirect=true'};
@@ -194,9 +194,17 @@ describe.only("Testing that the developer can call API to connectService() and r
     const req = {url: 'https//test.com/?devId='+testDev+'&userId='+testUser+'&devKey=test-key&provider=wahoo'};
     // set the assertions for the expected response object
     const res = {
-      redirect: (url) => {
-            assert.equal(url,"../redirectPage?provider=wahoo&devId="+testDev+"&userId="+testUser+"&devKey=test-key");
-        },
+      writeHead: (code, content)=>{
+        // could put assert here
+        assert.equal(code, 200);
+        assert.deepEqual(content, {"Content-Type": "text/html"} );
+      },
+      write: (html) => {
+        //could put an assert here
+      },
+      end: ()=>{
+        //could put an assert here
+      }
     }
 
     await myFunctions.redirectPage(req, res);
