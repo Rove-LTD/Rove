@@ -29,7 +29,7 @@ const got = require('got');
 // ------------------------END OF STUB FUNCTIONS----------------------------//
 
 // --------------START CONNECTSERVICE TESTS----------------------------------//
-describe.only("Testing that the developer can call API to connectService() and receive redirection URL: ", () => {
+describe("Testing that the developer can call API to connectService() and receive redirection URL: ", () => {
   it('should get error if the provider is not correct...', async () => {
       // set the request object with the incorrect provider, correct developerId, devKey and userId
       const req = {url: 'https//test.com/?devId='+testDev+'&userId='+testUser+'&devKey=test-key&provider=badFormat'};
