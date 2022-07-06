@@ -54,7 +54,7 @@ describe("Testing that the Garmin callbacks work: ", () => {
       };
 
       const expectedTestUserDoc = {
-          devId: devUserData.devId,
+          devId: testDev,
           email: devUserData.email,
           garmin_access_token: "garmin-access-token",
           garmin_access_token_secret: "garmin-test-secret",
@@ -74,7 +74,7 @@ describe("Testing that the Garmin callbacks work: ", () => {
               assert.equal(text, "THANKS, YOU CAN NOW CLOSE THIS WINDOW")
           },
           redirect: (url) => {
-            assert.equal(url, "https://paulsTest.com/callbackURL");
+            assert.equal(url, "https://paulsTest.com/callbackURL?userId="+testUser+"&provider=garmin");
           },
       }
       await myFunctions.oauthCallbackHandlerGarmin(req, res);
