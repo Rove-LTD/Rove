@@ -63,7 +63,7 @@ const request = require('request');
           const testDate = new Date();
           const expected_expiry_date = Math.round(testDate/1000+461375999);
           const expectedTestUserDoc = {
-              devId: devUserData.devId,
+              devId: testDev,
               email: devUserData.email,
               polar_access_token: 'test-polar-access-token',
               polar_token_type: 'bearer',
@@ -103,7 +103,7 @@ const request = require('request');
                   assert.equal(text, "your authorization was successful please close this window: you are already registered with Polar - there is no need to re-register")
               },
               redirect: (url) => {
-                assert.equal(url, "https://paulsTest.com/callbackURL");
+                assert.equal(url, "https://paulsTest.com/callbackURL?userId="+testUser+"&provider=polar");
               },
           }
           await myFunctions.polarCallback(req, res);
@@ -163,7 +163,7 @@ const request = require('request');
           const testDate = new Date();
           const expected_expiry_date = Math.round(testDate/1000+21600);
           const expectedTestUserDoc = {
-              devId: devUserData.devId,
+              devId: testDev,
               email: devUserData.email,
               polar_access_token: 'test-polar-access-token',
               polar_token_type: 'bearer',
@@ -185,7 +185,7 @@ const request = require('request');
                   assert.equal(text, "your authorization was successful please close this window: ")
               },
               redirect: (url) => {
-                assert.equal(url, "https://paulsTest.com/callbackURL");
+                assert.equal(url, "https://paulsTest.com/callbackURL?userId="+testUser+"&provider=polar");
               },
           }
           await myFunctions.polarCallback(req, res);

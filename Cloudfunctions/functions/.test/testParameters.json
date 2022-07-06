@@ -21,7 +21,6 @@
     "callbackURL": "https://paulsTest.com/callbackURL"
   },
   "devUserData": {
-    "devId": "anotherTestDev",
     "email": "paul.userTest@gmail.com"
   }
 }

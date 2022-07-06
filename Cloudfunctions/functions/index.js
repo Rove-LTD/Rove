@@ -481,9 +481,10 @@ exports.oauthCallbackHandlerGarmin = functions.https
     .onRequest(async (req, res) => {
       const oAuthCallback = Url.parse(req.url, true).query;
       const oauthTokenSecret = oAuthCallback["oauth_token_secret"].split("-");
+      const userId = oauthTokenSecret[1].split("=")[1];
       const devId = oauthTokenSecret[2].split("=")[1];
       await oauthCallbackHandlerGarmin(oAuthCallback, db);
-      const urlString = await successDevCallback(db, devId);
+      const urlString = await successDevCallback(db, devId, userId, "garmin");
       res.redirect(urlString);
       res.send("THANKS, YOU CAN NOW CLOSE THIS WINDOW");
     }),
@@ -524,7 +525,7 @@ exports.stravaCallback = functions.https.onRequest(async (req, res) => {
       // send a response now to endpoint for devId confirming success
       // await sendDevSuccess(devId); //TODO: create dev success post.
       // userResponse = "Some good redirect.";
-      const urlString = await successDevCallback(db, devId);
+      const urlString = await successDevCallback(db, devId, userId, "strava");
       res.redirect(urlString);
     } else {
       res.send("Error: "+response.statusCode+
@@ -537,9 +538,10 @@ exports.stravaCallback = functions.https.onRequest(async (req, res) => {
   });
 });
 
-async function successDevCallback(db, devId) {
+async function successDevCallback(db, devId, userId, provider) {
   const devDoc = await db.collection("developers").doc(devId).get();
-  const urlString = devDoc.data()["callbackURL"];
+  let urlString = devDoc.data()["callbackURL"];
+  urlString = urlString+"?userId="+userId+"&provider="+provider;
   // console.log("callback URL: "+ urlString);
   return urlString;
 }
@@ -806,7 +808,7 @@ exports.polarCallback = functions.https.onRequest(async (req, res) => {
       // send a response now to endpoint for devId confirming success
       // await sendDevSuccess(devId); //TODO: create dev success post.
       // userResponse = "Some good redirect.";
-      const urlString = await successDevCallback(db, devId);
+      const urlString = await successDevCallback(db, devId, userId, "polar");
       res.redirect(urlString);
     } else {
       res.send("Error: "+response.statusCode+":"+body.toString()+" please close this window and try again");
@@ -860,6 +862,7 @@ async function polarStoreTokens(userId, devId, data, db) {
     "polar_token_expires_in": data["expires_in"],
     "polar_connected": true,
     "polar_user_id": data["x_user_id"],
+    "devId": devId,
   };
   // set tokens for userId doc.
   const userRef = db.collection("users").doc(userId);
@@ -888,7 +891,7 @@ exports.wahooCallback = functions.https.onRequest(async (req, res) => {
     await oauthWahoo.getAndSaveAccessCodes();
   }
   if (!oauthWahoo.error) {
-    const urlString = await successDevCallback(db, oauthWahoo.devId);
+    const urlString = await successDevCallback(db, oauthWahoo.devId, oauthWahoo.userId, "wahoo");
     res.redirect(urlString);
     res.send("your authorization was successful please close this window");
   } else {
