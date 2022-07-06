@@ -21,7 +21,6 @@ const filters = require("./data-filter");
 const fs = require("fs");
 
 const configurations = contentsOfDotEnvFile["config"];
-const currentPath = process.env.PWD;
 // find a way to decrypt and encrypt this information
 
 admin.initializeApp();
