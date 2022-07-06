@@ -103,6 +103,7 @@ exports.connectService = functions.https.onRequest(async (req, res) => {
 
   if (isRedirect == undefined) {
     res.redirect("../redirectPage?provider="+provider+"&devId="+devId+"&userId="+userId+"&devKey="+devKey);
+    return;
   }
 
   // stravaOauth componses the request url for the user.

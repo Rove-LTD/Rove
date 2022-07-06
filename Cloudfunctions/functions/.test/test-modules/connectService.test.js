@@ -176,4 +176,17 @@ describe.only("Testing that the developer can call API to connectService() and r
       await myFunctions.connectService(req, res);
 
   })
+  it('should go to the redirect function whe isRedirect=undefined', async () => {
+    // set the request object with the correct provider, developerId and userId
+    const req = {url: 'https//test.com/?devId='+testDev+'&userId='+testUser+'&devKey=test-key&provider=wahoo'};
+    // set the assertions for the expected response object
+    const res = {
+      redirect: (url) => {
+            assert.equal(url,"../redirectPage?provider=wahoo&devId="+testDev+"&userId="+testUser+"&devKey=test-key");
+        },
+    }
+
+    await myFunctions.connectService(req, res);
+
+})
 });
