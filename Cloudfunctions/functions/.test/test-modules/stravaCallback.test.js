@@ -48,7 +48,7 @@ const strava = require("strava-v3");
         };
       
       const expectedTestUserDoc = {
-          devId: devUserData.devId,
+          devId: testDev,
           email: devUserData.email,
           strava_id: 12345678,
           strava_access_token: 'test-long-access-token',
@@ -68,7 +68,7 @@ const strava = require("strava-v3");
               assert.equal(text, "your authorization was successful please close this window")
           },
           redirect: (url) => {
-            assert.equal(url, "https://paulsTest.com/callbackURL");
+            assert.equal(url, "https://paulsTest.com/callbackURL?userId="+testUser+"&provider=strava");
           },
       }
       await myFunctions.stravaCallback(req, res);

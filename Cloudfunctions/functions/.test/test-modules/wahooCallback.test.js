@@ -65,7 +65,7 @@ describe("Testing that the Wahoo callbacks work: ", () => {
         }
       }
       const expectedTestUserDoc = {
-          devId: devUserData.devId,
+          devId: testDev,
           email: devUserData.email,
           wahoo_access_token: 'test-wahoo-access-token',
           wahoo_refresh_token: 'test-wahoo-refresh-token',
@@ -90,7 +90,7 @@ describe("Testing that the Wahoo callbacks work: ", () => {
               assert.equal(text, "your authorization was successful please close this window")
           },
           redirect: (url) => {
-            assert.equal(url, "https://paulsTest.com/callbackURL");
+            assert.equal(url, "https://paulsTest.com/callbackURL?userId="+testUser+"&provider=wahoo");
           },
       }
       await myFunctions.wahooCallback(req, res);
