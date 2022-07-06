@@ -38,13 +38,14 @@ describe("Testing that the Wahoo callbacks work: ", () => {
       .set(devUserData);
   });
   it('wahoo callback should check userId and DevId and write the access tokens to the database...', async () => {
-      //set up the stubbed response to mimic wahoo's response when called with the
-      //code to get the token
+      //set up the stubbed response to mimic wahoo's response when
+      //called with the code to get the token
       const responseObject1 = {
           json() { return {
               access_token: 'test-wahoo-access-token',
               refresh_token: 'test-wahoo-refresh-token',
-              expires_in: 21600,  
+              expires_in: 7200,  
+              created_at: 1656940968,  
           }
         }
       }
@@ -63,13 +64,14 @@ describe("Testing that the Wahoo callbacks work: ", () => {
             }
         }
       }
-
       const expectedTestUserDoc = {
           devId: devUserData.devId,
           email: devUserData.email,
           wahoo_access_token: 'test-wahoo-access-token',
           wahoo_refresh_token: 'test-wahoo-refresh-token',
-          wahoo_token_expires_in: 21600,
+          wahoo_token_expires_in: 7200,
+          wahoo_token_expires_at: 1656948168,
+          wahoo_created_at: 1656940968,
           wahoo_user_id: 60462,
           wahoo_connected: true,
       }

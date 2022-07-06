@@ -114,29 +114,67 @@ class OauthWahoo {
     await this.storeTokens();
   }
   /**
+  * @param {String} refreshCode
+  * @param {String} userToken
+  * @return {Future}
+  */
+  async refreshAndSaveAccessCodes(refreshCode, userToken) {
+    let response = {};
+    this.refreshCode = refreshCode;
+    this.accessToken = userToken;
+    try {
+      response =
+        await got.post(this.refreshCodeOptions).json();
+    } catch (error) {
+      this.error = true;
+      this.errorMessage =
+        "Error: "+error+
+        "could not refresh access code for user: "+this.userId;
+      console.log(error);
+      throw Error(this.errorMessage);
+    }
+    this.accessCodeResponse = response;
+    await this.storeTokens();
+    return;
+  }
+  /**
    *
-   * @return {void}
+   * @return {Future}
    */
   async storeTokens() {
     // set tokens for userId doc.
     const userRef = this.db.collection("users").doc(this.userId);
-    await userRef.set(this.tokenData, {merge: true});
+    const wahooUserDoc = await userRef.get();
+    const wahooUserId = wahooUserDoc.data()["wahoo_user_id"];
+    const userQuery = await this.db.collection("users")
+        .where("wahoo_user_id", "==", wahooUserId)
+        .get();
+    userQuery.docs.forEach(async (doc)=>{
+      await doc.ref.set(this.tokenData, {merge: true});
+    });
     return;
   }
   /**
    * returns accessCodeFields to update database with
    */
   get tokenData() {
+    const nowInSecondsSinceEpoch = Math.round(new Date()/1000);
+    const createDate = this.accessCodeResponse["created_at"];
+    const expiresIn = this.accessCodeResponse["expires_in"];
+    let expiryDate = createDate+expiresIn;
+    expiryDate = expiryDate || nowInSecondsSinceEpoch+expiresIn;
     return {
       "wahoo_access_token": this.accessCodeResponse["access_token"],
       "wahoo_token_expires_in": this.accessCodeResponse["expires_in"],
+      "wahoo_created_at": this.accessCodeResponse["created_at"] || null,
+      "wahoo_token_expires_at": expiryDate,
       "wahoo_refresh_token": this.accessCodeResponse["refresh_token"],
       "wahoo_connected": true,
     };
   }
   /**
    *
-   * @return {void}
+   * @return {Future}
    */
   async registerUser() {
     // get user Id either through register of get user calls
@@ -180,6 +218,24 @@ class OauthWahoo {
     };
   }
   /**
+   *
+   */
+  get refreshCodeOptions() {
+    const _dataString = "refresh_token="+
+    this.refreshCode+
+    "&client_id="+this.config[this.devId]["whaooClientId"]+
+    "&client_secret="+this.config[this.devId]["wahooSecret"]+
+    "&grant_type=refresh_token";
+    return {
+      url: "https://api.wahooligan.com/oauth/token?"+_dataString,
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer "+this.accessToken,
+      },
+    };
+  }
+  /**
    * @return {Object}
    */
   get registerUserOptions() {
@@ -191,6 +247,27 @@ class OauthWahoo {
         "Authorization": "Bearer "+this.accessCodeResponse["access_token"],
       },
     };
+  }
+  /**
+   *
+   * @param {FirebaseDocument} userDoc
+   * @return {Future}
+   */
+  async getUserToken(userDoc) {
+    const userToken = userDoc.data()["wahoo_access_token"];
+    this.devId = userDoc.data()["devId"];
+    this.userId = userDoc.id;
+
+    if (this.userId == undefined || this.devId == undefined) {
+      throw (new Error("error: userId or DevId not set"));
+    }
+    if (userDoc.data()["wahoo_token_expires_at"] < new Date()/1000) {
+      // token out of date needs to be refreshed
+      await this.refreshAndSaveAccessCodes(userDoc.data()["wahoo_refresh_token"], userToken);
+      return this.accessCodeResponse["access_token"];
+    } else {
+      return userToken;
+    }
   }
 }
 

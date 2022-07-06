@@ -342,32 +342,36 @@ async function deletePolarActivity(userDoc, webhookCall) {
       if (deAuthResponse.statusCode != 204) {
         return 400;
       }
-      // delete polar keys and activities
-      await userDoc.ref.update({
-        polar_access_token: admin.firestore.FieldValue.delete(),
-        polar_connected: admin.firestore.FieldValue.delete(),
-        polar_refresh_token: admin.firestore.FieldValue.delete(),
-        polar_token_expires_in: admin.firestore.FieldValue.delete(),
-        polar_token_expires_at: admin.firestore.FieldValue.delete(),
-        polar_user_id: admin.firestore.FieldValue.delete(),
-        polar_registration_date: admin.firestore.FieldValue.delete(),
-        polar_token_type: admin.firestore.FieldValue.delete(),
-      });
-      // delete activities from provider.
-      const activities = await userDoc.ref.collection("activities")
-          .where("sanitised.data_source", "==", "polar")
-          .get();
-      activities.forEach(async (doc)=>{
-        await doc.ref.delete();
-      });
-      await sendToDeauthoriseWebhook(userDoc, "polar", 0);
-      return 200;
     } catch (error) {
       if (error == 401) { // unauthorised
         // consider refreshing the access code and trying again
       }
       return 400;
     }
+  }
+  // delete polar keys and activities
+  try {
+    await userDoc.ref.update({
+      polar_access_token: admin.firestore.FieldValue.delete(),
+      polar_connected: admin.firestore.FieldValue.delete(),
+      polar_refresh_token: admin.firestore.FieldValue.delete(),
+      polar_token_expires_in: admin.firestore.FieldValue.delete(),
+      polar_token_expires_at: admin.firestore.FieldValue.delete(),
+      polar_user_id: admin.firestore.FieldValue.delete(),
+      polar_registration_date: admin.firestore.FieldValue.delete(),
+      polar_token_type: admin.firestore.FieldValue.delete(),
+    });
+    // delete activities from provider.
+    const activities = await userDoc.ref.collection("activities")
+        .where("sanitised.data_source", "==", "polar")
+        .get();
+    activities.forEach(async (doc)=>{
+      await doc.ref.delete();
+    });
+    await sendToDeauthoriseWebhook(userDoc, "polar", 0);
+    return 200;
+  } catch (error) {
+    return 400;
   }
 }
 
@@ -377,7 +381,7 @@ async function deleteWahooActivity(userDoc) {
       .get();
   if (userQueryList.docs.length == 1) {
     try {
-      const accessToken = userDoc.data()["wahoo_access_token"];
+      const accessToken = await oauthWahoo.getUserToken(userDoc);
       const options = {
         url: "https://api.wahooligan.com/v1/permissions",
         method: "DELETE",
@@ -390,29 +394,35 @@ async function deleteWahooActivity(userDoc) {
       if (deAuthResponse.success != "Application has been revoked") {
         return 400;
       }
-      // delete wahoo keys and activities
-      await db.collection("users").doc(userDoc.id).update({
-        wahoo_access_token: admin.firestore.FieldValue.delete(),
-        wahoo_connected: admin.firestore.FieldValue.delete(),
-        wahoo_refresh_token: admin.firestore.FieldValue.delete(),
-        wahoo_token_expires_in: admin.firestore.FieldValue.delete(),
-        wahoo_user_id: admin.firestore.FieldValue.delete(),
-      });
-      // delete activities from provider.
-      const activities = await userDoc.ref.collection("activities")
-          .where("sanitised.data_source", "==", "wahoo")
-          .get();
-      activities.forEach(async (doc)=>{
-        await doc.ref.delete();
-      });
-      await sendToDeauthoriseWebhook(userDoc, "wahoo", 0);
-      return 200;
     } catch (error) {
       if (error == 401) { // unauthorised
         // consider refreshing the access code and trying again
       }
       return 400;
     }
+  }
+  try {
+    // delete wahoo keys and activities
+    await db.collection("users").doc(userDoc.id).update({
+      wahoo_access_token: admin.firestore.FieldValue.delete(),
+      wahoo_connected: admin.firestore.FieldValue.delete(),
+      wahoo_refresh_token: admin.firestore.FieldValue.delete(),
+      wahoo_token_expires_in: admin.firestore.FieldValue.delete(),
+      wahoo_token_expires_at: admin.firestore.FieldValue.delete(),
+      wahoo_created_at: admin.firestore.FieldValue.delete(),
+      wahoo_user_id: admin.firestore.FieldValue.delete(),
+    });
+    // delete activities from provider.
+    const activities = await userDoc.ref.collection("activities")
+        .where("sanitised.data_source", "==", "wahoo")
+        .get();
+    activities.forEach(async (doc)=>{
+      await doc.ref.delete();
+    });
+    await sendToDeauthoriseWebhook(userDoc, "wahoo", 0);
+    return 200;
+  } catch (error) {
+    return 400;
   }
 }
 
@@ -443,7 +453,7 @@ async function sendToDeauthoriseWebhook(userDoc, provider, triesSoFar) {
     },
     body: JSON.stringify(datastring),
   };
-  const response = await got.post(options);
+  const response = await got(options);
   if (response.statusCode == 200) {
     // the developer accepted the information TODO
     /*
