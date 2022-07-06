@@ -29,17 +29,17 @@ const got = require('got');
 // ------------------------END OF STUB FUNCTIONS----------------------------//
 
 // --------------START CONNECTSERVICE TESTS----------------------------------//
-describe("Testing that the developer can call API to connectService() and receive redirection URL: ", () => {
+describe.only("Testing that the developer can call API to connectService() and receive redirection URL: ", () => {
   it('should get error if the provider is not correct...', async () => {
       // set the request object with the incorrect provider, correct developerId, devKey and userId
-      const req = {url: 'https//test.com/?devId='+testDev+'&userId='+testUser+'&devKey=test-key&provider=badFormat'};
+      const req = {url: 'https//test.com/?devId='+testDev+'&userId='+testUser+'&devKey=test-key&provider=badFormat&isredirect=true'};
       // set the assertions for the expected response object
       const res = {
           send: (url) => {
               assert.equal(url, "error: the provider was badly formatted, missing or not supported");
           },
           redirect: (url) => {
-            // ignore the redirect call
+            assert.equal(url,"../redirectPage?provider=badFormat&devId="+testDev+"&userId="+testUser+"&devKey=test-key");
           },
           status: (code) => {
               assert.equal(code, 400);
@@ -177,6 +177,19 @@ describe("Testing that the developer can call API to connectService() and receiv
 
   })
   it('should go to the redirect function whe isRedirect=undefined', async () => {
+      // set the request object with the correct provider, developerId and userId
+      const req = {url: 'https//test.com/?devId='+testDev+'&userId='+testUser+'&devKey=test-key&provider=wahoo'};
+      // set the assertions for the expected response object
+      const res = {
+        redirect: (url) => {
+              assert.equal(url,"../redirectPage?provider=wahoo&devId="+testDev+"&userId="+testUser+"&devKey=test-key");
+          },
+      }
+
+      await myFunctions.connectService(req, res);
+
+  })
+  it('the redirect function should send the HTML page needed', async () => {
     // set the request object with the correct provider, developerId and userId
     const req = {url: 'https//test.com/?devId='+testDev+'&userId='+testUser+'&devKey=test-key&provider=wahoo'};
     // set the assertions for the expected response object
@@ -186,7 +199,7 @@ describe("Testing that the developer can call API to connectService() and receiv
         },
     }
 
-    await myFunctions.connectService(req, res);
+    await myFunctions.redirectPage(req, res);
 
 })
 });
