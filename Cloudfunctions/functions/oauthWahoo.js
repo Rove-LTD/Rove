@@ -170,6 +170,7 @@ class OauthWahoo {
       "wahoo_token_expires_at": expiryDate,
       "wahoo_refresh_token": this.accessCodeResponse["refresh_token"],
       "wahoo_connected": true,
+      "devId": this.devId,
     };
   }
   /**
