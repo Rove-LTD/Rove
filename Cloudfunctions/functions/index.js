@@ -61,9 +61,7 @@ exports.connectService = functions.https.onRequest(async (req, res) => {
   const devKey = (Url.parse(req.url, true).query)["devKey"];
 
   const isRedirect = (Url.parse(req.url, true).query)["isRedirect"];
-  if (isRedirect == undefined) {
-    res.redirect("../redirectPage?provider="+provider+"&devId="+devId+"&userId="+userId+"&devKey="+devKey);
-  }
+
   let url = "";
 
   // parameter checks
@@ -103,6 +101,9 @@ exports.connectService = functions.https.onRequest(async (req, res) => {
     return;
   }
 
+  if (isRedirect == undefined) {
+    res.redirect("../redirectPage?provider="+provider+"&devId="+devId+"&userId="+userId+"&devKey="+devKey);
+  }
 
   // stravaOauth componses the request url for the user.
   if (provider == "strava") {
