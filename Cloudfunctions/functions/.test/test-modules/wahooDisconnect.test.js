@@ -36,9 +36,10 @@ describe("Check the Wahoo Disconnect Service works: ", () => {
   beforeEach(async () => {
     await admin.firestore()
         .collection("users")
-        .doc(testUser)
+        .doc(testDev+testUser)
         .set({
             "devId": testDev,
+            "userId": testUser,
             "email": "paul.userTest@gmail.com",
             "wahoo_connected": true,
             "wahoo_access_token": "test_access_token",
@@ -49,9 +50,10 @@ describe("Check the Wahoo Disconnect Service works: ", () => {
 
       await admin.firestore()
       .collection("users")
-      .doc(testDev+":secondTestUser")
+      .doc(testDev+"secondTestUser")
       .set({
           "devId": testDev,
+          "userId": "secondTestUser",
           "email": "paul.userTest@gmail.com",
           "wahoo_connected": true,
           "wahoo_access_token": "test_access_token",
@@ -62,7 +64,7 @@ describe("Check the Wahoo Disconnect Service works: ", () => {
 
     await admin.firestore()
         .collection("users")
-        .doc(testUser)
+        .doc(testDev+testUser)
         .collection("activities")
         .doc()
         .set({raw: {field1: "somedata"},
@@ -73,14 +75,15 @@ describe("Check the Wahoo Disconnect Service works: ", () => {
     // for this the test data needs to be 
     await admin.firestore()
     .collection("users")
-    .doc(testUser)
+    .doc(testDev+testUser)
     .set({
         "devId": testDev,
+        "userId": testUser,
         "email": "paul.userTest@gmail.com",});
 
     await admin.firestore()
     .collection("users")
-    .doc(testDev+":secondTestUser")
+    .doc(testDev+"secondTestUser")
     .delete();
 
     req = {
@@ -111,18 +114,19 @@ describe("Check the Wahoo Disconnect Service works: ", () => {
     // check the wahoo activities were deleted from the database only for this user
     const userDoc = await admin.firestore()
         .collection("users")
-        .doc(testUser)
+        .doc(testDev+testUser)
         .get();
       
     const activities = await admin.firestore()
         .collection("users")
-        .doc(testUser)
+        .doc(testDev+testUser)
         .collection("activities")
         .where("sanitised.data_source","==","wahoo")
         .get();
     
     const expectedUserResults = {
       "devId": testDev,
+      "userId": testUser,
       "email": "paul.userTest@gmail.com",
     };
     
@@ -136,7 +140,7 @@ describe("Check the Wahoo Disconnect Service works: ", () => {
 
     await admin.firestore()
     .collection("users")
-    .doc(testDev+":secondTestUser")
+    .doc(testDev+"secondTestUser")
     .delete();
 
     req = {
@@ -167,18 +171,19 @@ describe("Check the Wahoo Disconnect Service works: ", () => {
     // check the wahoo activities were deleted from the database only for this user
     const userDoc = await admin.firestore()
         .collection("users")
-        .doc(testUser)
+        .doc(testDev+testUser)
         .get();
       
     const activities = await admin.firestore()
         .collection("users")
-        .doc(testUser)
+        .doc(testDev+testUser)
         .collection("activities")
         .where("sanitised.data_source","==","wahoo")
         .get();
     
     const expectedUserResults = {
       "devId": testDev,
+      "userId": testUser,
       "email": "paul.userTest@gmail.com",
       "wahoo_connected": true,
       "wahoo_access_token": "test_access_token",
@@ -222,18 +227,19 @@ describe("Check the Wahoo Disconnect Service works: ", () => {
     // check the wahoo activities were deleted from the database only for this user
     const userDoc = await admin.firestore()
         .collection("users")
-        .doc(testUser)
+        .doc(testDev+testUser)
         .get();
       
     const activities = await admin.firestore()
         .collection("users")
-        .doc(testUser)
+        .doc(testDev+testUser)
         .collection("activities")
         .where("sanitised.data_source","==","wahoo")
         .get();
     
     const expectedUserResults = {
       "devId": testDev,
+      "userId": testUser,
       "email": "paul.userTest@gmail.com",
     };
     
@@ -247,7 +253,7 @@ describe("Check the Wahoo Disconnect Service works: ", () => {
       // set the expiry date for the token in the past
       await admin.firestore()
       .collection("users")
-      .doc(testUser)
+      .doc(testDev+testUser)
       .set({
           "wahoo_token_expires_at": tokenPastExpiryDate},
           {merge: true});
@@ -297,18 +303,19 @@ describe("Check the Wahoo Disconnect Service works: ", () => {
       //stubbedPost.calledOnceWith("postArgs");
       const userDoc = await admin.firestore()
           .collection("users")
-          .doc(testUser)
+          .doc(testDev+testUser)
           .get();
         
       const activities = await admin.firestore()
           .collection("users")
-          .doc(testUser)
+          .doc(testDev+testUser)
           .collection("activities")
           .where("sanitised.data_source","==","wahoo")
           .get();
       
       const expectedUserResults = {
         "devId": testDev,
+        "userId": testUser,
         "email": "paul.userTest@gmail.com",
       };
       

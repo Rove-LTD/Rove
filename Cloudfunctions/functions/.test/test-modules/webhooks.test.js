@@ -34,7 +34,7 @@ describe("Testing that the Webhooks work: ", () => {
   before ('set up the userIds in the test User doc', async () => {
       await admin.firestore()
       .collection("users")
-      .doc(testUser)
+      .doc(testDev+testUser)
       .set({
           "wahoo_user_id": "wahoo_test_user",
           "polar_user_id": "polar_test_user",
@@ -48,7 +48,7 @@ describe("Testing that the Webhooks work: ", () => {
 
       activityDocs = await admin.firestore()
           .collection("users")
-          .doc(testUser)
+          .doc(testDev+testUser)
           .collection("activities")
           .get();
       
@@ -76,7 +76,7 @@ describe("Testing that the Webhooks work: ", () => {
       //now check the database was updated correctly
      const testUserDocs = await admin.firestore()
      .collection("users")
-     .doc(testUser)
+     .doc(testDev+testUser)
      .collection("activities")
      .get();
 
@@ -177,7 +177,7 @@ describe("Testing that the Webhooks work: ", () => {
       //now check the database was updated correctly
      const testUserDocs = await admin.firestore()
      .collection("users")
-     .doc(testUser)
+     .doc(testDev+testUser)
      .collection("activities")
      .where("raw.id", "==", 1937529874)
      .get();
@@ -231,7 +231,7 @@ describe("Testing that the Webhooks work: ", () => {
       //now check the database was updated correctly
      const testUserDocs = await admin.firestore()
      .collection("users")
-     .doc(testUser)
+     .doc(testDev+testUser)
      .collection("activities")
      .where("raw.id", "==", 12345678987654321)
      .get();
@@ -293,7 +293,7 @@ describe("Testing that the Webhooks work: ", () => {
       //now check the database was updated correctly
      const testUserDocs = await admin.firestore()
      .collection("users")
-     .doc(testUser)
+     .doc(testDev+testUser)
      .collection("activities")
      .where("raw.activityId", "==", 7698241609)
      .get();

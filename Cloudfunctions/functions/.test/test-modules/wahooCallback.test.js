@@ -34,7 +34,7 @@ describe("Testing that the Wahoo callbacks work: ", () => {
     // reset the user doc before testing polar
     await admin.firestore()
       .collection("users")
-      .doc(testUser)
+      .doc(testDev+testUser)
       .set(devUserData);
   });
   it('wahoo callback should check userId and DevId and write the access tokens to the database...', async () => {
@@ -66,6 +66,7 @@ describe("Testing that the Wahoo callbacks work: ", () => {
       }
       const expectedTestUserDoc = {
           devId: testDev,
+          userId: testUser,
           email: devUserData.email,
           wahoo_access_token: 'test-wahoo-access-token',
           wahoo_refresh_token: 'test-wahoo-refresh-token',
@@ -98,7 +99,7 @@ describe("Testing that the Wahoo callbacks work: ", () => {
       //now check the database was updated correctly
       testUserDoc = await admin.firestore()
       .collection("users")
-      .doc(testUser)
+      .doc(testDev+testUser)
       .get();
       // check called with the right arguments
       accessCodeOptions =  {

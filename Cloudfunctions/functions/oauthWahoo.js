@@ -21,7 +21,7 @@ class OauthWahoo {
    * @param {String} devsUserTag
    * @param {String} provider
    */
-  setDevUser(devId, devsUserTag) {
+  setDevUser(devId, devsUserTag) {// just call userId
     this.devId = devId;
     this.userId = devsUserTag;
     this.status = {redirectUrl: false,
@@ -32,6 +32,12 @@ class OauthWahoo {
     this.error = false;
     this.errorMessage = "";
     this.redirectUrl = this.getRedirect();
+  }
+  /**
+   * @return {String} userDocId
+   */
+  get userDocId() {
+    return this.devId+this.userId;
   }
   /**
    *
@@ -129,7 +135,7 @@ class OauthWahoo {
       this.error = true;
       this.errorMessage =
         "Error: "+error+
-        "could not refresh access code for user: "+this.userId;
+        "could not refresh access code for user: "+this.userDocId;
       console.log(error);
       throw Error(this.errorMessage);
     }
@@ -143,7 +149,7 @@ class OauthWahoo {
    */
   async storeTokens() {
     // set tokens for userId doc.
-    const userRef = this.db.collection("users").doc(this.userId);
+    const userRef = this.db.collection("users").doc(this.userDocId);
     const wahooUserDoc = await userRef.get();
     const wahooUserId = wahooUserDoc.data()["wahoo_user_id"];
     const userQuery = await this.db.collection("users")
@@ -171,6 +177,7 @@ class OauthWahoo {
       "wahoo_refresh_token": this.accessCodeResponse["refresh_token"],
       "wahoo_connected": true,
       "devId": this.devId,
+      "userId": this.userId,
     };
   }
   /**
@@ -195,7 +202,7 @@ class OauthWahoo {
     const updates = {
       "wahoo_user_id": response["id"],
     };
-    const userRef = this.db.collection("users").doc(this.userId);
+    const userRef = this.db.collection("users").doc(this.userDocId);
     await userRef.set(updates, {merge: true});
     return;
   }
@@ -257,7 +264,7 @@ class OauthWahoo {
   async getUserToken(userDoc) {
     const userToken = userDoc.data()["wahoo_access_token"];
     this.devId = userDoc.data()["devId"];
-    this.userId = userDoc.id;
+    this.userId = userDoc.id; //userDoc.data()["userId"] => need to make sure this is set in the userDoc
 
     if (this.userId == undefined || this.devId == undefined) {
       throw (new Error("error: userId or DevId not set"));
