@@ -49,6 +49,7 @@ const strava = require("strava-v3");
       
       const expectedTestUserDoc = {
           devId: testDev,
+          userId: testUser,
           email: devUserData.email,
           strava_id: 12345678,
           strava_access_token: 'test-long-access-token',
@@ -76,7 +77,7 @@ const strava = require("strava-v3");
       //now check the database was updated correctly
       testUserDoc = await admin.firestore()
       .collection("users")
-      .doc(testUser)
+      .doc(testDev+testUser)
       .get();
 
       assert.deepEqual(testUserDoc.data(), expectedTestUserDoc);

@@ -33,9 +33,10 @@ const got = require('got');
   before(async () => {
     await admin.firestore()
         .collection("users")
-        .doc(testUser)
+        .doc(testDev+testUser)
         .set({
             "devId": testDev,
+            "userId": testUser,
             "email": "paul.userTest@gmail.com",
             "strava_connected": true,
             "strava_access_token": "4c68a65e19eb899b8f68aa21e760b074bf035a95",
@@ -45,7 +46,7 @@ const got = require('got');
 
     await admin.firestore()
         .collection("users")
-        .doc(testUser)
+        .doc(testDev+testUser)
         .collection("activities")
         .doc()
         .set({raw: {field1: "somedata"},
@@ -85,18 +86,19 @@ const got = require('got');
     // check the wahoo activities were deleted from the database only for this user
     const userDoc = await admin.firestore()
         .collection("users")
-        .doc(testUser)
+        .doc(testDev+testUser)
         .get();
       
     const activities = await admin.firestore()
         .collection("users")
-        .doc(testUser)
+        .doc(testDev+testUser)
         .collection("activities")
         .where("sanitised.data_source","==","strava")
         .get();
     
     const expectedUserResults = {
       "devId": testDev,
+      "userId": testUser,
       "email": "paul.userTest@gmail.com",
     };
     
@@ -135,18 +137,19 @@ const got = require('got');
     // check the wahoo activities were deleted from the database only for this user
     const userDoc = await admin.firestore()
         .collection("users")
-        .doc(testUser)
+        .doc(testDev+testUser)
         .get();
       
     const activities = await admin.firestore()
         .collection("users")
-        .doc(testUser)
+        .doc(testDev+testUser)
         .collection("activities")
         .where("sanitised.data_source","==","strava")
         .get();
     
     const expectedUserResults = {
       "devId": testDev,
+      "userId": testUser,
       "email": "paul.userTest@gmail.com",
     };
     

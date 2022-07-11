@@ -34,7 +34,7 @@ const request = require('request');
         // reset the user doc before testing polar
         await admin.firestore()
           .collection("users")
-          .doc(testUser)
+          .doc(testDev+testUser)
           .set(devUserData);
       });
       it('polar callback should report error if user already registered', async () => {
@@ -64,6 +64,7 @@ const request = require('request');
           const expected_expiry_date = Math.round(testDate/1000+461375999);
           const expectedTestUserDoc = {
               devId: testDev,
+              userId: testUser,
               email: devUserData.email,
               polar_access_token: 'test-polar-access-token',
               polar_token_type: 'bearer',
@@ -111,7 +112,7 @@ const request = require('request');
           //now check the database was updated correctly
           testUserDoc = await admin.firestore()
           .collection("users")
-          .doc(testUser)
+          .doc(testDev+testUser)
           .get();
 
           assert.deepEqual(testUserDoc.data(), expectedTestUserDoc);
@@ -164,6 +165,7 @@ const request = require('request');
           const expected_expiry_date = Math.round(testDate/1000+21600);
           const expectedTestUserDoc = {
               devId: testDev,
+              userId: testUser,
               email: devUserData.email,
               polar_access_token: 'test-polar-access-token',
               polar_token_type: 'bearer',
@@ -193,7 +195,7 @@ const request = require('request');
           //now check the database was updated correctly
           testUserDoc = await admin.firestore()
           .collection("users")
-          .doc(testUser)
+          .doc(testDev+testUser)
           .get();
 
           assert.deepEqual(testUserDoc.data(), expectedTestUserDoc);

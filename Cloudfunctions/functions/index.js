@@ -163,9 +163,10 @@ exports.disconnectService = functions.https.onRequest(async (req, res) => {
   }
   // now check the userId has been given
   if (userId != null) {
+    const userDocId = devId+userId;
     userDoc = await admin.firestore()
         .collection("users")
-        .doc(userId)
+        .doc(userDocId)
         .get();
 
     if (!userDoc.exists) {
@@ -434,10 +435,11 @@ async function sendToDeauthoriseWebhook(userDoc, provider, triesSoFar) {
   // retry if do not get 200 ok back
   const MaxRetries = 3;
   const devId = userDoc.data()["devId"];
+  const userId = userDoc.data()["userId"];
   const datastring = {
     provider: provider,
     status: "disconnected",
-    userId: userDoc.id,
+    userId: userId,
   };
   const developerDoc = await db.collection("developers").doc(devId).get();
   const endpoint = developerDoc.data()["deauthorise_endpoint"];
@@ -592,7 +594,7 @@ exports.garminWebhook = functions.https.onRequest(async (req, res) => {
       });
       // save raw and sanitised activites as a backup for each user
       userDocsList.forEach(async (userDoc)=>{
-        sanitisedActivity["userId"] = userDoc.id;
+        sanitisedActivity["userId"] = userDoc.data()["userId"];
         const activityDoc = await userDoc.ref
             .collection("activities")
             .doc()
@@ -612,6 +614,7 @@ exports.garminWebhook = functions.https.onRequest(async (req, res) => {
 });
 
 async function stravaStoreTokens(userId, devId, data, db) {
+  const userDocId = devId+userId;
   const parameters = {
     "strava_access_token": data["access_token"],
     "strava_refresh_token": data["refresh_token"],
@@ -619,9 +622,10 @@ async function stravaStoreTokens(userId, devId, data, db) {
     "strava_token_expires_in": data["expires_in"],
     "strava_connected": true,
     "devId": devId,
+    "userId": userId,
   };
   // set tokens for userId doc.
-  const userRef = db.collection("users").doc(userId);
+  const userRef = db.collection("users").doc(userDocId);
   await userRef.set(parameters, {merge: true});
   // assign userId for devId.
   // const devRef = db.collection("developers").doc(devId);
@@ -639,8 +643,9 @@ async function getStravaAthleteId(userId, devId, data, db) {
     "access_token": data["access_token"],
   };
   // set tokens for userId doc.
+  const userDocId = devId+userId;
   const athleteSummary = await stravaApi.athlete.get(parameters);
-  const userRef = db.collection("users").doc(userId);
+  const userRef = db.collection("users").doc(userDocId);
   await userRef.set({"strava_id": athleteSummary["id"]}, {merge: true});
   return;
 }
@@ -840,7 +845,8 @@ async function registerUserWithPolar(userId, devId, data, db) {
       const updates = {
         "polar_registration_date": JSON.parse(body)["registration-date"],
       };
-      const userRef = db.collection("users").doc(userId);
+      const userDocId = devId+userId;
+      const userRef = db.collection("users").doc(userDocId);
       await userRef.set(updates, {merge: true});
     } else if (response.statusCode == 409) {
       // user already registered
@@ -854,6 +860,7 @@ async function registerUserWithPolar(userId, devId, data, db) {
 
 async function polarStoreTokens(userId, devId, data, db) {
   const now = new Date();
+  const userDocId = devId+userId;
   const parameters = {
     "polar_access_token": data["access_token"],
     "polar_token_type": data["token_type"],
@@ -863,9 +870,10 @@ async function polarStoreTokens(userId, devId, data, db) {
     "polar_connected": true,
     "polar_user_id": data["x_user_id"],
     "devId": devId,
+    "userId": userId,
   };
-  // set tokens for userId doc.
-  const userRef = db.collection("users").doc(userId);
+  // set tokens for user doc.
+  const userRef = db.collection("users").doc(userDocId);
   await userRef.set(parameters, {merge: true});
   // assign userId for devId.
   // const devRef = db.collection("developers").doc(devId);
@@ -947,7 +955,7 @@ exports.stravaWebhook = functions.https.onRequest(async (request, response) => {
       } else {
         activity = await stravaApi.activities.get({"access_token": payloadAccessToken, "id": request.body.object_id});
         sanitisedActivity = filters.stravaSanitise([activity]);
-        sanitisedActivity[0]["userId"] = userDocRef.id;
+        sanitisedActivity[0]["userId"] = userDocRef.data()["userId"];
       }
     } else {
       // token in date, can get activities as required.
@@ -960,7 +968,7 @@ exports.stravaWebhook = functions.https.onRequest(async (request, response) => {
       } else {
         activity = await stravaApi.activities.get({"access_token": stravaAccessToken, "id": request.body.object_id});
         sanitisedActivity = filters.stravaSanitise([activity]);
-        sanitisedActivity[0]["userId"] = userDocRef.id;
+        sanitisedActivity[0]["userId"] = userDocRef.data()["userId"];
       }
     }
     // save to a doc
@@ -1028,7 +1036,7 @@ exports.wahooWebhook = functions.https.onRequest(async (request, response) => {
     }
     // save raw and sanitised activites as a backup for each user
     userDocsList.forEach(async (userDoc)=>{
-      sanitisedActivity["userId"] = userDoc.id;
+      sanitisedActivity["userId"] = userDoc.data()["userId"];
       const activityDoc = await userDoc.ref
           .collection("activities")
           .doc()
@@ -1091,7 +1099,7 @@ exports.polarWebhook = functions.https.onRequest(async (request, response) => {
       // write sanitised information and raw information to each user and then
       // send to developer
       userDocsList.forEach(async (userDoc)=>{
-        sanitisedActivity["userId"] = userDoc.id;
+        sanitisedActivity["userId"] = userDoc.data()["userId"];
         const activityDoc = await userDoc
             .ref.collection("activities")
             .doc()
@@ -1272,19 +1280,21 @@ async function oauthCallbackHandlerGarmin(oAuthCallback, db) {
     // console.log(data);
     const garminAccessToken = (data[1].split("&"))[0];
     const garminAccessTokenSecret = data[2];
+    const userDocId = devId+userId;
     const firestoreParameters = {
       "devId": devId,
+      "userId": userId,
       "garmin_access_token": garminAccessToken,
       "garmin_access_token_secret": garminAccessTokenSecret,
     };
-    await db.collection("users").doc(userId).set(firestoreParameters, {merge: true});
+    await db.collection("users").doc(userDocId).set(firestoreParameters, {merge: true});
     getGarminUserId(consumerSecret, garminAccessToken, garminAccessTokenSecret, devId, userId);
     return true;
   }
 }
 
-async function checkStravaTokens(userId, db) {
-  const tokens = await db.collection("users").doc(userId).get();
+async function checkStravaTokens(userDocId, db) {
+  const tokens = await db.collection("users").doc(userDocId).get();
   const expiry = tokens.data().strava_token_expires_at;
   const now = new Date().getTime()/1000; // current epoch in seconds
   if (now > expiry) {
@@ -1293,7 +1303,7 @@ async function checkStravaTokens(userId, db) {
     return false;
   }
 }
-async function stravaTokenStorage(docId, data, db) {
+async function stravaTokenStorage(userDocId, data, db) {
   const parameters = {
     "strava_access_token": data["access_token"],
     "strava_refresh_token": data["refresh_token"],
@@ -1301,7 +1311,7 @@ async function stravaTokenStorage(docId, data, db) {
     "strava_token_expires_in": data["expires_in"],
     "strava_connected": true,
   };
-  await db.collection("users").doc(docId).set(parameters, {merge: true});
+  await db.collection("users").doc(userDocId).set(parameters, {merge: true});
 }
 async function getGarminUserId(consumerSecret, garminAccessToken, garminAccessTokenSecret, devId, userId) {
   const oauthNonce = crypto.randomBytes(10).toString("hex");

@@ -34,7 +34,7 @@ describe("Testing that the Garmin callbacks work: ", () => {
     // reset the user doc before testing polar
     await admin.firestore()
       .collection("users")
-      .doc(testUser)
+      .doc(testDev+testUser)
       .set(devUserData);
   });
   it('Garmin callback should check userId and DevId and write the access tokens to the database...', async () => {
@@ -55,6 +55,7 @@ describe("Testing that the Garmin callbacks work: ", () => {
 
       const expectedTestUserDoc = {
           devId: testDev,
+          userId: testUser,
           email: devUserData.email,
           garmin_access_token: "garmin-access-token",
           garmin_access_token_secret: "garmin-test-secret",
@@ -82,7 +83,7 @@ describe("Testing that the Garmin callbacks work: ", () => {
       //now check the database was updated correctly
       testUserDoc = await admin.firestore()
       .collection("users")
-      .doc(testUser)
+      .doc(testDev+testUser)
       .get();
       // cant check called with the right arguments as signiture is always different
 

@@ -33,9 +33,10 @@ const got = require('got');
   before(async () => {
     await admin.firestore()
         .collection("users")
-        .doc(testUser)
+        .doc(testDev+testUser)
         .set({
             "devId": testDev,
+            "userId": testUser,
             "email": "paul.userTest@gmail.com",
             "polar_connected": true,
             "polar_access_token": "test_access_token",
@@ -46,7 +47,7 @@ const got = require('got');
 
     await admin.firestore()
         .collection("users")
-        .doc(testUser)
+        .doc(testDev+testUser)
         .collection("activities")
         .doc()
         .set({raw: {field1: "somedata"},
@@ -82,18 +83,19 @@ const got = require('got');
     // check the wahoo activities were deleted from the database only for this user
     const userDoc = await admin.firestore()
         .collection("users")
-        .doc(testUser)
+        .doc(testDev+testUser)
         .get();
       
     const activities = await admin.firestore()
         .collection("users")
-        .doc(testUser)
+        .doc(testDev+testUser)
         .collection("activities")
         .where("sanitised.data_source","==","polar")
         .get();
     
     const expectedUserResults = {
       "devId": testDev,
+      "userId": testUser,
       "email": "paul.userTest@gmail.com",
       "polar_connected": true,
       "polar_access_token": "test_access_token",
@@ -138,18 +140,19 @@ const got = require('got');
     // check the polar activities were deleted from the database only for this user
     const userDoc = await admin.firestore()
         .collection("users")
-        .doc(testUser)
+        .doc(testDev+testUser)
         .get();
       
     const activities = await admin.firestore()
         .collection("users")
-        .doc(testUser)
+        .doc(testDev+testUser)
         .collection("activities")
         .where("sanitised.data_source","==","polar")
         .get();
     
     const expectedUserResults = {
       "devId": testDev,
+      "userId": testUser,
       "email": "paul.userTest@gmail.com",
     };
     

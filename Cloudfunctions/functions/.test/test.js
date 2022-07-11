@@ -35,7 +35,7 @@ describe('ROVE full integration test scripts', () => {
         
         await admin.firestore()
             .collection("users")
-            .doc(testUser)
+            .doc(testDev+testUser)
             .set(devUserData);
                 
     }); //end before
