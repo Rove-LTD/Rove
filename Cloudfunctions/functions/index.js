@@ -33,11 +33,10 @@ const oauthWahoo = new OauthWahoo(configurations, db);
 // tokens stored under userId
 
 exports.redirectPage = functions.https.onRequest(async (req, res) => {
+  const transactionId = (Url.parse(req.url, true).query)["transactionId"];
   const provider = (Url.parse(req.url, true).query)["provider"];
   const devId = (Url.parse(req.url, true).query)["devId"];
-  const userId = (Url.parse(req.url, true).query)["userId"];
-  const devKey = (Url.parse(req.url, true).query)["devKey"];
-  const params = "?devId="+devId+"&userId="+userId+"&devKey="+devKey+"&provider="+provider+"&isRedirect=true";
+  const params = "?transactionId="+transactionId+"&isRedirect=true";
   fs.readFile("redirectPage.html", function(err, html) {
     if (err) {
       throw err;
@@ -55,12 +54,26 @@ exports.connectService = functions.https.onRequest(async (req, res) => {
   // authenticate.
   // in form:  us-central1-rove.cloudfunctions.net/connectService?
   // userId=***&devId=***&devKey=***&provider=***
-  const provider = (Url.parse(req.url, true).query)["provider"];
-  const devId = (Url.parse(req.url, true).query)["devId"];
-  const userId = (Url.parse(req.url, true).query)["userId"];
-  const devKey = (Url.parse(req.url, true).query)["devKey"];
-
+  const transactionId = (Url.parse(req.url, true).query)["transactionId"];
   const isRedirect = (Url.parse(req.url, true).query)["isRedirect"];
+  let provider;
+  let devId;
+  let userId;
+  let devKey;
+  if (transactionId == undefined) {
+    provider = (Url.parse(req.url, true).query)["provider"];
+    devId = (Url.parse(req.url, true).query)["devId"];
+    userId = (Url.parse(req.url, true).query)["userId"];
+    devKey = (Url.parse(req.url, true).query)["devKey"];
+  } else {
+    const transactionDoc = await db.collection("transactions")
+        .doc(transactionId).get();
+    provider = transactionDoc.data()["provider"];
+    devId = transactionDoc.data()["devId"];
+    userId = transactionDoc.data()["userId"];
+    devKey = transactionDoc.data()["devKey"];
+    transactionDoc.ref.set({"userClickedRedirectAt": new Date().toISOString()});
+  }
 
   let url = "";
 
@@ -102,7 +115,18 @@ exports.connectService = functions.https.onRequest(async (req, res) => {
   }
 
   if (isRedirect == undefined) {
-    res.redirect("../redirectPage?provider="+provider+"&devId="+devId+"&userId="+userId+"&devKey="+devKey);
+    // transaction is valid - create a transaction record and then
+    // call redirect with the transaction id
+    const transaction = {
+      provider: provider,
+      devId: devId,
+      userId: userId,
+      devKey: devKey,
+      started: new Date().toISOString(),
+    };
+    const transactionRef = db.collection("transactions").doc();
+    await transactionRef.set(transaction);
+    res.redirect("../redirectPage?transactionId="+transactionRef.id+"&provider="+provider+"&devId="+devId);
     return;
   }
 
