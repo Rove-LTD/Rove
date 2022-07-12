@@ -98,13 +98,14 @@ describe("Testing that the developer can call API to connectService() and receiv
       await myFunctions.connectService(req, res);
   });
   
-  it.only('should get a properly formatted strava redirect url...', async () => {
+  it('should get a properly formatted strava redirect url...', async () => {
       // set the request object with the correct provider, developerId and userId
       const req = {url: 'https//test.com/?devId='+testDev+'&userId='+testUser+'&devKey=test-key&provider=strava&isRedirect=false'};
       // set the assertions for the expected response object
       const res = {
           redirect: (url) => {
-              assert.equal(url, "https://www.strava.com/oauth/authorize?client_id=72486&response_type=code&redirect_uri=https://us-central1-rove-26.cloudfunctions.net/stravaCallback?userId="+testUser+":"+testDev+"&approval_prompt=force&scope=profile:read_all,activity:read_all");
+              assert.include(url, "https://www.strava.com/oauth/authorize?client_id=72486&response_type=code&redirect_uri=https://us-central1-rove-26.cloudfunctions.net/stravaCallback?transactionId=");
+              assert.include(url, "&approval_prompt=force&scope=profile:read_all,activity:read_all");
               recievedStravaUrl = url;
           },
       }
@@ -120,8 +121,7 @@ describe("Testing that the developer can call API to connectService() and receiv
           redirect: (url) => {
               assert.include(url, "https://connect.garmin.com/oauthConfirm?oauth_token=");
               assert.include(url, "&oauth_callback=https://us-central1-rove-26.cloudfunctions.net/oauthCallbackHandlerGarmin?oauth_token_secret=");
-              assert.include(url, "-userId="+testUser);
-              assert.include(url, "-devId="+testDev);
+              assert.include(url, "-transactionId=");
               recievedGarminUrl = url;
           },
       }
@@ -151,7 +151,7 @@ describe("Testing that the developer can call API to connectService() and receiv
       // set the assertions for the expected response object
       const res = {
         redirect: (url) => {
-              assert.equal(url, "https://flow.polar.com/oauth2/authorization?client_id=654623e7-7191-4cfe-aab5-0bc24785fdee&response_type=code&redirect_uri=https://us-central1-rove-26.cloudfunctions.net/polarCallback&scope=accesslink.read_all&state="+testUser+":"+testDev);
+              assert.include(url, "https://flow.polar.com/oauth2/authorization?client_id=654623e7-7191-4cfe-aab5-0bc24785fdee&response_type=code&redirect_uri=https://us-central1-rove-26.cloudfunctions.net/polarCallback&scope=accesslink.read_all&state=");
               recievedPolarUrl = url;
           },
       }
@@ -169,7 +169,6 @@ describe("Testing that the developer can call API to connectService() and receiv
               assert.include(url, "https://api.wahooligan.com/oauth/authorize?");
               assert.include(url, "client_id=iA2JRS_dBkikcb0uEnHPtb6IDt1vDYNbityEEhp801I");
               assert.include(url, "&redirect_uri=https://us-central1-rove-26.cloudfunctions.net/wahooCallback?state=");
-              assert.include(url, "state="+testUser+":"+testDev);
           },
       }
 
@@ -184,6 +183,7 @@ describe("Testing that the developer can call API to connectService() and receiv
         redirect: (url) => {
               assert.include(url,"../redirectPage?transactionId=");
               assert.include(url, "&provider=wahoo");
+              assert.include(url, "&devId="+testDev);
           },
       }
 

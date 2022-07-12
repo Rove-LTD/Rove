@@ -36,6 +36,16 @@ describe("Testing that the Wahoo callbacks work: ", () => {
       .collection("users")
       .doc(testDev+testUser)
       .set(devUserData);
+    
+    await admin.firestore()
+        .collection("transactions")
+        .doc("wahooTestTransaction")
+        .set({
+          "provider": "wahoo",
+          "userId": testUser,
+          "devId": testDev,
+          "redirectUrl": null,
+        });
   });
   it('wahoo callback should check userId and DevId and write the access tokens to the database...', async () => {
       //set up the stubbed response to mimic wahoo's response when
@@ -83,7 +93,7 @@ describe("Testing that the Wahoo callbacks work: ", () => {
       stubbedget.onFirstCall().returns(responseObject2);
 
       // set the request object with the correct provider, developerId and userId
-      const req = {url: "https://us-central1-rove-26.cloudfunctions.net/wahooCallback?state="+testUser+":"+testDev+"&code=testcode",
+      const req = {url: "https://us-central1-rove-26.cloudfunctions.net/wahooCallback?transactionId=wahooTestTransaction&code=testcode",
       debug: true
       };
       const res = {

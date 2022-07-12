@@ -50,39 +50,33 @@ exports.redirectPage = functions.https.onRequest(async (req, res) => {
 });
 
 exports.connectService = functions.https.onRequest(async (req, res) => {
-  // Dev calls this service with parameters: user-id, dev-id, and service to
-  // authenticate.
+  // Dev calls this service with parameters: user-id, dev-id, service to
+  // authenticate and URL to redirect to at the end of the call
   // in form:  us-central1-rove.cloudfunctions.net/connectService?
   // userId=***&devId=***&devKey=***&provider=***
-  const transactionId = (Url.parse(req.url, true).query)["transactionId"];
+  let transactionId = (Url.parse(req.url, true).query)["transactionId"];
   const isRedirect = (Url.parse(req.url, true).query)["isRedirect"];
-  let provider;
-  let devId;
-  let userId;
-  let devKey;
+  let parameters = {};
+  let redirectUrl;
   if (transactionId == undefined) {
-    provider = (Url.parse(req.url, true).query)["provider"];
-    devId = (Url.parse(req.url, true).query)["devId"];
-    userId = (Url.parse(req.url, true).query)["userId"];
-    devKey = (Url.parse(req.url, true).query)["devKey"];
+    parameters.provider = (Url.parse(req.url, true).query)["provider"];
+    parameters.devId = (Url.parse(req.url, true).query)["devId"];
+    parameters.userId = (Url.parse(req.url, true).query)["userId"];
+    parameters.devKey = (Url.parse(req.url, true).query)["devKey"] || null;
+    parameters.redirectUrl = (Url.parse(req.url, true).query)["redirectUrl"] || null;
   } else {
-    const transactionDoc = await db.collection("transactions")
-        .doc(transactionId).get();
-    provider = transactionDoc.data()["provider"];
-    devId = transactionDoc.data()["devId"];
-    userId = transactionDoc.data()["userId"];
-    devKey = transactionDoc.data()["devKey"];
-    transactionDoc.ref.set({"userClickedRedirectAt": new Date().toISOString()});
+    parameters = await getParametersFromTransactionId(transactionId);
+    updateTransactionWithStatus(transactionId, "userClickedAuthButton");
   }
 
   let url = "";
 
   // parameter checks
   // first check developer exists and the devKey matches
-  if (devId != null) {
+  if (parameters.devId != null) {
     const devDoc = await admin.firestore()
         .collection("developers")
-        .doc(devId)
+        .doc(parameters.devId)
         .get();
 
     if (!devDoc.exists) {
@@ -92,7 +86,7 @@ exports.connectService = functions.https.onRequest(async (req, res) => {
       res.send(url);
       return;
     }
-    if (devDoc.data().devKey != devKey|| devKey == null) {
+    if (devDoc.data().devKey != parameters.devKey|| parameters.devKey == null) {
       url =
          "error: the developerId was badly formatted, missing or not authorised";
       res.status(400);
@@ -107,39 +101,40 @@ exports.connectService = functions.https.onRequest(async (req, res) => {
   }
 
   // now check the userId has been given
-  if (userId == null) {
+  if (parameters.userId == null) {
     url = "error: the userId parameter is missing";
     res.status(400);
     res.send(url);
     return;
   }
-
+  const providers = ["strava", "garmin", "polar", "wahoo"];
+  if (providers.includes(parameters.provider) == false) {
+    url = "error: the provider was badly formatted, missing or not supported";
+    res.status(400);
+    res.send(url);
+    return;
+  }
+  // now all parameters are checked create transaction
+  // if one not already created
+  if (transactionId == undefined) {
+    transactionId = await createTransactionWithParameters(parameters);
+  }
+  // redirect to splash page if isRedirect is not set
   if (isRedirect == undefined) {
-    // transaction is valid - create a transaction record and then
     // call redirect with the transaction id
-    const transaction = {
-      provider: provider,
-      devId: devId,
-      userId: userId,
-      devKey: devKey,
-      started: new Date().toISOString(),
-    };
-    const transactionRef = db.collection("transactions").doc();
-    await transactionRef.set(transaction);
-    res.redirect("../redirectPage?transactionId="+transactionRef.id+"&provider="+provider+"&devId="+devId);
+    res.redirect("../redirectPage?transactionId="+transactionId+"&provider="+parameters.provider+"&devId="+parameters.devId);
     return;
   }
 
-  // stravaOauth componses the request url for the user.
-  if (provider == "strava") {
-    url = await stravaOauth(req);
-  } else if (provider == "garmin") {
-    // TODO: Make the garmin request async and returnable.
-    url = await garminOauth(req);
-  } else if (provider == "polar") {
-    url = await polarOauth(req);
-  } else if (provider == "wahoo") {
-    url = await wahooOauth(req);
+  // compose the redirect url for the user.
+  if (parameters.provider == "strava") {
+    url = await stravaOauth(parameters, transactionId);
+  } else if (parameters.provider == "garmin") {
+    url = await garminOauth(parameters, transactionId);
+  } else if (parameters.provider == "polar") {
+    url = polarOauth(parameters, transactionId);
+  } else if (parameters.provider == "wahoo") {
+    url = wahooOauth(parameters, transactionId);
   } else {
     // the request was badly formatted with incorrect provider parameter
     url = "error: the provider was badly formatted, missing or not supported";
@@ -507,10 +502,11 @@ exports.oauthCallbackHandlerGarmin = functions.https
     .onRequest(async (req, res) => {
       const oAuthCallback = Url.parse(req.url, true).query;
       const oauthTokenSecret = oAuthCallback["oauth_token_secret"].split("-");
-      const userId = oauthTokenSecret[1].split("=")[1];
-      const devId = oauthTokenSecret[2].split("=")[1];
-      await oauthCallbackHandlerGarmin(oAuthCallback, db);
-      const urlString = await successDevCallback(db, devId, userId, "garmin");
+      const transactionId = oauthTokenSecret[1].split("=")[1];
+      const transactionData =
+          await getParametersFromTransactionId(transactionId);
+      await oauthCallbackHandlerGarmin(oAuthCallback, transactionData);
+      const urlString = await successDevCallback(transactionData);
       res.redirect(urlString);
       res.send("THANKS, YOU CAN NOW CLOSE THIS WINDOW");
     }),
@@ -519,10 +515,11 @@ exports.oauthCallbackHandlerGarmin = functions.https
 exports.stravaCallback = functions.https.onRequest(async (req, res) => {
   // this comes from strava
   // create authorization for user completing oAuth flow.
-  const oAuthCallback = (Url.parse(req.url, true).query)["userId"].split(":");
+  const transactionId = (Url.parse(req.url, true).query)["transactionId"];
+  const transactionData = await getParametersFromTransactionId(transactionId);
   const code = (Url.parse(req.url, true).query)["code"];
-  const userId = oAuthCallback[0];
-  const devId = oAuthCallback[1];
+  const userId = transactionData.userId;
+  const devId = transactionData.devId;
   if (userId == null || devId == null || code == null) {
     res.send(
         "Error: missing userId of DevId in callback: an unexpected "+
@@ -551,7 +548,7 @@ exports.stravaCallback = functions.https.onRequest(async (req, res) => {
       // send a response now to endpoint for devId confirming success
       // await sendDevSuccess(devId); //TODO: create dev success post.
       // userResponse = "Some good redirect.";
-      const urlString = await successDevCallback(db, devId, userId, "strava");
+      const urlString = await successDevCallback(transactionData);
       res.redirect(urlString);
     } else {
       res.send("Error: "+response.statusCode+
@@ -564,11 +561,25 @@ exports.stravaCallback = functions.https.onRequest(async (req, res) => {
   });
 });
 
-async function successDevCallback(db, devId, userId, provider) {
-  const devDoc = await db.collection("developers").doc(devId).get();
-  let urlString = devDoc.data()["callbackURL"];
-  urlString = urlString+"?userId="+userId+"&provider="+provider;
-  // console.log("callback URL: "+ urlString);
+async function successDevCallback(transactionData) {
+  let urlString = "";
+  if (transactionData.redirectUrl == null) {
+    // if no redirectUrl provided use default from developer
+    // document and append userId and provider
+    const devDoc = await db.collection("developers").doc(transactionData.devId).get();
+    urlString = devDoc.data()["callbackURL"];
+    urlString = urlString+"?userId="+transactionData.userId+"&provider="+transactionData.provider;
+  } else {
+    // use the url string that was sent with the API call
+    const url = transactionData.redirectUrl.split("?");
+    const baseUrl = url[0];
+    if (url.length > 1) {
+      urlString = transactionData.redirectUrl+"&";
+    } else {
+      urlString = transactionData.redirectUrl+"?";
+    }
+    urlString = urlString+"userId="+transactionData.userId+"&provider="+transactionData.provider;
+  }
   return urlString;
 }
 exports.garminDeregistrations = functions.https.onRequest(async (req, res) => {
@@ -674,18 +685,15 @@ async function getStravaAthleteId(userId, devId, data, db) {
   return;
 }
 
-function stravaOauth(req) {
-  const appQuery = Url.parse(req.url, true).query;
-  const userId = appQuery["userId"];
-  const devId = appQuery["devId"];
+function stravaOauth(transactionData, transactionId) {
+  const userId = transactionData.userId;
+  const devId = transactionData.devId;
   // add parameters from user onto the callback redirect.
   const parameters = {
     client_id: configurations[devId]["stravaClientId"],
     response_type: "code",
-    redirect_uri: "https://us-central1-rove-26.cloudfunctions.net/stravaCallback?userId="+
-       userId+
-       ":"+
-       devId,
+    redirect_uri: "https://us-central1-rove-26.cloudfunctions.net/stravaCallback?transactionId="+
+      transactionId,
     approval_prompt: "force",
     scope: "profile:read_all,activity:read_all",
   };
@@ -706,10 +714,10 @@ function stravaOauth(req) {
   return (baseUrl + encodedParameters);
 }
 
-async function garminOauth(req) {
+async function garminOauth(transactionData, transactionId) {
   const oauthNonce = crypto.randomBytes(10).toString("hex");
-  const userId = (Url.parse(req.url, true).query)["userId"];
-  const devId = (Url.parse(req.url, true).query)["devId"];
+  const userId = transactionData.userId;
+  const devId = transactionData.devId;
   // console.log(oauth_nonce);
   const oauthTimestamp = Math.round(new Date().getTime()/1000);
   // console.log(oauth_timestamp);
@@ -753,7 +761,7 @@ async function garminOauth(req) {
   const callbackURL =
      "oauth_callback=https://us-central1-rove-26.cloudfunctions.net/oauthCallbackHandlerGarmin?" +
      oauthTokens[1] +
-         "-userId=" + userId + "-devId=" + devId;
+         "-transactionId=" + transactionId;
   // append to oauth garmin url.
   const _url = "https://connect.garmin.com/oauthConfirm?" +
    oauthTokens[0] +
@@ -762,17 +770,16 @@ async function garminOauth(req) {
   return _url;
 }
 
-function polarOauth(req) {
-  const appQuery = Url.parse(req.url, true).query;
-  const userId = appQuery["userId"];
-  const devId = appQuery["devId"];
+function polarOauth(transactionData, transactionId) {
+  const userId = transactionData.userId;
+  const devId =transactionData.devId;
   // add parameters from user onto the callback redirect.
   const parameters = {
     client_id: configurations[devId]["polarClientId"],
     response_type: "code",
     redirect_uri: "https://us-central1-rove-26.cloudfunctions.net/polarCallback",
     scope: "accesslink.read_all",
-    state: userId+":"+devId,
+    state: transactionId,
   };
 
   let encodedParameters = "";
@@ -796,11 +803,12 @@ function polarOauth(req) {
 exports.polarCallback = functions.https.onRequest(async (req, res) => {
   // this comes from polar
   // create authorization for user completing oAuth flow.
-  const oAuthCallback = (Url.parse(req.url, true).query)["state"].split(":");
+  const transactionId = (Url.parse(req.url, true).query)["state"];
+  const transactionData = await getParametersFromTransactionId(transactionId);
   const code = (Url.parse(req.url, true).query)["code"];
   const error = (Url.parse(req.url, true).query)["error"];
-  const userId = oAuthCallback[0];
-  const devId = oAuthCallback[1];
+  const userId = transactionData.userId;
+  const devId = transactionData.devId;
   if (error != null) {
     res.send("Error: "+error+" please try again");
     return;
@@ -837,7 +845,7 @@ exports.polarCallback = functions.https.onRequest(async (req, res) => {
       // send a response now to endpoint for devId confirming success
       // await sendDevSuccess(devId); //TODO: create dev success post.
       // userResponse = "Some good redirect.";
-      const urlString = await successDevCallback(db, devId, userId, "polar");
+      const urlString = await successDevCallback(transactionData);
       res.redirect(urlString);
     } else {
       res.send("Error: "+response.statusCode+":"+body.toString()+" please close this window and try again");
@@ -905,25 +913,25 @@ async function polarStoreTokens(userId, devId, data, db) {
   return;
 }
 
-function wahooOauth(req) {
-  const appQuery = Url.parse(req.url, true).query;
-  const userId = appQuery["userId"];
-  const devId = appQuery["devId"];
+function wahooOauth(transactionData, transactionId) {
+  const userId = transactionData.userId;
+  const devId =transactionData.devId;
   // add parameters from user onto the callback redirect.
-  oauthWahoo.setDevUser(devId, userId);
+  oauthWahoo.setDevUser(transactionData, transactionId);
   return oauthWahoo.redirectUrl;
 }
 
 exports.wahooCallback = functions.https.onRequest(async (req, res) => {
   // recreate the oauth object that is managing the Oauth flow
-  // console.log(req.url);
+  const transactionId = (Url.parse(req.url, true).query)["transactionId"];
+  const transactionData = await getParametersFromTransactionId(transactionId);
   const data = Url.parse(req.url, true).query;
-  oauthWahoo.fromCallbackData(data);
+  oauthWahoo.fromCallbackData(data, transactionData);
   if (oauthWahoo.status.gotCode) {
     await oauthWahoo.getAndSaveAccessCodes();
   }
   if (!oauthWahoo.error) {
-    const urlString = await successDevCallback(db, oauthWahoo.devId, oauthWahoo.userId, "wahoo");
+    const urlString = await successDevCallback(transactionData);
     res.redirect(urlString);
     res.send("your authorization was successful please close this window");
   } else {
@@ -1270,14 +1278,14 @@ async function polarWebhookUtility(devId, action, webhookId) {
   return response;
 }
 
-async function oauthCallbackHandlerGarmin(oAuthCallback, db) {
+async function oauthCallbackHandlerGarmin(oAuthCallback, transactionData) {
   const oauthNonce = crypto.randomBytes(10).toString("hex");
   // console.log(oauth_nonce);
   const oauthTimestamp = Math.round(new Date().getTime()/1000);
   // console.log(oauth_timestamp);
   let oauthTokenSecret = oAuthCallback["oauth_token_secret"].split("-");
-  const userId = oauthTokenSecret[1].split("=")[1];
-  const devId = oauthTokenSecret[2].split("=")[1];
+  const userId = transactionData.userId;
+  const devId = transactionData.devId;
   const consumerSecret = configurations[devId]["consumerSecret"];
   oauthTokenSecret = oauthTokenSecret[0];
   const parameters = {
@@ -1382,6 +1390,38 @@ async function getGarminUserId(consumerSecret, garminAccessToken, garminAccessTo
   }
   return;
 }
+
+async function getParametersFromTransactionId(transactionId) {
+  const transactionDoc =
+      await db.collection("transactions")
+          .doc(transactionId)
+          .get();
+  const parameters = {
+    devId: transactionDoc.data()["devId"],
+    userId: transactionDoc.data()["userId"],
+    devKey: transactionDoc.data()["devKey"],
+    provider: transactionDoc.data()["provider"],
+    redirectUrl: transactionDoc.data()["redirectUrl"],
+  };
+  return parameters;
+}
+
+async function updateTransactionWithStatus(transactionId, status) {
+  const now = new Date().toISOString;
+  db.collection("transactions")
+      .doc(transactionId)
+      .set({status: now}, {merge: true});
+}
+
+async function createTransactionWithParameters(parameters) {
+  parameters.receivedConnectServiceCall = new Date().toISOString();
+  const transactionRef = db.collection("transactions").doc();
+  await transactionRef
+      .set(parameters);
+  return transactionRef.id;
+}
+
+
 // Utility Functions and Constants -----------------------------
 const waitTime = {0: 0, 1: 1, 2: 10, 3: 60}; // time in minutes
 const wait = (mins) => new Promise((resolve) => setTimeout(resolve, mins*60*1000));
