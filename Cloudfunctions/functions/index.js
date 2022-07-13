@@ -656,7 +656,7 @@ function stravaOauth(req) {
   const devId = appQuery["devId"];
   // add parameters from user onto the callback redirect.
   const parameters = {
-    client_id: configurations[devId]["stravaClientId"],
+    client_id: configurations["paulsTestDev"]["stravaClientId"],
     response_type: "code",
     redirect_uri: "https://us-central1-rove-26.cloudfunctions.net/stravaCallback?userId="+
        userId+
@@ -1197,6 +1197,28 @@ exports.polarWebhookSetup = functions.https.onRequest(async (req, res) => {
     res.send("error: "+response.statusCode+response.body);
   }
   return;
+});
+
+exports.createNotionLink = functions.https.onRequest(async (req, res) => {
+  const databaseId = (Url.parse(req.url, true).query)["databaseId"];
+  const provider = (Url.parse(req.url, true).query)["provider"];
+  const key = (Url.parse(req.url, true).query)["key"];
+  // we need to create a new dev and a new user linked to this dev for the notion user.
+  // the endpoint of notion should be written in.
+
+  // create dev.
+  await db.collection("developers").doc("notion"+databaseId).set({"callbackURL": "https://notion.so",
+    "deauthorize_endpoint": "",
+    "devKey": key,
+    "email": "",
+    "endpoint": databaseId});
+  // create user
+  await db.collection("users").doc("notion"+databaseId).set({
+    "devId": databaseId,
+    "userId": "notion",
+  });
+  // redirec the user to connectService with new dev and user credentials.
+  res.redirect("/connectService?userId=notion"+databaseId+"&devId=notion"+databaseId+"&provider="+provider+"&devKey="+key);
 });
 
 async function polarWebhookUtility(devId, action, webhookId) {

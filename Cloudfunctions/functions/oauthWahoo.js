@@ -264,7 +264,7 @@ class OauthWahoo {
   async getUserToken(userDoc) {
     const userToken = userDoc.data()["wahoo_access_token"];
     this.devId = userDoc.data()["devId"];
-    this.userId = userDoc.id; //userDoc.data()["userId"] => need to make sure this is set in the userDoc
+    this.userId = userDoc.id; // userDoc.data()["userId"] => need to make sure this is set in the userDoc
 
     if (this.userId == undefined || this.devId == undefined) {
       throw (new Error("error: userId or DevId not set"));
