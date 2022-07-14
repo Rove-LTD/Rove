@@ -9,6 +9,7 @@ const chai = require('chai');
 const assert = chai.assert;
 // Sinon is a library used for mocking or verifying function calls in JavaScript.
 const sinon = require('sinon');
+const fs = require("fs");
 // -------------------END COMMON TEST SETUP---------------------------//
 
 // -----------INITIALISE THE ROVE TEST PARAMETERS----------------------------//
@@ -32,7 +33,7 @@ const got = require('got');
 describe("Testing that the developer can call API to connectService() and receive redirection URL: ", () => {
   it('should get error if the provider is not correct...', async () => {
       // set the request object with the incorrect provider, correct developerId, devKey and userId
-      const req = {url: 'https//test.com/?devId='+testDev+'&userId='+testUser+'&devKey=test-key&provider=badFormat&isRedirect=true'};
+      const req = {url: 'https//test.com/?devId='+testDev+'&userId='+testUser+'&devKey=test-key&provider=badFormat'};
       // set the assertions for the expected response object
       const res = {
           send: (url) => {
@@ -68,7 +69,7 @@ describe("Testing that the developer can call API to connectService() and receiv
 
   it("Should get an error if the developer is not correctly authorised", async () => {
       // set the request object with the correct provider, developerId and userId
-      const req = {url: 'https//test.com/?devId='+testDev+'&userId='+testUser+'&devKey=wrong-key&provider=wahoo&isRedirect=false'};
+      const req = {url: 'https//test.com/?devId='+testDev+'&userId='+testUser+'&devKey=wrong-key&provider=wahoo'};
       // set the assertions for the expected response object
       const res = {
           send: (url) => {
@@ -84,7 +85,7 @@ describe("Testing that the developer can call API to connectService() and receiv
 
   it("Should get an error if the userId is not provided", async () => {
       // set the request object with the correct provider, developerId and userId
-      const req = {url: 'https//test.com/?devId='+testDev+'&devKey=test-key&provider=wahoo&isRedirect=false'};
+      const req = {url: 'https//test.com/?devId='+testDev+'&devKey=test-key&provider=wahoo'};
       // set the assertions for the expected response object
       const res = {
           send: (url) => {
@@ -98,15 +99,46 @@ describe("Testing that the developer can call API to connectService() and receiv
       await myFunctions.connectService(req, res);
   });
   
-  it('should get a properly formatted strava redirect url...', async () => {
+  it.only('should get a properly formatted strava redirect url...', async () => {
       // set the request object with the correct provider, developerId and userId
-      const req = {url: 'https//test.com/?devId='+testDev+'&userId='+testUser+'&devKey=test-key&provider=strava&isRedirect=false'};
+      let htmlPage;
+      await fs.readFile("redirectPage.html", function(err, html) {
+        htmlPage = html;
+        if (err) {
+          throw err;
+        };
+      });
+      const req = {url: 'https//test.com/?devId='+testDev+'&userId='+testUser+'&devKey=test-key&provider=strava&isRedirect=true'};
       // set the assertions for the expected response object
       const res = {
-          redirect: (url) => {
+          redirect: async (url) => {
+              let count = 0;
+              const res2 = {
+                writeHead: (code, content)=>{
+                  // could put assert here
+                  assert.equal(code, 200);
+                  assert.deepEqual(content, {"Content-Type": "text/html"} );
+                },
+                write: (html) => {
+                  if (count == 0) {
+                    assert.deepEqual(html, htmlPage);
+                  } else if (count == 1) {
+                    assert.equal(html, "<h2 style='text-align: center;font-family:DM Sans'>Data integrations provider for "+testDev+"</h2>\
+                    <h2 style='text-align: center;font-family:DM Sans'>To authenticate ");
+                  } else {
+                    assert.equal(count, 1, "write should only be called twice");
+                  }
+                  count = count+1;
+                  //could put an assert here
+                },
+                end: ()=>{
+                  //could put an assert here
+                }
+              }
               assert.include(url, "https://www.strava.com/oauth/authorize?client_id=72486&response_type=code&redirect_uri=https://us-central1-rove-26.cloudfunctions.net/stravaCallback?transactionId=");
               assert.include(url, "&approval_prompt=force&scope=profile:read_all,activity:read_all");
               recievedStravaUrl = url;
+              await myFunctions.redirectPage(res.redirect, res2)
           },
       }
 
@@ -115,7 +147,7 @@ describe("Testing that the developer can call API to connectService() and receiv
   })
   it('should get a properly formatted garmin redirect url...', async () => {
       // set the request object with the correct provider, developerId and userId
-      const req = {url: 'https//test.com/?devId='+testDev+'&userId='+testUser+'&devKey=test-key&provider=garmin&isRedirect=false'};
+      const req = {url: 'https//test.com/?devId='+testDev+'&userId='+testUser+'&devKey=test-key&provider=garmin&isRedirect=true'};
       // set the assertions for the expected response object
       const res = {
           redirect: (url) => {
@@ -147,7 +179,7 @@ describe("Testing that the developer can call API to connectService() and receiv
   })
   it('should get a properly formatted polar redirect url...', async () => {
       // set the request object with the correct provider, developerId and userId
-      const req = {url: 'https//test.com/?devId='+testDev+'&userId='+testUser+'&devKey=test-key&provider=polar&isRedirect=false'};
+      const req = {url: 'https//test.com/?devId='+testDev+'&userId='+testUser+'&devKey=test-key&provider=polar&isRedirect=true'};
       // set the assertions for the expected response object
       const res = {
         redirect: (url) => {
@@ -162,7 +194,7 @@ describe("Testing that the developer can call API to connectService() and receiv
 
   it('should get a properly formatted wahoo redirect url...', async () => {
       // set the request object with the correct provider, developerId and userId
-      const req = {url: 'https//test.com/?devId='+testDev+'&userId='+testUser+'&devKey=test-key&provider=wahoo&isRedirect=false'};
+      const req = {url: 'https//test.com/?devId='+testDev+'&userId='+testUser+'&devKey=test-key&provider=wahoo&isRedirect=true'};
       // set the assertions for the expected response object
       const res = {
         redirect: (url) => {
@@ -175,7 +207,7 @@ describe("Testing that the developer can call API to connectService() and receiv
       await myFunctions.connectService(req, res);
 
   })
-  it('should go to the redirect function whe isRedirect=undefined', async () => {
+  it('should go to the redirect function when isRedirect=undefined', async () => {
       // set the request object with the correct provider, developerId and userId
       const req = {url: 'https//test.com/?devId='+testDev+'&userId='+testUser+'&devKey=test-key&provider=wahoo'};
       // set the assertions for the expected response object
@@ -184,6 +216,7 @@ describe("Testing that the developer can call API to connectService() and receiv
               assert.include(url,"../redirectPage?transactionId=");
               assert.include(url, "&provider=wahoo");
               assert.include(url, "&devId="+testDev);
+              assert.include(url, "?transactionId=");
           },
       }
 
