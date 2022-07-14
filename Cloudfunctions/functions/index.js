@@ -923,7 +923,7 @@ function wahooOauth(transactionData, transactionId) {
 
 exports.wahooCallback = functions.https.onRequest(async (req, res) => {
   // recreate the oauth object that is managing the Oauth flow
-  const transactionId = (Url.parse(req.url, true).query)["transactionId"];
+  const transactionId = (Url.parse(req.url, true).query)["state"];
   const transactionData = await getParametersFromTransactionId(transactionId);
   const data = Url.parse(req.url, true).query;
   oauthWahoo.fromCallbackData(data, transactionData);

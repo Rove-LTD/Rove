@@ -93,7 +93,7 @@ describe("Testing that the Wahoo callbacks work: ", () => {
       stubbedget.onFirstCall().returns(responseObject2);
 
       // set the request object with the correct provider, developerId and userId
-      const req = {url: "https://us-central1-rove-26.cloudfunctions.net/wahooCallback?transactionId=wahooTestTransaction&code=testcode",
+      const req = {url: "https://us-central1-rove-26.cloudfunctions.net/wahooCallback?state=wahooTestTransaction&code=testcode",
       debug: true
       };
       const res = {
