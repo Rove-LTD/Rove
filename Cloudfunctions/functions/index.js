@@ -1407,7 +1407,7 @@ async function getParametersFromTransactionId(transactionId) {
 }
 
 async function updateTransactionWithStatus(transactionId, status) {
-  const now = new Date().toISOString;
+  const now = new Date().toISOString();
   db.collection("transactions")
       .doc(transactionId)
       .set({status: now}, {merge: true});
