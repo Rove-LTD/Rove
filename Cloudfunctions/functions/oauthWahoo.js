@@ -49,6 +49,7 @@ class OauthWahoo {
     this.errorMessage = "";
     this.devId = transactionData.devId;
     this.userId = transactionData.userId;
+    this.transactionId = data["state"];
     this.code = data["code"];
     this.error = data["error"] || false;
     this.status = {redirectUrl: true,
@@ -215,7 +216,7 @@ class OauthWahoo {
     "&client_id="+this.config[this.devId]["whaooClientId"]+
     "&client_secret="+this.config[this.devId]["wahooSecret"]+
     "&grant_type=authorization_code"+
-    "&redirect_uri="+this.callbackBaseUrl+"?state="+this.userId+":"+this.devId;
+    "&redirect_uri="+this.callbackBaseUrl+"?state="+this.transactionId;
     return {
       url: "https://api.wahooligan.com/oauth/token?"+_dataString,
       method: "POST",
