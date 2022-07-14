@@ -1220,9 +1220,9 @@ exports.createNotionLink = functions.https.onRequest(async (req, res) => {
   // we need to create a new dev and a new user linked to this dev for the notion user.
   // the endpoint of notion should be written in.
 
-  // create dev.
+  // create dev with secret_lookup notionUeser.
   await db.collection("developers").doc("notion"+databaseId).set({
-    "secret_lookup": "paulsTestDev",
+    "secret_lookup": "notionUser",
     "callbackURL": "https://notion.so",
     "deauthorize_endpoint": "",
     "devKey": key,
