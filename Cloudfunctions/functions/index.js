@@ -929,7 +929,6 @@ exports.wahooCallback = functions.https.onRequest(async (req, res) => {
   if (!oauthWahoo.error) {
     const urlString = await successDevCallback(transactionData);
     res.redirect(urlString);
-    res.send("your authorization was successful please close this window");
   } else {
     res.send(oauthWahoo.errorMessage);
   }

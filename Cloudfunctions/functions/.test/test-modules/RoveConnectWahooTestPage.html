@@ -1,0 +1,24 @@
+
+<h5>Sign in with Wahoo!</h5>
+<img src="https://cdn.road.cc/sites/default/files/styles/amp_metadata_content_image_min_696px_wide/public/wahoo-white-black-cmyk-logo.jpg"
+ style="width:300px;" onclick="signUpWith('wahoo')">
+
+
+<h5>Error Message</h5>
+<body error>errorMessage goes here</body>
+
+<script type="text/javascript">
+	const testDev = "paulsWahooTestDev";
+	const devKey = "test-key"
+	const testUser = "wahooTestUser";
+	const redirectUrl = "https://bbc.co.uk"
+    function signUpWith(provider) {
+    	window.location.href = 
+    	'https://us-central1-rovetest-beea7.cloudfunctions.net/connectService?userId='
+    	+testUser+
+    	'&devId='+testDev+
+    	'&devKey='+devKey+
+    	'&provider='+provider+
+    	'&redirectUrl='+redirectUrl;
+    }
+</script>

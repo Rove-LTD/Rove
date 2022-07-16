@@ -33,7 +33,7 @@ const request = require('request');
 const strava = require("strava-v3");
 //-------------TEST 2--- Test Callbacks from Strava-------
  describe("Describe what this set of tests check: ", () => {
-  it('describe what this specific test does', async () => {
+  it('make ConnectServices Call to ', async () => {
 
   })
   it('describe what this specific test does', async () => {

@@ -11,10 +11,14 @@ class OauthWahoo {
   * @param {Object} firebaseDb
   */
   constructor(config, firebaseDb) {
+    const GCproject = process.env.GCLOUD_PROJECT;
     this.db = firebaseDb;
     this.config = config;
     this.provider = "wahoo";
-    this.callbackBaseUrl = "https://us-central1-rove-26.cloudfunctions.net/wahooCallback";
+    this.oauthCallbackUrl =
+        "https://us-central1-"+
+        GCproject+
+        ".cloudfunctions.net/wahooCallback";
   }
   /**
    * @param {Object} transactionData
@@ -80,7 +84,7 @@ class OauthWahoo {
     const parameters = {
       client_id: this.clientId,
       response_type: "code",
-      redirect_uri: this.callbackBaseUrl+"?state="+this.state,
+      redirect_uri: this.oauthCallbackUrl+"?state="+this.state,
       scope: this.scope,
     };
 
@@ -101,7 +105,7 @@ class OauthWahoo {
   }
   /**
   *
-  * @return {void}
+  * @return {Future}
   */
   async getAndSaveAccessCodes() {
     let response = {};
@@ -216,7 +220,7 @@ class OauthWahoo {
     "&client_id="+this.config[this.devId]["whaooClientId"]+
     "&client_secret="+this.config[this.devId]["wahooSecret"]+
     "&grant_type=authorization_code"+
-    "&redirect_uri="+this.callbackBaseUrl+"?state="+this.transactionId;
+    "&redirect_uri="+this.oauthCallbackUrl+"?state="+this.transactionId;
     return {
       url: "https://api.wahooligan.com/oauth/token?"+_dataString,
       method: "POST",
