@@ -7,6 +7,7 @@
 // extended with plugins.
 const chai = require('chai');
 const assert = chai.assert;
+
 // Sinon is a library used for mocking or verifying function calls in JavaScript.
 const sinon = require('sinon');
 // -------------------END COMMON TEST SETUP---------------------------//
@@ -40,14 +41,14 @@ describe('ROVE full integration test scripts', () => {
                 
     }); //end before
 
-    after(async () => {
+    after(() => {
         // Do cleanup tasks and
         // restore any stubbed functions
         sinon.restore();
         test.cleanup();
     }); //end after
 
-    afterEach(async() => {
+    afterEach(() => {
       sinon.restore();
     })
 

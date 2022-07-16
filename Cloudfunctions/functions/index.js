@@ -32,21 +32,17 @@ const oauthWahoo = new OauthWahoo(configurations, db);
 // we recieve auth token from strava to stravaCallBack.
 // tokens stored under userId
 
-exports.redirectPage = functions.https.onRequest(async (req, res) => {
+exports.redirectPage = functions.https.onRequest( async (req, res) => {
   const transactionId = (Url.parse(req.url, true).query)["transactionId"];
   const provider = (Url.parse(req.url, true).query)["provider"];
   const devId = (Url.parse(req.url, true).query)["devId"];
   const params = "?transactionId="+transactionId+"&isRedirect=true";
-  fs.readFile("redirectPage.html", function(err, html) {
-    if (err) {
-      throw err;
-    }
-    res.writeHead(200, {"Content-Type": "text/html"});
-    res.write(html);
-    res.write("<h2 style='text-align: center;font-family:DM Sans'>Data integrations provider for "+devId+"</h2>\
-    <h2 style='text-align: center;font-family:DM Sans'>To authenticate "+provider+" click <a href=/connectService"+params+">here</a></h2>");
-    res.end();
-  });
+  const html = await fs.promises.readFile("redirectPage.html");
+  res.writeHead(200, {"Content-Type": "text/html"});
+  res.write(html);
+  res.write("<h2 style='text-align: center;font-family:DM Sans'>Data integrations provider for "+devId+"</h2>\
+  <h2 style='text-align: center;font-family:DM Sans'>To authenticate "+provider+" click <a href=/connectService"+params+">here</a></h2>");
+  res.end();
 });
 
 exports.connectService = functions.https.onRequest(async (req, res) => {

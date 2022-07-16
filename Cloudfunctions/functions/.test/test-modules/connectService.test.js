@@ -7,9 +7,10 @@
 // extended with plugins.
 const chai = require('chai');
 const assert = chai.assert;
+const fs = require('fs');
+
 // Sinon is a library used for mocking or verifying function calls in JavaScript.
 const sinon = require('sinon');
-const fs = require("fs");
 // -------------------END COMMON TEST SETUP---------------------------//
 
 // -----------INITIALISE THE ROVE TEST PARAMETERS----------------------------//
@@ -27,6 +28,7 @@ const myFunctions = require('../../index.js');
 // testing processes - these have to have the same constant
 // name as in the function we are testing
 const got = require('got');
+const { doesNotMatch } = require('assert');
 // ------------------------END OF STUB FUNCTIONS----------------------------//
 
 // --------------START CONNECTSERVICE TESTS----------------------------------//
@@ -99,46 +101,15 @@ describe("Testing that the developer can call API to connectService() and receiv
       await myFunctions.connectService(req, res);
   });
   
-  it.only('should get a properly formatted strava redirect url...', async () => {
+  it('should get a properly formatted strava redirect url...', async () => {
       // set the request object with the correct provider, developerId and userId
-      let htmlPage;
-      await fs.readFile("redirectPage.html", function(err, html) {
-        htmlPage = html;
-        if (err) {
-          throw err;
-        };
-      });
       const req = {url: 'https//test.com/?devId='+testDev+'&userId='+testUser+'&devKey=test-key&provider=strava&isRedirect=true'};
       // set the assertions for the expected response object
       const res = {
           redirect: async (url) => {
-              let count = 0;
-              const res2 = {
-                writeHead: (code, content)=>{
-                  // could put assert here
-                  assert.equal(code, 200);
-                  assert.deepEqual(content, {"Content-Type": "text/html"} );
-                },
-                write: (html) => {
-                  if (count == 0) {
-                    assert.deepEqual(html, htmlPage);
-                  } else if (count == 1) {
-                    assert.equal(html, "<h2 style='text-align: center;font-family:DM Sans'>Data integrations provider for "+testDev+"</h2>\
-                    <h2 style='text-align: center;font-family:DM Sans'>To authenticate ");
-                  } else {
-                    assert.equal(count, 1, "write should only be called twice");
-                  }
-                  count = count+1;
-                  //could put an assert here
-                },
-                end: ()=>{
-                  //could put an assert here
-                }
-              }
               assert.include(url, "https://www.strava.com/oauth/authorize?client_id=72486&response_type=code&redirect_uri=https://us-central1-rove-26.cloudfunctions.net/stravaCallback?transactionId=");
               assert.include(url, "&approval_prompt=force&scope=profile:read_all,activity:read_all");
               recievedStravaUrl = url;
-              await myFunctions.redirectPage(res.redirect, res2)
           },
       }
 
@@ -224,8 +195,11 @@ describe("Testing that the developer can call API to connectService() and receiv
 
   })
   it('the redirect function should send the HTML page needed', async () => {
+    let count = 0;
+    const htmlPage = await fs.promises.readFile("redirectPage.html");
+
     // set the request object with the correct provider, developerId and userId
-    const req = {url: 'https//test.com/?devId='+testDev+'&userId='+testUser+'&devKey=test-key&provider=wahoo'};
+    const req = {url: 'https//test.com/?transactionId=testTransactionId&devId='+testDev+'&devKey=test-key&provider=wahoo'};
     // set the assertions for the expected response object
     const res = {
       writeHead: (code, content)=>{
@@ -234,7 +208,15 @@ describe("Testing that the developer can call API to connectService() and receiv
         assert.deepEqual(content, {"Content-Type": "text/html"} );
       },
       write: (html) => {
-        //could put an assert here
+        if (count == 0) { // first time write is called
+          assert.deepEqual(html, htmlPage);
+        } else if (count == 1) { // second time write is called
+          assert.equal(html, "<h2 style='text-align: center;font-family:DM Sans'>Data integrations provider for "+testDev+"</h2>\
+  <h2 style='text-align: center;font-family:DM Sans'>To authenticate wahoo click <a href=/connectService?transactionId=testTransactionId&isRedirect=true>here</a></h2>");
+        } else {
+          assert.equal(count, 1, "write should only be called twice");
+        }
+        count = count+1;
       },
       end: ()=>{
         //could put an assert here
@@ -242,6 +224,5 @@ describe("Testing that the developer can call API to connectService() and receiv
     }
 
     await myFunctions.redirectPage(req, res);
-
-})
+  });
 });

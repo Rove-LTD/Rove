@@ -47,7 +47,7 @@ describe("Testing that the Wahoo callbacks work: ", () => {
           "redirectUrl": null,
         });
   });
-  it.only('wahoo callback should check userId and DevId and write the access tokens to the database...', async () => {
+  it('wahoo callback should check userId and DevId and write the access tokens to the database...', async () => {
       //set up the stubbed response to mimic wahoo's response when
       //called with the code to get the token
       const responseObject1 = {
