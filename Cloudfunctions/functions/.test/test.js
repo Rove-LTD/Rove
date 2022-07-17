@@ -16,8 +16,12 @@ const testParameters = require('./testParameters.json');
 const firebaseConfig = testParameters.firebaseConfig;
 const testUser = testParameters.testUser
 const testDev = testParameters.testDev
+const testNotionUser = testParameters.testNotionUser
+const testNotionDev = testParameters.testNotionDev
 const devTestData = testParameters.devTestData
 const devUserData = testParameters.devUserData
+const devTestNotionData = testParameters.devTestNotionData
+const devUserNotionData = testParameters.devUserNotionData
 const test = require('firebase-functions-test')(firebaseConfig, testParameters.testKeyFile);
 const admin = require("firebase-admin");
 // -----------END INITIALISE ROVE TEST PARAMETERS----------------------------//
@@ -32,11 +36,21 @@ describe('ROVE full integration test scripts', () => {
             .collection("developers")
             .doc(testDev)
             .set(devTestData);
+
+            await admin.firestore()
+            .collection("developers")
+            .doc(testNotionDev)
+            .set(devTestNotionData);
         
         await admin.firestore()
             .collection("users")
             .doc(testDev+testUser)
             .set(devUserData);
+    
+        await admin.firestore()
+            .collection("users")
+            .doc(testNotionDev+testNotionUser)
+            .set(devUserNotionData);
                 
     }); //end before
 
@@ -62,6 +76,7 @@ describe('ROVE full integration test scripts', () => {
     require ('./test-modules/wahooDisconnect.test.js');
     require ('./test-modules/stravaDisconnect.test.js');
     require ('./test-modules/polarDisconnect.test.js');
+    require ('./test-modules/notion.test.js');
 });
 // require ('./test-modules/index.test.js');
 // require ('./test-modules/utility.test.js');

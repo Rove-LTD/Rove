@@ -19,6 +19,7 @@ const OauthWahoo = require("./oauthWahoo");
 const contentsOfDotEnvFile = require("./config.json");
 const filters = require("./data-filter");
 const fs = require("fs");
+const notion = require("./notion");
 
 const configurations = contentsOfDotEnvFile["config"];
 // find a way to decrypt and encrypt this information
@@ -1146,37 +1147,43 @@ async function sendToDeveloper(userDoc,
   const datastring = {"sanitised": sanitisedActivity, "raw": activity};
   const developerDoc = await db.collection("developers").doc(devId).get();
   const endpoint = developerDoc.data()["endpoint"];
-  if (endpoint == undefined || endpoint == null) {
+  const userData = userDoc.data();
+  // check if the user is from notion.
+  if (userData["userId"] == "notion") {
+    notion.sendToNotionEndpoint(endpoint, developerDoc, sanitisedActivity);
+  } else {
+    if (endpoint == undefined || endpoint == null) {
     // cannot send to developer as endpoint does not exist
-    console.log("Cannot send webhook payload to "+devId+" endpoint not provided");
-    return;
-  }
-  const options = {
-    method: "POST",
-    url: endpoint,
-    headers: {
-      "Accept": "application/json",
-      "Content-type": "application/json",
-    },
-    body: JSON.stringify(datastring),
-  };
-  const response = await got.post(options);
-  if (response.statusCode == 200) {
+      console.log("Cannot send webhook payload to "+devId+" endpoint not provided");
+      return;
+    }
+    const options = {
+      method: "POST",
+      url: endpoint,
+      headers: {
+        "Accept": "application/json",
+        "Content-type": "application/json",
+      },
+      body: JSON.stringify(datastring),
+    };
+    const response = await got.post(options);
+    if (response.statusCode == 200) {
     // the developer accepted the information TODO
     /*
      userDoc.ref
          .collection("activities")
          .doc(activityDoc)
          .set({status: "sent", timestamp: new Date()}, {merge: true}); */
-  } else {
-    // call the retry functionality and increment the retry counter
-    if (triesSoFar <= MaxRetries) {
-      console.log("retrying sending to developer");
-      wait(waitTime[triesSoFar]);
-      sendToDeveloper(userDoc, sanitisedActivity, activity, activityDoc, triesSoFar+1);
     } else {
+    // call the retry functionality and increment the retry counter
+      if (triesSoFar <= MaxRetries) {
+        console.log("retrying sending to developer");
+        wait(waitTime[triesSoFar]);
+        sendToDeveloper(userDoc, sanitisedActivity, activity, activityDoc, triesSoFar+1);
+      } else {
       // max retries email developer
-      console.log("max retries on sending to developer reached - fail");
+        console.log("max retries on sending to developer reached - fail");
+      }
     }
   }
 }
