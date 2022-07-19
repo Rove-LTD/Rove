@@ -1023,7 +1023,7 @@ exports.stravaWebhook = functions.https.onRequest(async (request, response) => {
       }
     }
     // save to a doc
-    const activityDoc = await userDocRef.ref.collection("activities").doc();
+    const activityDoc = userDocRef.ref.collection("activities").doc();
     await activityDoc.set({"raw": activity, "sanitised": sanitisedActivity[0]});
     // Send the information to an endpoint specified by the dev registered to a user.
     response.status(200);
@@ -1093,7 +1093,7 @@ exports.wahooWebhook = functions.https.onRequest(async (request, response) => {
       // being written incorrectly in this loop during async
       // firebase writes.
       const localSanitisedActivity = JSON.parse(JSON.stringify(sanitisedActivity));
-      const activityDoc = await userDoc.ref
+      const activityDoc = userDoc.ref
           .collection("activities")
           .doc();
       await activityDoc.set({"sanitised": localSanitisedActivity, "raw": request.body});
@@ -1160,7 +1160,7 @@ exports.polarWebhook = functions.https.onRequest(async (request, response) => {
         // being written incorrectly in this loop during async
         // firebase writes.
         const localSanitisedActivity = JSON.parse(JSON.stringify(sanitisedActivity));
-        const activityDoc = await userDoc
+        const activityDoc = userDoc
             .ref.collection("activities")
             .doc();
         await activityDoc.set({"sanitised": localSanitisedActivity, "raw": activity});
