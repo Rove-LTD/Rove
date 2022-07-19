@@ -36,6 +36,16 @@ describe("Testing that the Garmin callbacks work: ", () => {
       .collection("users")
       .doc(testDev+testUser)
       .set(devUserData);
+
+    await admin.firestore()
+    .collection("transactions")
+    .doc("garminTestTransaction")
+    .set({
+      "provider": "garmin",
+      "userId": testUser,
+      "devId": testDev,
+      "redirectUrl": "https://redirectedURI?state=withMyState",
+    });
   });
   it('Garmin callback should check userId and DevId and write the access tokens to the database...', async () => {
       //set up the stubbed response to mimic polar's response when called with the
@@ -66,7 +76,7 @@ describe("Testing that the Garmin callbacks work: ", () => {
       sinon.stub(got, "get").returns(responseObject2);
 
       // set the request object with the correct provider, developerId and userId
-      const req = {url: "https://us-central1-rove-26.cloudfunctions.net/wahooCallback?oauth_token_secret=testcode-userId="+testUser+"-devId="+testDev+"&oauth_verifier=test-verifyer&oauth_token=test-token",
+      const req = {url: "https://us-central1-rove-26.cloudfunctions.net/oauthCallbackHandlerGarmin?oauth_token_secret=testcode-transactionId=garminTestTransaction&oauth_verifier=test-verifyer&oauth_token=test-token",
           debug: true
       };
 
@@ -75,7 +85,7 @@ describe("Testing that the Garmin callbacks work: ", () => {
               assert.equal(text, "THANKS, YOU CAN NOW CLOSE THIS WINDOW")
           },
           redirect: (url) => {
-            assert.equal(url, "https://paulsTest.com/callbackURL?userId="+testUser+"&provider=garmin");
+            assert.equal(url, "https://redirectedURI?state=withMyState&userId="+testUser+"&provider=garmin");
           },
       }
       await myFunctions.oauthCallbackHandlerGarmin(req, res);

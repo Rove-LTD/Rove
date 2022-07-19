@@ -31,6 +31,17 @@ const request = require('request');
 const strava = require("strava-v3");
 //-------------TEST 2--- Test Callbacks from Strava-------
  describe("Testing that the strava callbacks work: ", () => {
+  before(async ()=>{
+    await admin.firestore()
+        .collection("transactions")
+        .doc("stravaTestTransaction")
+        .set({
+          "provider": "strava",
+          "userId": testUser,
+          "devId": testDev,
+          "redirectUrl": null,
+        });
+  })
   it('strava callback should check userId and DevId and write the access tokens to the database...', async () => {
       //set up the stubbed response to mimic strava's response when called with the
       //code to get the token
@@ -63,7 +74,7 @@ const strava = require("strava-v3");
       sinon.stub(strava.athlete, "get").returns({id: 12345678});
 
       // set the request object with the correct provider, developerId and userId
-      const req = {url: "https://us-central1-rove-26.cloudfunctions.net/stravaCallback?userId="+testUser+":"+testDev+"&code=testcode&approval_prompt=force&scope=profile:read_all,activity:read_all"};
+      const req = {url: "https://us-central1-rove-26.cloudfunctions.net/stravaCallback?transactionId=stravaTestTransaction&code=testcode&approval_prompt=force&scope=profile:read_all,activity:read_all"};
       const res = {
           send: (text) => {
               assert.equal(text, "your authorization was successful please close this window")

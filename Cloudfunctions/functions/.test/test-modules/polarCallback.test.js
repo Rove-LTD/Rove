@@ -36,6 +36,17 @@ const request = require('request');
           .collection("users")
           .doc(testDev+testUser)
           .set(devUserData);
+
+
+        await admin.firestore()
+        .collection("transactions")
+        .doc("polarTestTransaction")
+        .set({
+          "provider": "polar",
+          "userId": testUser,
+          "devId": testDev,
+          "redirectUrl": null,
+        });
       });
       it('polar callback should report error if user already registered', async () => {
           //set up the stubbed response to mimic polar's response when called with the
@@ -98,7 +109,7 @@ const request = require('request');
           stubbedcall.onSecondCall().yields(null, responseObject2, JSON.stringify(responseBody2));
 
           // set the request object with the correct provider, developerId and userId
-          const req = {url: "https://us-central1-rove-26.cloudfunctions.net/polarCallback?state="+testUser+":"+testDev+"&code=testcode"};
+          const req = {url: "https://us-central1-rove-26.cloudfunctions.net/polarCallback?state=polarTestTransaction&code=testcode"};
           const res = {
               send: (text) => {
                   assert.equal(text, "your authorization was successful please close this window: you are already registered with Polar - there is no need to re-register")
@@ -181,7 +192,7 @@ const request = require('request');
           stubbedcall.onSecondCall().yields(null, responseObject2, JSON.stringify(responseBody2));
 
           // set the request object with the correct provider, developerId and userId
-          const req = {url: "https://us-central1-rove-26.cloudfunctions.net/polarCallback?state="+testUser+":"+testDev+"&code=testcode"};
+          const req = {url: "https://us-central1-rove-26.cloudfunctions.net/polarCallback?state=polarTestTransaction&code=testcode"};
           const res = {
               send: (text) => {
                   assert.equal(text, "your authorization was successful please close this window: ")

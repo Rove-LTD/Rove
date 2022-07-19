@@ -17,13 +17,13 @@ class OauthWahoo {
     this.callbackBaseUrl = "https://us-central1-rove-26.cloudfunctions.net/wahooCallback";
   }
   /**
-   * @param {String} devId
-   * @param {String} devsUserTag
-   * @param {String} provider
+   * @param {Object} transactionData
+   * @param {String} transactionId
    */
-  setDevUser(devId, devsUserTag) {// just call userId
-    this.devId = devId;
-    this.userId = devsUserTag;
+  setDevUser(transactionData, transactionId) {// just call userId
+    this.devId = transactionData.devId;
+    this.userId = transactionData.userId;
+    this.transactionId = transactionId;
     this.status = {redirectUrl: false,
       gotCode: false,
       gotAccessToken: false,
@@ -42,13 +42,14 @@ class OauthWahoo {
   /**
    *
    * @param {Object} data - the parsed JSON body returned from the provider
+   * @param {Object} transactionData
    */
-  fromCallbackData(data) {
+  fromCallbackData(data, transactionData) {
     this.error = false;
     this.errorMessage = "";
-    const _state = data["state"].split(":");
-    this.devId = _state[1];
-    this.userId = _state[0];
+    this.devId = transactionData.devId;
+    this.userId = transactionData.userId;
+    this.transactionId = data["state"];
     this.code = data["code"];
     this.error = data["error"] || false;
     this.status = {redirectUrl: true,
@@ -73,7 +74,7 @@ class OauthWahoo {
     this.clientId = this.config[this.devId]["whaooClientId"];
     this.clientSecret = this.config[this.devId]["wahooSecret"];
     this.scope = "email%20user_read%20workouts_read%20offline_data";
-    this.state = this.userId+":"+this.devId;
+    this.state = this.transactionId;
     this.baseUrl = "https://api.wahooligan.com/oauth/authorize?";
 
     const parameters = {
@@ -215,7 +216,7 @@ class OauthWahoo {
     "&client_id="+this.config[this.devId]["whaooClientId"]+
     "&client_secret="+this.config[this.devId]["wahooSecret"]+
     "&grant_type=authorization_code"+
-    "&redirect_uri="+this.callbackBaseUrl+"?state="+this.userId+":"+this.devId;
+    "&redirect_uri="+this.callbackBaseUrl+"?state="+this.transactionId;
     return {
       url: "https://api.wahooligan.com/oauth/token?"+_dataString,
       method: "POST",
