@@ -1228,7 +1228,7 @@ exports.createNotionLink = functions.https.onRequest(async (req, res) => {
   // the endpoint of notion should be written in.
 
   // create dev with secret_lookup notionUeser.
-  await db.collection("developers").doc("notion"+databaseId).set({
+  await db.collection("developers").doc(databaseId).set({
     "secret_lookup": "notionUser",
     "callbackURL": "https://notion.so",
     "deauthorize_endpoint": "",
@@ -1236,12 +1236,12 @@ exports.createNotionLink = functions.https.onRequest(async (req, res) => {
     "email": "",
     "endpoint": databaseId});
   // create user
-  await db.collection("users").doc("notion"+databaseId).set({
+  await db.collection("users").doc(databaseId+"notion").set({
     "devId": databaseId,
     "userId": "notion",
   });
   // redirec the user to connectService with new dev and user credentials.
-  res.redirect("/connectService?userId=notion"+databaseId+"&devId=notion"+databaseId+"&provider="+provider+"&devKey="+key);
+  res.redirect("/connectService?userId="+databaseId+"notion"+"&devId="+databaseId+"&provider="+provider+"&devKey="+key);
 });
 
 async function polarWebhookUtility(devId, action, webhookId) {
