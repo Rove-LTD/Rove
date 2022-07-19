@@ -128,9 +128,9 @@ exports.connectService = functions.https.onRequest(async (req, res) => {
   } else if (parameters.provider == "garmin") {
     url = await garminOauth(parameters, transactionId);
   } else if (parameters.provider == "polar") {
-    url = polarOauth(parameters, transactionId);
+    url = await polarOauth(parameters, transactionId);
   } else if (parameters.provider == "wahoo") {
-    url = wahooOauth(parameters, transactionId);
+    url = await wahooOauth(parameters, transactionId);
   } else {
     // the request was badly formatted with incorrect provider parameter
     url = "error: the provider was badly formatted, missing or not supported";
@@ -266,13 +266,14 @@ exports.disconnectService = functions.https.onRequest(async (req, res) => {
   return;
 });
 
-async function deleteStravaActivity(userDoc, webhookCall, devId, webhookCall) {
+async function deleteStravaActivity(userDoc, callbackBaseUrl, webhookCall) {
+  const devId = await userDoc.data()["devId"];
   const secretLookup = await db.collection("developers").doc(devId).get();
   const lookup = await secretLookup.data()["secret_lookup"];
   stravaApi.config({
     "client_id": configurations[lookup]["stravaClientId"],
     "client_secret": configurations[lookup]["stravaClientSecret"],
-    "redirect_uri": "https://us-central1-rove-26.cloudfunctions.net/stravaCallback",
+    "redirect_uri": callbackBaseUrl+"/stravaCallback",
   });
   // delete activities
   // check if this is the last user with this stravaId and this is not a call from the webhook
@@ -930,11 +931,11 @@ async function polarStoreTokens(userId, devId, data, db) {
   return;
 }
 
-function wahooOauth(transactionData, transactionId) {
+async function wahooOauth(transactionData, transactionId) {
   const userId = transactionData.userId;
   const devId = transactionData.devId;
   // add parameters from user onto the callback redirect.
-  oauthWahoo.setDevUser(transactionData, transactionId);
+  await oauthWahoo.setDevUser(transactionData, transactionId);
   return oauthWahoo.redirectUrl;
 }
 
@@ -943,7 +944,7 @@ exports.wahooCallback = functions.https.onRequest(async (req, res) => {
   const transactionId = (Url.parse(req.url, true).query)["state"];
   const transactionData = await getParametersFromTransactionId(transactionId);
   const data = Url.parse(req.url, true).query;
-  oauthWahoo.fromCallbackData(data, transactionData);
+  await oauthWahoo.fromCallbackData(data, transactionData);
   if (oauthWahoo.status.gotCode) {
     await oauthWahoo.getAndSaveAccessCodes();
   }
@@ -1213,11 +1214,9 @@ async function sendToDeveloper(userDoc,
     const response = await got.post(options);
     if (response.statusCode == 200) {
     // the developer accepted the information TODO
-    /*
-     userDoc.ref
-         .collection("activities")
-         .doc(activityDoc)
-         .set({status: "sent", timestamp: new Date().toISOString()}, {merge: true}); */
+      activityDoc
+          .set({status: "sent", timestamp: new Date().toISOString()},
+              {merge: true});
     } else {
     // call the retry functionality and increment the retry counter
       if (triesSoFar <= MaxRetries) {

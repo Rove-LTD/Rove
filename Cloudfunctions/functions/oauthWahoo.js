@@ -23,10 +23,12 @@ class OauthWahoo {
   /**
    * @param {Object} transactionData
    * @param {String} transactionId
+   * @return {Future}
    */
-  setDevUser(transactionData, transactionId) {// just call userId
+  async setDevUser(transactionData, transactionId) { // just call userId
     this.devId = transactionData.devId;
     this.userId = transactionData.userId;
+    await this.getDevDoc();
     this.transactionId = transactionId;
     this.status = {redirectUrl: false,
       gotCode: false,
@@ -38,21 +40,35 @@ class OauthWahoo {
     this.redirectUrl = this.getRedirect();
   }
   /**
+   * @return {Future}
+   */
+  async getDevDoc() {
+    this.devDoc = await this.db.collection("developers").doc(this.devId).get();
+  }
+  /**
    * @return {String} userDocId
    */
   get userDocId() {
     return this.devId+this.userId;
   }
   /**
+   * @return {String} lookup
+   */
+  get lookup() {
+    return this.devDoc.data()["secret_lookup"];
+  }
+  /**
    *
    * @param {Object} data - the parsed JSON body returned from the provider
    * @param {Object} transactionData
+   * @return {Future}
    */
-  fromCallbackData(data, transactionData) {
+  async fromCallbackData(data, transactionData) {
     this.error = false;
     this.errorMessage = "";
     this.devId = transactionData.devId;
     this.userId = transactionData.userId;
+    await this.getDevDoc();
     this.transactionId = data["state"];
     this.code = data["code"];
     this.error = data["error"] || false;
@@ -75,8 +91,8 @@ class OauthWahoo {
    * @return {void}
    */
   getRedirect() {
-    this.clientId = this.config[this.devId]["whaooClientId"];
-    this.clientSecret = this.config[this.devId]["wahooSecret"];
+    this.clientId = this.config[this.lookup]["whaooClientId"];
+    this.clientSecret = this.config[this.lookup]["wahooSecret"];
     this.scope = "email%20user_read%20workouts_read%20offline_data";
     this.state = this.transactionId;
     this.baseUrl = "https://api.wahooligan.com/oauth/authorize?";
@@ -217,8 +233,8 @@ class OauthWahoo {
   get accessCodeOptions() {
     const _dataString = "code="+
     this.code+
-    "&client_id="+this.config[this.devId]["whaooClientId"]+
-    "&client_secret="+this.config[this.devId]["wahooSecret"]+
+    "&client_id="+this.config[this.lookup]["whaooClientId"]+
+    "&client_secret="+this.config[this.lookup]["wahooSecret"]+
     "&grant_type=authorization_code"+
     "&redirect_uri="+this.oauthCallbackUrl+"?state="+this.transactionId;
     return {
@@ -236,8 +252,8 @@ class OauthWahoo {
   get refreshCodeOptions() {
     const _dataString = "refresh_token="+
     this.refreshCode+
-    "&client_id="+this.config[this.devId]["whaooClientId"]+
-    "&client_secret="+this.config[this.devId]["wahooSecret"]+
+    "&client_id="+this.config[this.lookup]["whaooClientId"]+
+    "&client_secret="+this.config[this.lookup]["wahooSecret"]+
     "&grant_type=refresh_token";
     return {
       url: "https://api.wahooligan.com/oauth/token?"+_dataString,
