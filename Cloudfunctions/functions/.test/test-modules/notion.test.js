@@ -33,14 +33,14 @@ const request = require('request');
 const strava = require("strava-v3");
 const notion = require('../../notion');
 //-------------TEST 2--- Test Callbacks from Strava-------
- describe("Check the notion functions are writting activites to the notion endpoint.", () => {
+ describe.only("Check the notion functions are writing activites to the notion endpoint.", () => {
   before ('set up the userIds in the test User doc', async () => {
     await admin.firestore()
     .collection("users")
     .doc(testDev+testUser)
     .set({
         "devId": testDev,
-        "userId": "notion",
+        "userId": testUser,
         "strava_id" : "notion_test_strava_id",
         "strava_access_token": "test_strava_access_token",
         "strava_refresh_token": "test_strava_refresh_token",
@@ -82,11 +82,11 @@ const notion = require('../../notion');
     await wait(1000);
     //now check the database was updated correctly
    const testUserDocs = await admin.firestore()
-   .collection("users")
-   .doc(testDev+testUser)
-   .collection("activities")
-   .where("raw.id", "==", 12345678987654321)
-   .get();
+        .collection("users")
+        .doc(testDev+testUser)
+        .collection("activities")
+        .where("raw.id", "==", 12345678987654321)
+        .get();
 
    const sanatisedActivity = testUserDocs.docs[0].data()["sanitised"];
    const expectedResults = { // TODO:

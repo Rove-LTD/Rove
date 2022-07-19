@@ -1,7 +1,7 @@
 { "testDev" :  "anotherTestDev",
   "testUser": "anotherTestUser",
   "testNotionDev" :  "9e796cc24091489d97865364dc726b7b",
-  "testNotionUser": "9e796cc24091489d97865364dc726b7bnotion",
+  "testNotionUser": "notion",
   "firebaseConfig": {
     "apiKey": "AIzaSyCiMcMwrKgSKu6w5XW8hdCrWnLeI8CtGY4",
     "authDomain": "rovetest-beea7.firebaseapp.com",
