@@ -33,21 +33,17 @@ const oauthWahoo = new OauthWahoo(configurations, db);
 // we recieve auth token from strava to stravaCallBack.
 // tokens stored under userId
 
-exports.redirectPage = functions.https.onRequest(async (req, res) => {
+exports.redirectPage = functions.https.onRequest( async (req, res) => {
   const transactionId = (Url.parse(req.url, true).query)["transactionId"];
   const provider = (Url.parse(req.url, true).query)["provider"];
   const devId = (Url.parse(req.url, true).query)["devId"];
   const params = "?transactionId="+transactionId+"&isRedirect=true";
-  fs.readFile("redirectPage.html", function(err, html) {
-    if (err) {
-      throw err;
-    }
-    res.writeHead(200, {"Content-Type": "text/html"});
-    res.write(html);
-    res.write("<h2 style='text-align: center;font-family:DM Sans'>Data integrations provider for "+devId+"</h2>\
-    <h2 style='text-align: center;font-family:DM Sans'>To authenticate "+provider+" click <a href=/connectService"+params+">here</a></h2>");
-    res.end();
-  });
+  const html = await fs.promises.readFile("redirectPage.html");
+  res.writeHead(200, {"Content-Type": "text/html"});
+  res.write(html);
+  res.write("<h2 style='text-align: center;font-family:DM Sans'>Data integrations provider for "+devId+"</h2>\
+  <h2 style='text-align: center;font-family:DM Sans'>To authenticate "+provider+" click <a href=/connectService"+params+">here</a></h2>");
+  res.end();
 });
 
 exports.connectService = functions.https.onRequest(async (req, res) => {
@@ -58,7 +54,6 @@ exports.connectService = functions.https.onRequest(async (req, res) => {
   let transactionId = (Url.parse(req.url, true).query)["transactionId"];
   const isRedirect = (Url.parse(req.url, true).query)["isRedirect"];
   let parameters = {};
-  let redirectUrl;
   if (transactionId == undefined) {
     parameters.provider = (Url.parse(req.url, true).query)["provider"];
     parameters.devId = (Url.parse(req.url, true).query)["devId"];
@@ -69,9 +64,9 @@ exports.connectService = functions.https.onRequest(async (req, res) => {
     parameters = await getParametersFromTransactionId(transactionId);
     updateTransactionWithStatus(transactionId, "userClickedAuthButton");
   }
-
   let url = "";
-
+  parameters.callbackBaseUrl = "https://"+Url.parse(req.url, true, false).host;
+  // console.log(parameters.callbackBaseUrl);
   // parameter checks
   // first check developer exists and the devKey matches
   if (parameters.devId != null) {
@@ -121,9 +116,9 @@ exports.connectService = functions.https.onRequest(async (req, res) => {
     transactionId = await createTransactionWithParameters(parameters);
   }
   // redirect to splash page if isRedirect is not set
-  if (isRedirect == undefined) {
+  if (isRedirect == undefined || isRedirect == false) {
     // call redirect with the transaction id
-    res.redirect("../redirectPage?transactionId="+transactionId+"&provider="+parameters.provider+"&devId="+parameters.devId);
+    res.redirect(parameters.callbackBaseUrl+"/redirectPage?transactionId="+transactionId+"&provider="+parameters.provider+"&devId="+parameters.devId);
     return;
   }
 
@@ -149,6 +144,8 @@ exports.disconnectService = functions.https.onRequest(async (req, res) => {
   const devId = (Url.parse(req.url, true).query)["devId"];
   const userId = (Url.parse(req.url, true).query)["userId"];
   const devKey = (Url.parse(req.url, true).query)["devKey"];
+  const callbackBaseUrl =
+  "https://"+Url.parse(req.url, true, true).host;
 
   let message = "";
   let userDoc;
@@ -214,7 +211,7 @@ exports.disconnectService = functions.https.onRequest(async (req, res) => {
       // deauth for Strava.
       // TODO check user is already authorised
       if (userDocData["strava_connected"] == true) {
-        result = await deleteStravaActivity(userDoc, false, devId);
+        result = await deleteStravaActivity(userDoc, callbackBaseUrl, false);
         // check success or fail. result 200 is success 400 is failure
       } else {
         // error the user is not authorizes already
@@ -269,7 +266,7 @@ exports.disconnectService = functions.https.onRequest(async (req, res) => {
   return;
 });
 
-async function deleteStravaActivity(userDoc, webhookCall, devId) {
+async function deleteStravaActivity(userDoc, webhookCall, devId, webhookCall) {
   const secretLookup = await db.collection("developers").doc(devId).get();
   const lookup = await secretLookup.data()["secret_lookup"];
   stravaApi.config({
@@ -518,6 +515,8 @@ exports.oauthCallbackHandlerGarmin = functions.https
 exports.stravaCallback = functions.https.onRequest(async (req, res) => {
   // this comes from strava
   // create authorization for user completing oAuth flow.
+  const callbackBaseUrl =
+      "https://"+Url.parse(req.url, true, true).host;
   const transactionId = (Url.parse(req.url, true).query)["transactionId"];
   const transactionData = await getParametersFromTransactionId(transactionId);
   const code = (Url.parse(req.url, true).query)["code"];
@@ -549,7 +548,7 @@ exports.stravaCallback = functions.https.onRequest(async (req, res) => {
     if (!error && response.statusCode == 200) {
       // this is where the tokens come back.
       stravaStoreTokens(userId, devId, JSON.parse(body), db);
-      await getStravaAthleteId(userId, devId, JSON.parse(body), db);
+      await getStravaAthleteId(userId, devId, JSON.parse(body), callbackBaseUrl);
       // send a response now to endpoint for devId confirming success
       // await sendDevSuccess(devId); //TODO: create dev success post.
       // userResponse = "Some good redirect.";
@@ -623,24 +622,22 @@ exports.garminWebhook = functions.https.onRequest(async (req, res) => {
       const userDocsList = [];
       const userQuery = await db.collection("users")
           .where("garmin_access_token", "==", req.body.activities[index].userAccessToken).get();
-      userQuery.docs.forEach(async (doc)=> {
+      userQuery.docs.forEach((doc)=> {
         userDocsList.push(doc);
-        // take opportunity to fill garmin_userId for future use
-        if (doc.data()["garmin_userId"] == undefined &&
-             req.body.activities[index].userId != undefined) {
-          doc.ref
-              .set({"garmin_userId": req.body.activities[index].userId}, {merge: true});
-        }
       });
       // save raw and sanitised activites as a backup for each user
-      userDocsList.forEach(async (userDoc)=>{
+      userDocsList.forEach( async (userDoc)=>{
         sanitisedActivity["userId"] = userDoc.data()["userId"];
-        const activityDoc = await userDoc.ref
+        // TODO: this is a bit of a cludge to prevent the userId
+        // being written incorrectly in this loop during async
+        // firebase writes.
+        const localSanitisedActivity = JSON.parse(JSON.stringify(sanitisedActivity));
+        const activityDoc = userDoc.ref
             .collection("activities")
-            .doc()
-            .set({"sanitised": sanitisedActivity, "raw": req.body.activities[index]});
+            .doc();
+        await activityDoc.set({"sanitised": localSanitisedActivity, "raw": req.body.activities[index]});
         const triesSoFar = 0; // this is our first try to write to developer
-        sendToDeveloper(userDoc, sanitisedActivity, req.body.activities[index], activityDoc, triesSoFar);
+        await sendToDeveloper(userDoc, localSanitisedActivity, req.body.activities[index], activityDoc, triesSoFar);
       });
     });
     res.status(200);
@@ -672,14 +669,14 @@ async function stravaStoreTokens(userId, devId, data, db) {
   // write resultant message to dev endpoint.
   return;
 }
-async function getStravaAthleteId(userId, devId, data, db) {
+async function getStravaAthleteId(userId, devId, data, callbackBaseUrl) {
   // get athlete id from strava.
   const secretLookup = await db.collection("developers").doc(devId).get();
   const lookup = await secretLookup.data()["secret_lookup"];
   stravaApi.config({
     "client_id": configurations[lookup]["stravaClientId"],
     "client_secret": configurations[lookup]["stravaClientSecret"],
-    "redirect_uri": "https://us-central1-rove-26.cloudfunctions.net/stravaCallback",
+    "redirect_uri": callbackBaseUrl+"/stravaCallback",
   });
   const parameters = {
     "access_token": data["access_token"],
@@ -701,7 +698,8 @@ async function stravaOauth(transactionData, transactionId) {
   const parameters = {
     client_id: configurations[lookup]["stravaClientId"],
     response_type: "code",
-    redirect_uri: "https://us-central1-rove-26.cloudfunctions.net/stravaCallback?transactionId="+
+    redirect_uri: transactionData.callbackBaseUrl+
+      "/stravaCallback?transactionId="+
       transactionId,
     approval_prompt: "force",
     scope: "profile:read_all,activity:read_all",
@@ -770,14 +768,16 @@ async function garminOauth(transactionData, transactionId) {
   const oauthTokens = response.body.split("&");
   // set callbackURL for garmin Oauth with token and userId and devId.
   const callbackURL =
-     "oauth_callback=https://us-central1-rove-26.cloudfunctions.net/oauthCallbackHandlerGarmin?" +
-     oauthTokens[1] +
-         "-transactionId=" + transactionId;
+      "oauth_callback="+
+      transactionData.callbackBaseUrl+
+      "/oauthCallbackHandlerGarmin?"+
+      oauthTokens[1]+
+      "-transactionId="+transactionId;
   // append to oauth garmin url.
-  const _url = "https://connect.garmin.com/oauthConfirm?" +
-   oauthTokens[0] +
-         "&" +
-         callbackURL;
+  const _url = "https://connect.garmin.com/oauthConfirm?"+
+      oauthTokens[0]+
+      "&"+
+      callbackURL;
   return _url;
 }
 
@@ -790,7 +790,7 @@ async function polarOauth(transactionData, transactionId) {
   const parameters = {
     client_id: configurations[lookup]["polarClientId"],
     response_type: "code",
-    redirect_uri: "https://us-central1-rove-26.cloudfunctions.net/polarCallback",
+    redirect_uri: transactionData.callbackBaseUrl+"/polarCallback",
     scope: "accesslink.read_all",
     state: transactionId,
   };
@@ -818,6 +818,8 @@ exports.polarCallback = functions.https.onRequest(async (req, res) => {
   // create authorization for user completing oAuth flow.
   const transactionId = (Url.parse(req.url, true).query)["state"];
   const transactionData = await getParametersFromTransactionId(transactionId);
+  transactionData.callbackBaseUrl =
+      "https://"+Url.parse(req.url, true, true).host;
   const code = (Url.parse(req.url, true).query)["code"];
   const error = (Url.parse(req.url, true).query)["error"];
   const userId = transactionData.userId;
@@ -838,7 +840,7 @@ exports.polarCallback = functions.https.onRequest(async (req, res) => {
   const dataString = "code="+
      code+
      "&grant_type=authorization_code"+
-     "&redirect_uri=https://us-central1-rove-26.cloudfunctions.net/polarCallback";
+     "&redirect_uri="+transactionData.callbackBaseUrl+"/polarCallback";
   const options = {
     url: "https://polarremote.com/v2/oauth2/token",
     method: "POST",
@@ -930,7 +932,7 @@ async function polarStoreTokens(userId, devId, data, db) {
 
 function wahooOauth(transactionData, transactionId) {
   const userId = transactionData.userId;
-  const devId =transactionData.devId;
+  const devId = transactionData.devId;
   // add parameters from user onto the callback redirect.
   oauthWahoo.setDevUser(transactionData, transactionId);
   return oauthWahoo.redirectUrl;
@@ -948,17 +950,18 @@ exports.wahooCallback = functions.https.onRequest(async (req, res) => {
   if (!oauthWahoo.error) {
     const urlString = await successDevCallback(transactionData);
     res.redirect(urlString);
-    res.send("your authorization was successful please close this window");
   } else {
     res.send(oauthWahoo.errorMessage);
   }
 });
 
 exports.stravaWebhook = functions.https.onRequest(async (request, response) => {
+  const callbackBaseUrl =
+      "https://"+Url.parse(request.url, true, true).host;
   stravaApi.config({
     "client_id": configurations["paulsTestDev"]["stravaClientId"],
     "client_secret": configurations["paulsTestDev"]["stravaClientSecret"],
-    "redirect_uri": "https://us-central1-rove-26.cloudfunctions.net/stravaCallback",
+    "redirect_uri": callbackBaseUrl+"/stravaCallback",
   });
   if (request.method === "POST") {
     if (!request.debug) {
@@ -995,7 +998,7 @@ exports.stravaWebhook = functions.https.onRequest(async (request, response) => {
       const payloadAccessToken = payload["access_token"];
       if ("authorized" in request.body.updates) {
         console.log("de-auth event");
-        const result = await deleteStravaActivity(userDocRef, true);
+        const result = await deleteStravaActivity(userDocRef, callbackBaseUrl, true);
         response.status(result);
         response.send();
         return;
@@ -1008,7 +1011,7 @@ exports.stravaWebhook = functions.https.onRequest(async (request, response) => {
       // token in date, can get activities as required.
       if ("authorized" in request.body.updates) {
         console.log("de-auth event");
-        const result = await deleteStravaActivity(userDocRef, true);
+        const result = await deleteStravaActivity(userDocRef, callbackBaseUrl, true);
         response.status(result);
         response.send();
         return;
@@ -1019,7 +1022,8 @@ exports.stravaWebhook = functions.https.onRequest(async (request, response) => {
       }
     }
     // save to a doc
-    const activityDoc = await userDocRef.ref.collection("activities").doc().set({"raw": activity, "sanitised": sanitisedActivity[0]});
+    const activityDoc = await userDocRef.ref.collection("activities").doc();
+    await activityDoc.set({"raw": activity, "sanitised": sanitisedActivity[0]});
     // Send the information to an endpoint specified by the dev registered to a user.
     response.status(200);
     response.send("OK!");
@@ -1084,12 +1088,16 @@ exports.wahooWebhook = functions.https.onRequest(async (request, response) => {
     // save raw and sanitised activites as a backup for each user
     userDocsList.forEach(async (userDoc)=>{
       sanitisedActivity["userId"] = userDoc.data()["userId"];
+      // TODO: this is a bit of a cludge to prevent the userId
+      // being written incorrectly in this loop during async
+      // firebase writes.
+      const localSanitisedActivity = JSON.parse(JSON.stringify(sanitisedActivity));
       const activityDoc = await userDoc.ref
           .collection("activities")
-          .doc()
-          .set({"sanitised": sanitisedActivity, "raw": request.body});
+          .doc();
+      await activityDoc.set({"sanitised": localSanitisedActivity, "raw": request.body});
       const triesSoFar = 0; // this is our first try to write to developer
-      sendToDeveloper(userDoc, sanitisedActivity, request.body, activityDoc, triesSoFar);
+      await sendToDeveloper(userDoc, localSanitisedActivity, request.body, activityDoc, triesSoFar);
     });
     response.status(200);
     response.send("EVENT_RECEIVED");
@@ -1147,12 +1155,16 @@ exports.polarWebhook = functions.https.onRequest(async (request, response) => {
       // send to developer
       userDocsList.forEach(async (userDoc)=>{
         sanitisedActivity["userId"] = userDoc.data()["userId"];
+        // TODO: this is a bit of a cludge to prevent the userId
+        // being written incorrectly in this loop during async
+        // firebase writes.
+        const localSanitisedActivity = JSON.parse(JSON.stringify(sanitisedActivity));
         const activityDoc = await userDoc
             .ref.collection("activities")
-            .doc()
-            .set({"sanitised": sanitisedActivity, "raw": activity});
+            .doc();
+        await activityDoc.set({"sanitised": localSanitisedActivity, "raw": activity});
         const triesSoFar = 0; // this is our first try to write to developer
-        sendToDeveloper(userDoc, sanitisedActivity, activity, activityDoc, triesSoFar);
+        await sendToDeveloper(userDoc, localSanitisedActivity, activity, activityDoc, triesSoFar);
       });
     }
     response.status(200);
@@ -1205,7 +1217,7 @@ async function sendToDeveloper(userDoc,
      userDoc.ref
          .collection("activities")
          .doc(activityDoc)
-         .set({status: "sent", timestamp: new Date()}, {merge: true}); */
+         .set({status: "sent", timestamp: new Date().toISOString()}, {merge: true}); */
     } else {
     // call the retry functionality and increment the retry counter
       if (triesSoFar <= MaxRetries) {

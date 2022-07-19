@@ -31,6 +31,8 @@ const got = require('got');
 //-------------TEST 2--- Test Callbacks from Strava-------
  describe("Check the Strava Disconnect Service works: ", () => {
   before(async () => {
+    nowInSeconds = new Date()/1000
+    notExpiredDate = nowInSeconds+1000;
     await admin.firestore()
         .collection("users")
         .doc(testDev+testUser)
@@ -41,7 +43,7 @@ const got = require('got');
             "strava_connected": true,
             "strava_access_token": "4c68a65e19eb899b8f68aa21e760b074bf035a95",
             "strava_refresh_token": "78ba71c103106141ea7030ce60ff1ee3d599b7ba",
-            "strava_token_expires_at": 1656517735,
+            "strava_token_expires_at": notExpiredDate,
             "strava_id": 12972711});
 
     await admin.firestore()
