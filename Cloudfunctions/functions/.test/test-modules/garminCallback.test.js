@@ -76,7 +76,7 @@ describe("Testing that the Garmin callbacks work: ", () => {
       sinon.stub(got, "get").returns(responseObject2);
 
       // set the request object with the correct provider, developerId and userId
-      const req = {url: "https://us-central1-rove-26.cloudfunctions.net/oauthCallbackHandlerGarmin?oauth_token_secret=testcode-transactionId=garminTestTransaction&oauth_verifier=test-verifyer&oauth_token=test-token",
+      const req = {url: "https://us-central1-rovetest-beea7.cloudfunctions.net/oauthCallbackHandlerGarmin?oauth_token_secret=testcode-transactionId=garminTestTransaction&oauth_verifier=test-verifyer&oauth_token=test-token",
           debug: true
       };
 

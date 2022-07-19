@@ -35,7 +35,7 @@ const { doesNotMatch } = require('assert');
 describe("Testing that the developer can call API to connectService() and receive redirection URL: ", () => {
   it('should get error if the provider is not correct...', async () => {
       // set the request object with the incorrect provider, correct developerId, devKey and userId
-      const req = {url: 'https//test.com/?devId='+testDev+'&userId='+testUser+'&devKey=test-key&provider=badFormat'};
+      const req = {url: 'https://us-central1-rovetest-beea7.cloudfunctions.net/connectService?devId='+testDev+'&userId='+testUser+'&devKey=test-key&provider=badFormat'};
       // set the assertions for the expected response object
       const res = {
           send: (url) => {
@@ -55,7 +55,7 @@ describe("Testing that the developer can call API to connectService() and receiv
 
   it("Should get an error if the devID is not correctly formatted or missing", async () => {
       // set the request object with the correct provider, incorrect developerId and correct userId
-      const req = {url: 'https//test.com/?devId='+"incorrectDev"+'&userId='+testUser+'&provider=wahoo'};
+      const req = {url: 'https://us-central1-rovetest-beea7.cloudfunctions.net/connectService?devId='+"incorrectDev"+'&userId='+testUser+'&provider=wahoo'};
       // set the assertions for the expected response object
       const res = {
           send: (url) => {
@@ -71,7 +71,7 @@ describe("Testing that the developer can call API to connectService() and receiv
 
   it("Should get an error if the developer is not correctly authorised", async () => {
       // set the request object with the correct provider, developerId and userId
-      const req = {url: 'https//test.com/?devId='+testDev+'&userId='+testUser+'&devKey=wrong-key&provider=wahoo'};
+      const req = {url: 'https://us-central1-rovetest-beea7.cloudfunctions.net/connectService?devId='+testDev+'&userId='+testUser+'&devKey=wrong-key&provider=wahoo'};
       // set the assertions for the expected response object
       const res = {
           send: (url) => {
@@ -87,7 +87,7 @@ describe("Testing that the developer can call API to connectService() and receiv
 
   it("Should get an error if the userId is not provided", async () => {
       // set the request object with the correct provider, developerId and userId
-      const req = {url: 'https//test.com/?devId='+testDev+'&devKey=test-key&provider=wahoo'};
+      const req = {url: 'https://us-central1-rovetest-beea7.cloudfunctions.net/connectService?devId='+testDev+'&devKey=test-key&provider=wahoo'};
       // set the assertions for the expected response object
       const res = {
           send: (url) => {
@@ -103,11 +103,11 @@ describe("Testing that the developer can call API to connectService() and receiv
   
   it('should get a properly formatted strava redirect url...', async () => {
       // set the request object with the correct provider, developerId and userId
-      const req = {url: 'https//test.com/?devId='+testDev+'&userId='+testUser+'&devKey=test-key&provider=strava&isRedirect=true'};
+      const req = {url: 'https://us-central1-rovetest-beea7.cloudfunctions.net/connectService?devId='+testDev+'&userId='+testUser+'&devKey=test-key&provider=strava&isRedirect=true'};
       // set the assertions for the expected response object
       const res = {
           redirect: async (url) => {
-              assert.include(url, "https://www.strava.com/oauth/authorize?client_id=72486&response_type=code&redirect_uri=https://us-central1-rove-26.cloudfunctions.net/stravaCallback?transactionId=");
+              assert.include(url, "https://www.strava.com/oauth/authorize?client_id=72486&response_type=code&redirect_uri=https://us-central1-rovetest-beea7.cloudfunctions.net/stravaCallback?transactionId=");
               assert.include(url, "&approval_prompt=force&scope=profile:read_all,activity:read_all");
               recievedStravaUrl = url;
           },
@@ -118,12 +118,12 @@ describe("Testing that the developer can call API to connectService() and receiv
   })
   it('should get a properly formatted garmin redirect url...', async () => {
       // set the request object with the correct provider, developerId and userId
-      const req = {url: 'https//test.com/?devId='+testDev+'&userId='+testUser+'&devKey=test-key&provider=garmin&isRedirect=true'};
+      const req = {url: 'https://us-central1-rovetest-beea7.cloudfunctions.net/connectService?devId='+testDev+'&userId='+testUser+'&devKey=test-key&provider=garmin&isRedirect=true'};
       // set the assertions for the expected response object
       const res = {
           redirect: (url) => {
               assert.include(url, "https://connect.garmin.com/oauthConfirm?oauth_token=");
-              assert.include(url, "&oauth_callback=https://us-central1-rove-26.cloudfunctions.net/oauthCallbackHandlerGarmin?oauth_token_secret=");
+              assert.include(url, "&oauth_callback=https://us-central1-rovetest-beea7.cloudfunctions.net/oauthCallbackHandlerGarmin?oauth_token_secret=");
               assert.include(url, "-transactionId=");
               recievedGarminUrl = url;
           },
@@ -150,11 +150,11 @@ describe("Testing that the developer can call API to connectService() and receiv
   })
   it('should get a properly formatted polar redirect url...', async () => {
       // set the request object with the correct provider, developerId and userId
-      const req = {url: 'https//test.com/?devId='+testDev+'&userId='+testUser+'&devKey=test-key&provider=polar&isRedirect=true'};
+      const req = {url: 'https://us-central1-rovetest-beea7.cloudfunctions.net/connectService?devId='+testDev+'&userId='+testUser+'&devKey=test-key&provider=polar&isRedirect=true'};
       // set the assertions for the expected response object
       const res = {
         redirect: (url) => {
-              assert.include(url, "https://flow.polar.com/oauth2/authorization?client_id=654623e7-7191-4cfe-aab5-0bc24785fdee&response_type=code&redirect_uri=https://us-central1-rove-26.cloudfunctions.net/polarCallback&scope=accesslink.read_all&state=");
+              assert.include(url, "https://flow.polar.com/oauth2/authorization?client_id=654623e7-7191-4cfe-aab5-0bc24785fdee&response_type=code&redirect_uri=https://us-central1-rovetest-beea7.cloudfunctions.net/polarCallback&scope=accesslink.read_all&state=");
               recievedPolarUrl = url;
           },
       }
@@ -165,13 +165,13 @@ describe("Testing that the developer can call API to connectService() and receiv
 
   it('should get a properly formatted wahoo redirect url...', async () => {
       // set the request object with the correct provider, developerId and userId
-      const req = {url: 'https//test.com/?devId='+testDev+'&userId='+testUser+'&devKey=test-key&provider=wahoo&isRedirect=true'};
+      const req = {url: 'https://us-central1-rovetest-beea7.cloudfunctions.net/connectService?devId='+testDev+'&userId='+testUser+'&devKey=test-key&provider=wahoo&isRedirect=true'};
       // set the assertions for the expected response object
       const res = {
         redirect: (url) => {
               assert.include(url, "https://api.wahooligan.com/oauth/authorize?");
               assert.include(url, "client_id=iA2JRS_dBkikcb0uEnHPtb6IDt1vDYNbityEEhp801I");
-              assert.include(url, "&redirect_uri=https://us-central1-rove-26.cloudfunctions.net/wahooCallback?state=");
+              assert.include(url, "&redirect_uri=https://us-central1-rovetest-beea7.cloudfunctions.net/wahooCallback?state=");
           },
       }
 
@@ -180,11 +180,11 @@ describe("Testing that the developer can call API to connectService() and receiv
   })
   it('should go to the redirect function when isRedirect=undefined', async () => {
       // set the request object with the correct provider, developerId and userId
-      const req = {url: 'https//test.com/?devId='+testDev+'&userId='+testUser+'&devKey=test-key&provider=wahoo'};
+      const req = {url: 'https://us-central1-rovetest-beea7.cloudfunctions.net/connectService?devId='+testDev+'&userId='+testUser+'&devKey=test-key&provider=wahoo'};
       // set the assertions for the expected response object
       const res = {
         redirect: (url) => {
-              assert.include(url,"../redirectPage?transactionId=");
+              assert.include(url,"https://us-central1-rovetest-beea7.cloudfunctions.net/redirectPage?transactionId=");
               assert.include(url, "&provider=wahoo");
               assert.include(url, "&devId="+testDev);
               assert.include(url, "?transactionId=");
@@ -199,7 +199,7 @@ describe("Testing that the developer can call API to connectService() and receiv
     const htmlPage = await fs.promises.readFile("redirectPage.html");
 
     // set the request object with the correct provider, developerId and userId
-    const req = {url: 'https//test.com/?transactionId=testTransactionId&devId='+testDev+'&devKey=test-key&provider=wahoo'};
+    const req = {url: 'https://us-central1-rovetest-beea7.cloudfunctions.net/redirectPage?transactionId=testTransactionId&devId='+testDev+'&devKey=test-key&provider=wahoo'};
     // set the assertions for the expected response object
     const res = {
       writeHead: (code, content)=>{

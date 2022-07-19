@@ -3,7 +3,10 @@
 <img src="https://cdn.road.cc/sites/default/files/styles/amp_metadata_content_image_min_696px_wide/public/wahoo-white-black-cmyk-logo.jpg"
  style="width:300px;" onclick="signUpWith('wahoo')">
 
-
+ <h5>Disconnect with Wahoo!</h5>
+ <img src="https://cdn.road.cc/sites/default/files/styles/amp_metadata_content_image_min_696px_wide/public/wahoo-white-black-cmyk-logo.jpg"
+	style="width:300px;" onclick="signOutWith('wahoo')">
+ 
 <h5>Error Message</h5>
 <body error>errorMessage goes here</body>
 
@@ -21,4 +24,14 @@
     	'&provider='+provider+
     	'&redirectUrl='+redirectUrl;
     }
+		function signOutWith(provider) {
+    	window.location.href = 
+    	'https://us-central1-rovetest-beea7.cloudfunctions.net/disconnectService?userId='
+    	+testUser+
+    	'&devId='+testDev+
+    	'&devKey='+devKey+
+    	'&provider='+provider+
+    	'&redirectUrl='+redirectUrl;
+    }
+		
 </script>
