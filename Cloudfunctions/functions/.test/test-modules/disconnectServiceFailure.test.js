@@ -33,7 +33,7 @@ const strava = require("strava-v3");
  describe("Check that the deauthorise call fails when parameters are incorrect: ", () => {
   it('call deauthorise and get an error if the devId doesnt exist', async () => {
     req = {
-      url: "https://ourDomain.com?devId=incorrect&userId="+testUser+"&provider=wahoo&devKey=test-key",
+      url: "https://us-central1-rovetest-beea7.cloudfunctions.net/disconnectService?devId=incorrect&userId="+testUser+"&provider=wahoo&devKey=test-key",
     };
     res = {
       status: (code) => {
@@ -50,7 +50,7 @@ const strava = require("strava-v3");
 
   it('call deauthorise and get an error if the userId doesnt exist', async () => {
     req = {
-      url: "https://ourDomain.com?devId="+testDev+"&userId=incorrect&provider=wahoo&devKey=test-key",
+      url: "https://us-central1-rovetest-beea7.cloudfunctions.net/disconnectService?devId="+testDev+"&userId=incorrect&provider=wahoo&devKey=test-key",
     };
     res = {
       status: (code) => {
@@ -67,7 +67,7 @@ const strava = require("strava-v3");
 
   it('call deauthorise and get an error if the devId not supplied', async () => {
     req = {
-      url: "https://ourDomain.com?userId="+testUser+"&provider=wahoo&devKey=test-key",
+      url: "https://us-central1-rovetest-beea7.cloudfunctions.net/disconnectService?userId="+testUser+"&provider=wahoo&devKey=test-key",
     };
     res = {
       status: (code) => {
@@ -84,7 +84,7 @@ const strava = require("strava-v3");
 
   it('call deauthorise and get an error if the userId not supplied', async () => {
     req = {
-      url: "https://ourDomain.com?devId="+testDev+"&provider=wahoo&devKey=test-key",
+      url: "https://us-central1-rovetest-beea7.cloudfunctions.net/disconnectService?devId="+testDev+"&provider=wahoo&devKey=test-key",
     };
     res = {
       status: (code) => {
@@ -100,7 +100,7 @@ const strava = require("strava-v3");
   })
   it('call deauthorise and get an error if the provider not supplied', async () => {
     req = {
-      url: "https://ourDomain.com?devId="+testDev+"&userId="+testUser+"&devKey=test-key",
+      url: "https://us-central1-rovetest-beea7.cloudfunctions.net/disconnectService?devId="+testDev+"&userId="+testUser+"&devKey=test-key",
     };
     res = {
       status: (code) => {
@@ -116,7 +116,7 @@ const strava = require("strava-v3");
   })
   it('call deauthorise and get an error if the provider not supported', async () => {
     req = {
-      url: "https://ourDomain.com?devId="+testDev+"&userId="+testUser+"&provider=incorrect&devKey=test-key"
+      url: "https://us-central1-rovetest-beea7.cloudfunctions.net/disconnectService?devId="+testDev+"&userId="+testUser+"&provider=incorrect&devKey=test-key"
     };
     res = {
       status: (code) => {
@@ -130,6 +130,4 @@ const strava = require("strava-v3");
     await myFunctions.disconnectService(req, res);
 
   })
-  //https://ourDomain.com?devId="+testDev+"&userId="+testUser+"&provider=wahoo&devKey=test-key"
-
 });//End TEST 2--- Test Callbacks for Strava--------------

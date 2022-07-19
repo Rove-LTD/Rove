@@ -93,7 +93,7 @@ const request = require('request');
           const base64String = buffer.toString("base64");
           const dataString = "code=testcode"+
           "&grant_type=authorization_code"+
-          "&redirect_uri=https://us-central1-rove-26.cloudfunctions.net/polarCallback";
+          "&redirect_uri=https://us-central1-rovetest-beea7.cloudfunctions.net/polarCallback";
           options = {
               url: "https://polarremote.com/v2/oauth2/token",
               method: "POST",
@@ -109,7 +109,7 @@ const request = require('request');
           stubbedcall.onSecondCall().yields(null, responseObject2, JSON.stringify(responseBody2));
 
           // set the request object with the correct provider, developerId and userId
-          const req = {url: "https://us-central1-rove-26.cloudfunctions.net/polarCallback?state=polarTestTransaction&code=testcode"};
+          const req = {url: "https://us-central1-rovetest-beea7.cloudfunctions.net/polarCallback?state=polarTestTransaction&code=testcode"};
           const res = {
               send: (text) => {
                   assert.equal(text, "your authorization was successful please close this window: you are already registered with Polar - there is no need to re-register")
@@ -192,7 +192,7 @@ const request = require('request');
           stubbedcall.onSecondCall().yields(null, responseObject2, JSON.stringify(responseBody2));
 
           // set the request object with the correct provider, developerId and userId
-          const req = {url: "https://us-central1-rove-26.cloudfunctions.net/polarCallback?state=polarTestTransaction&code=testcode"};
+          const req = {url: "https://us-central1-rovetest-beea7.cloudfunctions.net/polarCallback?state=polarTestTransaction&code=testcode"};
           const res = {
               send: (text) => {
                   assert.equal(text, "your authorization was successful please close this window: ")

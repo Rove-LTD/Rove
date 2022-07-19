@@ -74,7 +74,7 @@ const strava = require("strava-v3");
       sinon.stub(strava.athlete, "get").returns({id: 12345678});
 
       // set the request object with the correct provider, developerId and userId
-      const req = {url: "https://us-central1-rove-26.cloudfunctions.net/stravaCallback?transactionId=stravaTestTransaction&code=testcode&approval_prompt=force&scope=profile:read_all,activity:read_all"};
+      const req = {url: "https://us-central1-rovetest-beea7.cloudfunctions.net/stravaCallback?transactionId=stravaTestTransaction&code=testcode&approval_prompt=force&scope=profile:read_all,activity:read_all"};
       const res = {
           send: (text) => {
               assert.equal(text, "your authorization was successful please close this window")
