@@ -1275,7 +1275,7 @@ exports.createNotionLink = functions.https.onRequest(async (req, res) => {
     "devId": databaseId,
     "userId": "notion",
   });
-  // redirec the user to connectService with new dev and user credentials.
+  // redirect the user to connectService with new dev and user credentials.
   res.redirect("/connectService?userId="+databaseId+"notion"+"&devId="+databaseId+"&provider="+provider+"&devKey="+key);
 });
 
