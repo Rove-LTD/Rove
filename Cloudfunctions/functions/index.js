@@ -27,6 +27,7 @@ const configurations = contentsOfDotEnvFile["config"];
 admin.initializeApp();
 const db = admin.firestore();
 const oauthWahoo = new OauthWahoo(configurations, db);
+const callbackBaseUrl = "https://us-central1-"+process.env.GCLOUD_PROJECT+".cloudfunctions.net";
 
 // INTEGRATION FOR APP:
 // get url response and go through onboarding flow.
@@ -65,8 +66,7 @@ exports.connectService = functions.https.onRequest(async (req, res) => {
     updateTransactionWithStatus(transactionId, "userClickedAuthButton");
   }
   let url = "";
-  parameters.callbackBaseUrl = "https://"+Url.parse(req.url, true, false).host;
-  // console.log(parameters.callbackBaseUrl);
+  console.log(callbackBaseUrl);
   // parameter checks
   // first check developer exists and the devKey matches
   if (parameters.devId != null) {
@@ -118,7 +118,7 @@ exports.connectService = functions.https.onRequest(async (req, res) => {
   // redirect to splash page if isRedirect is not set
   if (isRedirect == undefined || isRedirect == false) {
     // call redirect with the transaction id
-    res.redirect(parameters.callbackBaseUrl+"/redirectPage?transactionId="+transactionId+"&provider="+parameters.provider+"&devId="+parameters.devId);
+    res.redirect(callbackBaseUrl+"/redirectPage?transactionId="+transactionId+"&provider="+parameters.provider+"&devId="+parameters.devId);
     return;
   }
 
@@ -144,8 +144,6 @@ exports.disconnectService = functions.https.onRequest(async (req, res) => {
   const devId = (Url.parse(req.url, true).query)["devId"];
   const userId = (Url.parse(req.url, true).query)["userId"];
   const devKey = (Url.parse(req.url, true).query)["devKey"];
-  const callbackBaseUrl =
-  "https://"+Url.parse(req.url, true, true).host;
 
   let message = "";
   let userDoc;
@@ -211,7 +209,7 @@ exports.disconnectService = functions.https.onRequest(async (req, res) => {
       // deauth for Strava.
       // TODO check user is already authorised
       if (userDocData["strava_connected"] == true) {
-        result = await deleteStravaActivity(userDoc, callbackBaseUrl, false);
+        result = await deleteStravaActivity(userDoc, false);
         // check success or fail. result 200 is success 400 is failure
       } else {
         // error the user is not authorizes already
@@ -266,7 +264,7 @@ exports.disconnectService = functions.https.onRequest(async (req, res) => {
   return;
 });
 
-async function deleteStravaActivity(userDoc, callbackBaseUrl, webhookCall) {
+async function deleteStravaActivity(userDoc, webhookCall) {
   const devId = await userDoc.data()["devId"];
   const secretLookup = await db.collection("developers").doc(devId).get();
   const lookup = await secretLookup.data()["secret_lookup"];
@@ -516,8 +514,6 @@ exports.oauthCallbackHandlerGarmin = functions.https
 exports.stravaCallback = functions.https.onRequest(async (req, res) => {
   // this comes from strava
   // create authorization for user completing oAuth flow.
-  const callbackBaseUrl =
-      "https://"+Url.parse(req.url, true, true).host;
   const transactionId = (Url.parse(req.url, true).query)["transactionId"];
   const transactionData = await getParametersFromTransactionId(transactionId);
   const code = (Url.parse(req.url, true).query)["code"];
@@ -549,7 +545,7 @@ exports.stravaCallback = functions.https.onRequest(async (req, res) => {
     if (!error && response.statusCode == 200) {
       // this is where the tokens come back.
       stravaStoreTokens(userId, devId, JSON.parse(body), db);
-      await getStravaAthleteId(userId, devId, JSON.parse(body), callbackBaseUrl);
+      await getStravaAthleteId(userId, devId, JSON.parse(body));
       // send a response now to endpoint for devId confirming success
       // await sendDevSuccess(devId); //TODO: create dev success post.
       // userResponse = "Some good redirect.";
@@ -670,7 +666,7 @@ async function stravaStoreTokens(userId, devId, data, db) {
   // write resultant message to dev endpoint.
   return;
 }
-async function getStravaAthleteId(userId, devId, data, callbackBaseUrl) {
+async function getStravaAthleteId(userId, devId, data) {
   // get athlete id from strava.
   const secretLookup = await db.collection("developers").doc(devId).get();
   const lookup = await secretLookup.data()["secret_lookup"];
@@ -699,7 +695,7 @@ async function stravaOauth(transactionData, transactionId) {
   const parameters = {
     client_id: configurations[lookup]["stravaClientId"],
     response_type: "code",
-    redirect_uri: transactionData.callbackBaseUrl+
+    redirect_uri: callbackBaseUrl+
       "/stravaCallback?transactionId="+
       transactionId,
     approval_prompt: "force",
@@ -770,7 +766,7 @@ async function garminOauth(transactionData, transactionId) {
   // set callbackURL for garmin Oauth with token and userId and devId.
   const callbackURL =
       "oauth_callback="+
-      transactionData.callbackBaseUrl+
+      callbackBaseUrl+
       "/oauthCallbackHandlerGarmin?"+
       oauthTokens[1]+
       "-transactionId="+transactionId;
@@ -791,7 +787,7 @@ async function polarOauth(transactionData, transactionId) {
   const parameters = {
     client_id: configurations[lookup]["polarClientId"],
     response_type: "code",
-    redirect_uri: transactionData.callbackBaseUrl+"/polarCallback",
+    redirect_uri: callbackBaseUrl+"/polarCallback",
     scope: "accesslink.read_all",
     state: transactionId,
   };
@@ -819,8 +815,6 @@ exports.polarCallback = functions.https.onRequest(async (req, res) => {
   // create authorization for user completing oAuth flow.
   const transactionId = (Url.parse(req.url, true).query)["state"];
   const transactionData = await getParametersFromTransactionId(transactionId);
-  transactionData.callbackBaseUrl =
-      "https://"+Url.parse(req.url, true, true).host;
   const code = (Url.parse(req.url, true).query)["code"];
   const error = (Url.parse(req.url, true).query)["error"];
   const userId = transactionData.userId;
@@ -841,7 +835,7 @@ exports.polarCallback = functions.https.onRequest(async (req, res) => {
   const dataString = "code="+
      code+
      "&grant_type=authorization_code"+
-     "&redirect_uri="+transactionData.callbackBaseUrl+"/polarCallback";
+     "&redirect_uri="+callbackBaseUrl+"/polarCallback";
   const options = {
     url: "https://polarremote.com/v2/oauth2/token",
     method: "POST",
@@ -957,8 +951,6 @@ exports.wahooCallback = functions.https.onRequest(async (req, res) => {
 });
 
 exports.stravaWebhook = functions.https.onRequest(async (request, response) => {
-  const callbackBaseUrl =
-      "https://"+Url.parse(request.url, true, true).host;
   stravaApi.config({
     "client_id": configurations["paulsTestDev"]["stravaClientId"],
     "client_secret": configurations["paulsTestDev"]["stravaClientSecret"],
@@ -999,7 +991,7 @@ exports.stravaWebhook = functions.https.onRequest(async (request, response) => {
       const payloadAccessToken = payload["access_token"];
       if ("authorized" in request.body.updates) {
         console.log("de-auth event");
-        const result = await deleteStravaActivity(userDocRef, callbackBaseUrl, true);
+        const result = await deleteStravaActivity(userDocRef, true);
         response.status(result);
         response.send();
         return;
@@ -1012,7 +1004,7 @@ exports.stravaWebhook = functions.https.onRequest(async (request, response) => {
       // token in date, can get activities as required.
       if ("authorized" in request.body.updates) {
         console.log("de-auth event");
-        const result = await deleteStravaActivity(userDocRef, callbackBaseUrl, true);
+        const result = await deleteStravaActivity(userDocRef, true);
         response.status(result);
         response.send();
         return;

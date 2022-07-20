@@ -33,7 +33,7 @@ const request = require('request');
 const strava = require("strava-v3");
 const notion = require('../../notion');
 //-------------TEST 2--- Test Callbacks from Strava-------
- describe.only("Check the notion functions are writing activites to the notion endpoint.", () => {
+ describe("Check the notion functions are writing activites to the notion endpoint.", () => {
   before ('set up the userIds in the test User doc', async () => {
     await admin.firestore()
     .collection("users")

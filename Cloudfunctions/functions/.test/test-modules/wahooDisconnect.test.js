@@ -87,7 +87,7 @@ describe("Check the Wahoo Disconnect Service works: ", () => {
     .delete();
 
     req = {
-      url: "https://ourDomain.com?devId="+testDev+"&userId="+testUser+"&provider=wahoo&devKey=test-key",
+      url: "https://us-central1-rovetest-beea7.cloudfunctions.net/disconnectService?devId="+testDev+"&userId="+testUser+"&provider=wahoo&devKey=test-key",
     };
     res = {
       status: (code) => {
@@ -144,7 +144,7 @@ describe("Check the Wahoo Disconnect Service works: ", () => {
     .delete();
 
     req = {
-      url: "https://ourDomain.com?devId="+testDev+"&userId="+testUser+"&provider=wahoo&devKey=test-key",
+      url: "https://us-central1-rovetest-beea7.cloudfunctions.net/disconnectService?devId="+testDev+"&userId="+testUser+"&provider=wahoo&devKey=test-key",
     };
     res = {
       status: (code) => {
@@ -200,7 +200,7 @@ describe("Check the Wahoo Disconnect Service works: ", () => {
   });
   it('Check that service succeeds if user authorised already', async () => {
     req = {
-      url: "https://ourDomain.com?devId="+testDev+"&userId="+testUser+"&provider=wahoo&devKey=test-key",
+      url: "https://us-central1-rovetest-beea7.cloudfunctions.net/disconnectService?devId="+testDev+"&userId="+testUser+"&provider=wahoo&devKey=test-key",
     };
     res = {
       status: (code) => {
