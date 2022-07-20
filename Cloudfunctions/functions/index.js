@@ -952,8 +952,8 @@ exports.wahooCallback = functions.https.onRequest(async (req, res) => {
 
 exports.stravaWebhook = functions.https.onRequest(async (request, response) => {
   stravaApi.config({
-    "client_id": configurations["paulsTestDev"]["stravaClientId"],
-    "client_secret": configurations["paulsTestDev"]["stravaClientSecret"],
+    "client_id": configurations["roveLiveSecrets"]["stravaClientId"],
+    "client_secret": configurations["roveLiveSecrets"]["stravaClientSecret"],
     "redirect_uri": callbackBaseUrl+"/stravaCallback",
   });
   if (request.method === "POST") {
@@ -1264,7 +1264,7 @@ exports.createNotionLink = functions.https.onRequest(async (req, res) => {
 
   // create dev with secret_lookup notionUeser.
   await db.collection("developers").doc(databaseId).set({
-    "secret_lookup": "notionUser",
+    "secret_lookup": "roveLiveSecrets",
     "callbackURL": "https://notion.so",
     "deauthorize_endpoint": "",
     "devKey": key,
