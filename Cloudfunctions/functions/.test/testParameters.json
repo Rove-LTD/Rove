@@ -1,5 +1,7 @@
 { "testDev" :  "anotherTestDev",
   "testUser": "anotherTestUser",
+  "testNotionDev" :  "9e796cc24091489d97865364dc726b7b",
+  "testNotionUser": "notion",
   "firebaseConfig": {
     "apiKey": "AIzaSyCiMcMwrKgSKu6w5XW8hdCrWnLeI8CtGY4",
     "authDomain": "rovetest-beea7.firebaseapp.com",
@@ -13,12 +15,24 @@
   "testKeyFile": ".test/keys/rovetest-beea7-firebase-adminsdk-key.json",
   "devTestData": {
     "email": "paul.testDev@gmail.com",
+    "secret_lookup": "roveLiveSecrets",
     "devKey": "test-key",
     "polar_signature_secret_key": "e14f5f33-0ffc-4f38-8f7e-8d243337f986",
     "polar_webhook_id": "wPWwr1P7",
     "endpoint": "https://rovetest-beea7-default-rtdb.firebaseio.com/newmessage.json",
     "deauthorise_endpoint": "https://rovetest-beea7-default-rtdb.firebaseio.com/deauthMessage.json",
     "callbackURL": "https://paulsTest.com/callbackURL"
+  },
+  "devTestNotionData": {
+    "secret_lookup": "roveLiveSecrets",
+    "callbackURL": "https://notion.so",
+    "deauthorize_endpoint": "",
+    "devKey": "secret_RxAF1yQYpr7swJkAGUxfFKh5EgXg03hFPDjVwJhrOFr",
+    "email": "",
+    "endpoint": "9e796cc24091489d97865364dc726b7b"
+  },
+  "devUserNotionData": {
+    "userId": "notion"
   },
   "devUserData": {
     "email": "paul.userTest@gmail.com"
