@@ -216,9 +216,18 @@ exports.disconnectService = functions.https.onRequest(async (req, res) => {
       }
     } else if (provider == "garmin") {
       if (userDocData["garmin_connected"] == true) {
-        result = deleteGarminActivity(userDoc, false);
+        result = await deleteGarminActivity(userDoc, false);
         // check success or fail. result 200 is success 400 is failure
+        if (result == 200) {
+          res.status(200);
+          message = JSON.stringify({status: "disconnected"});
+        } else {
+          res.status(result);
+          message = "error: unexpected problem";
+        }
       } else {
+        res.status(400);
+        message = "error: the userId was not authorised for this provider";
         // error the user is not authorizes already
       }
     } else if (provider == "polar") {
@@ -318,29 +327,43 @@ async function deleteStravaActivity(userDoc, webhookCall) {
 }
 
 async function deleteGarminActivity(userDoc, webhookCall) {
-  const userDocData = await userDoc.data();
   if (!webhookCall) {
-    const userQueryList = db.collection("users").
-        where("garmin_userId", "==", userDocData["garmin_userId"])
+    const userQueryList = await db.collection("users").
+        where("garmin_access_token",
+            "==",
+            userDoc.data()["garmin_access_token"])
         .get();
-    if ( userQueryList.docs.length == 1) {
+    if (userQueryList.docs.length == 1) {
     // send post to garmin to de-auth.
       const response = await got
           .delete("https://apis.garmin.com/wellness-api/rest/user/registration",
-              {"Authorization": "Bearer " + userDocData["garmin_access_token"]});
+              {"Authorization": "Bearer " +
+                  userDoc.data()["garmin_access_token"]});
       // check success if fail return 400
       if (response.statusCode != 204) {
         return 400;
       }
     }
   }
-  // delete garmin keys and activities.
-  await db.collection("users").doc(userDoc.id).update({
-    garmin_access_token: admin.firestore.FieldValue.delete(),
-    garmin_access_token_secret: admin.firestore.FieldValue.delete(),
-  });
-  sendToDeauthoriseWebhook(userDoc);
-  return 200; // 200 success, 400 failure
+  try {
+    // delete garmin keys and activities.
+    await db.collection("users").doc(userDoc.id).update({
+      garmin_access_token: admin.firestore.FieldValue.delete(),
+      garmin_access_token_secret: admin.firestore.FieldValue.delete(),
+      garmin_connected: admin.firestore.FieldValue.delete(),
+    });
+    // delete activities from provider.
+    const activities = await userDoc.ref.collection("activities")
+        .where("sanitised.data_source", "==", "garmin")
+        .get();
+    activities.forEach(async (doc)=>{
+      await doc.ref.delete();
+    });
+    await sendToDeauthoriseWebhook(userDoc);
+    return 200; // 200 success, 400 failure
+  } catch (error) {
+    return 400;
+  }
 }
 
 async function deletePolarActivity(userDoc, webhookCall) {
@@ -507,7 +530,6 @@ exports.oauthCallbackHandlerGarmin = functions.https
       await oauthCallbackHandlerGarmin(oAuthCallback, transactionData);
       const urlString = await successDevCallback(transactionData);
       res.redirect(urlString);
-      res.send("THANKS, YOU CAN NOW CLOSE THIS WINDOW");
     }),
 
 // callback from strava with token in
@@ -1370,6 +1392,7 @@ async function oauthCallbackHandlerGarmin(oAuthCallback, transactionData) {
       "userId": userId,
       "garmin_access_token": garminAccessToken,
       "garmin_access_token_secret": garminAccessTokenSecret,
+      "garmin_connected": true,
     };
     await db.collection("users").doc(userDocId).set(firestoreParameters, {merge: true});
     getGarminUserId(consumerSecret, garminAccessToken, garminAccessTokenSecret, devId, userId);

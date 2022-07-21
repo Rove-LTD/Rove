@@ -11,6 +11,8 @@
       "wahooWebhookToken": "97661c16-6359-4854-9498-a49c07b6ec11"
     },
     "roveTestSecrets": {
+      "consumerSecret": "ffqgs2OxeJkFHUM0c3pGysdCp1Znt0tnc2s",
+      "oauth_consumer_key": "eb0a9a22-db68-4188-a913-77ee997924a8",
       "whaooClientId": "IGQW1vInhei9CE_tEyoso2V4COhNOn53AfYGsTx96oA",
       "wahooSecret": "-TQHcASsAk-cTUN3485_oyY6lUqsKhFLLpoKoWrCnHs",
       "wahooWebhookToken": "348a6fe2-3719-4647-a233-933b8c404d6b"

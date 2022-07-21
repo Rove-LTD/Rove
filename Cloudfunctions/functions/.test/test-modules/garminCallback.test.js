@@ -69,6 +69,7 @@ describe("Testing that the Garmin callbacks work: ", () => {
           email: devUserData.email,
           garmin_access_token: "garmin-access-token",
           garmin_access_token_secret: "garmin-test-secret",
+          garmin_connected: true,
       }
 
       const stubbedcall = sinon.stub(got, "post");
