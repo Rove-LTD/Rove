@@ -37,7 +37,6 @@ const request = require('request');
           .doc(testDev+testUser)
           .set(devUserData);
 
-
         await admin.firestore()
         .collection("transactions")
         .doc("polarTestTransaction")
@@ -80,7 +79,7 @@ const request = require('request');
               polar_access_token: 'test-polar-access-token',
               polar_token_type: 'bearer',
               polar_token_expires_in: 461375999,
-              polar_token_expires_at: expected_expiry_date,
+              polar_token_expires_at: "tested seperately",
               polar_connected: true,
               polar_user_id: '123456polar',
           }
@@ -93,7 +92,7 @@ const request = require('request');
           const base64String = buffer.toString("base64");
           const dataString = "code=testcode"+
           "&grant_type=authorization_code"+
-          "&redirect_uri=https://us-central1-rove-26.cloudfunctions.net/polarCallback";
+          "&redirect_uri=https://us-central1-rovetest-beea7.cloudfunctions.net/polarCallback";
           options = {
               url: "https://polarremote.com/v2/oauth2/token",
               method: "POST",
@@ -109,7 +108,7 @@ const request = require('request');
           stubbedcall.onSecondCall().yields(null, responseObject2, JSON.stringify(responseBody2));
 
           // set the request object with the correct provider, developerId and userId
-          const req = {url: "https://us-central1-rove-26.cloudfunctions.net/polarCallback?state=polarTestTransaction&code=testcode"};
+          const req = {url: "https://us-central1-rovetest-beea7.cloudfunctions.net/polarCallback?state=polarTestTransaction&code=testcode"};
           const res = {
               send: (text) => {
                   assert.equal(text, "your authorization was successful please close this window: you are already registered with Polar - there is no need to re-register")
@@ -126,7 +125,12 @@ const request = require('request');
           .doc(testDev+testUser)
           .get();
 
-          assert.deepEqual(testUserDoc.data(), expectedTestUserDoc);
+          testUserDocData = testUserDoc.data();
+
+          assert.approximately(testUserDocData.polar_token_expires_at, expected_expiry_date, 2);
+          testUserDocData.polar_token_expires_at = "tested seperately"
+
+          assert.deepEqual(testUserDocData, expectedTestUserDoc);
           assert(stubbedcall.calledWith(options), "the call to polar had the wrong arguments");
 
           sinon.restore();
@@ -181,7 +185,7 @@ const request = require('request');
               polar_access_token: 'test-polar-access-token',
               polar_token_type: 'bearer',
               polar_token_expires_in: 21600,
-              polar_token_expires_at: expected_expiry_date,
+              polar_token_expires_at: "tested seperately",
               polar_connected: true,
               polar_registration_date: "2011-10-14T12:50:37.000Z",
               polar_user_id: '123456polar',
@@ -192,7 +196,7 @@ const request = require('request');
           stubbedcall.onSecondCall().yields(null, responseObject2, JSON.stringify(responseBody2));
 
           // set the request object with the correct provider, developerId and userId
-          const req = {url: "https://us-central1-rove-26.cloudfunctions.net/polarCallback?state=polarTestTransaction&code=testcode"};
+          const req = {url: "https://us-central1-rovetest-beea7.cloudfunctions.net/polarCallback?state=polarTestTransaction&code=testcode"};
           const res = {
               send: (text) => {
                   assert.equal(text, "your authorization was successful please close this window: ")
@@ -209,7 +213,12 @@ const request = require('request');
           .doc(testDev+testUser)
           .get();
 
-          assert.deepEqual(testUserDoc.data(), expectedTestUserDoc);
+          testUserDocData = testUserDoc.data();
+
+          assert.approximately(testUserDocData.polar_token_expires_at, expected_expiry_date, 2);
+          testUserDocData.polar_token_expires_at = "tested seperately"
+
+          assert.deepEqual(testUserDocData, expectedTestUserDoc);
 
           await sinon.restore();
 

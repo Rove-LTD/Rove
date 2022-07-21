@@ -19,6 +19,7 @@ const OauthWahoo = require("./oauthWahoo");
 const contentsOfDotEnvFile = require("./config.json");
 const filters = require("./data-filter");
 const fs = require("fs");
+const notion = require("./notion");
 
 const configurations = contentsOfDotEnvFile["config"];
 // find a way to decrypt and encrypt this information
@@ -26,27 +27,24 @@ const configurations = contentsOfDotEnvFile["config"];
 admin.initializeApp();
 const db = admin.firestore();
 const oauthWahoo = new OauthWahoo(configurations, db);
+const callbackBaseUrl = "https://us-central1-"+process.env.GCLOUD_PROJECT+".cloudfunctions.net";
 
 // INTEGRATION FOR APP:
 // get url response and go through onboarding flow.
 // we recieve auth token from strava to stravaCallBack.
 // tokens stored under userId
 
-exports.redirectPage = functions.https.onRequest(async (req, res) => {
+exports.redirectPage = functions.https.onRequest( async (req, res) => {
   const transactionId = (Url.parse(req.url, true).query)["transactionId"];
   const provider = (Url.parse(req.url, true).query)["provider"];
   const devId = (Url.parse(req.url, true).query)["devId"];
   const params = "?transactionId="+transactionId+"&isRedirect=true";
-  fs.readFile("redirectPage.html", function(err, html) {
-    if (err) {
-      throw err;
-    }
-    res.writeHead(200, {"Content-Type": "text/html"});
-    res.write(html);
-    res.write("<h2 style='text-align: center;font-family:DM Sans'>Data integrations provider for "+devId+"</h2>\
-    <h2 style='text-align: center;font-family:DM Sans'>To authenticate "+provider+" click <a href=/connectService"+params+">here</a></h2>");
-    res.end();
-  });
+  const html = await fs.promises.readFile("redirectPage.html");
+  res.writeHead(200, {"Content-Type": "text/html"});
+  res.write(html);
+  res.write("<h2 style='text-align: center;font-family:DM Sans'>Data integrations provider for "+devId+"</h2>\
+  <h2 style='text-align: center;font-family:DM Sans'>To authenticate "+provider+" click <a href=/connectService"+params+">here</a></h2>");
+  res.end();
 });
 
 exports.connectService = functions.https.onRequest(async (req, res) => {
@@ -57,7 +55,6 @@ exports.connectService = functions.https.onRequest(async (req, res) => {
   let transactionId = (Url.parse(req.url, true).query)["transactionId"];
   const isRedirect = (Url.parse(req.url, true).query)["isRedirect"];
   let parameters = {};
-  let redirectUrl;
   if (transactionId == undefined) {
     parameters.provider = (Url.parse(req.url, true).query)["provider"];
     parameters.devId = (Url.parse(req.url, true).query)["devId"];
@@ -68,9 +65,8 @@ exports.connectService = functions.https.onRequest(async (req, res) => {
     parameters = await getParametersFromTransactionId(transactionId);
     updateTransactionWithStatus(transactionId, "userClickedAuthButton");
   }
-
   let url = "";
-
+  console.log(callbackBaseUrl);
   // parameter checks
   // first check developer exists and the devKey matches
   if (parameters.devId != null) {
@@ -120,9 +116,9 @@ exports.connectService = functions.https.onRequest(async (req, res) => {
     transactionId = await createTransactionWithParameters(parameters);
   }
   // redirect to splash page if isRedirect is not set
-  if (isRedirect == undefined) {
+  if (isRedirect == undefined || isRedirect == false) {
     // call redirect with the transaction id
-    res.redirect("../redirectPage?transactionId="+transactionId+"&provider="+parameters.provider+"&devId="+parameters.devId);
+    res.redirect(callbackBaseUrl+"/redirectPage?transactionId="+transactionId+"&provider="+parameters.provider+"&devId="+parameters.devId);
     return;
   }
 
@@ -132,9 +128,9 @@ exports.connectService = functions.https.onRequest(async (req, res) => {
   } else if (parameters.provider == "garmin") {
     url = await garminOauth(parameters, transactionId);
   } else if (parameters.provider == "polar") {
-    url = polarOauth(parameters, transactionId);
+    url = await polarOauth(parameters, transactionId);
   } else if (parameters.provider == "wahoo") {
-    url = wahooOauth(parameters, transactionId);
+    url = await wahooOauth(parameters, transactionId);
   } else {
     // the request was badly formatted with incorrect provider parameter
     url = "error: the provider was badly formatted, missing or not supported";
@@ -269,10 +265,13 @@ exports.disconnectService = functions.https.onRequest(async (req, res) => {
 });
 
 async function deleteStravaActivity(userDoc, webhookCall) {
+  const devId = await userDoc.data()["devId"];
+  const secretLookup = await db.collection("developers").doc(devId).get();
+  const lookup = await secretLookup.data()["secret_lookup"];
   stravaApi.config({
-    "client_id": configurations["paulsTestDev"]["stravaClientId"],
-    "client_secret": configurations["paulsTestDev"]["stravaClientSecret"],
-    "redirect_uri": "https://us-central1-rove-26.cloudfunctions.net/stravaCallback",
+    "client_id": configurations[lookup]["stravaClientId"],
+    "client_secret": configurations[lookup]["stravaClientSecret"],
+    "redirect_uri": callbackBaseUrl+"/stravaCallback",
   });
   // delete activities
   // check if this is the last user with this stravaId and this is not a call from the webhook
@@ -526,10 +525,12 @@ exports.stravaCallback = functions.https.onRequest(async (req, res) => {
          "error has occurred please close this window and try again");
     return;
   }
+  const secretLookup = await db.collection("developers").doc(devId).get();
+  const lookup = await secretLookup.data()["secret_lookup"];
   const dataString = "client_id="+
-     configurations[devId]["stravaClientId"]+
+     configurations[lookup]["stravaClientId"]+
      "&client_secret="+
-     configurations[devId]["stravaClientSecret"]+
+     configurations[lookup]["stravaClientSecret"]+
      "&code="+
      code+
      "&grant_type=authorization_code";
@@ -544,7 +545,7 @@ exports.stravaCallback = functions.https.onRequest(async (req, res) => {
     if (!error && response.statusCode == 200) {
       // this is where the tokens come back.
       stravaStoreTokens(userId, devId, JSON.parse(body), db);
-      await getStravaAthleteId(userId, devId, JSON.parse(body), db);
+      await getStravaAthleteId(userId, devId, JSON.parse(body));
       // send a response now to endpoint for devId confirming success
       // await sendDevSuccess(devId); //TODO: create dev success post.
       // userResponse = "Some good redirect.";
@@ -618,24 +619,22 @@ exports.garminWebhook = functions.https.onRequest(async (req, res) => {
       const userDocsList = [];
       const userQuery = await db.collection("users")
           .where("garmin_access_token", "==", req.body.activities[index].userAccessToken).get();
-      userQuery.docs.forEach(async (doc)=> {
+      userQuery.docs.forEach((doc)=> {
         userDocsList.push(doc);
-        // take opportunity to fill garmin_userId for future use
-        if (doc.data()["garmin_userId"] == undefined &&
-             req.body.activities[index].userId != undefined) {
-          doc.ref
-              .set({"garmin_userId": req.body.activities[index].userId}, {merge: true});
-        }
       });
       // save raw and sanitised activites as a backup for each user
-      userDocsList.forEach(async (userDoc)=>{
+      userDocsList.forEach( async (userDoc)=>{
         sanitisedActivity["userId"] = userDoc.data()["userId"];
-        const activityDoc = await userDoc.ref
+        // TODO: this is a bit of a cludge to prevent the userId
+        // being written incorrectly in this loop during async
+        // firebase writes.
+        const localSanitisedActivity = JSON.parse(JSON.stringify(sanitisedActivity));
+        const activityDoc = userDoc.ref
             .collection("activities")
-            .doc()
-            .set({"sanitised": sanitisedActivity, "raw": req.body.activities[index]});
+            .doc();
+        await activityDoc.set({"sanitised": localSanitisedActivity, "raw": req.body.activities[index]});
         const triesSoFar = 0; // this is our first try to write to developer
-        sendToDeveloper(userDoc, sanitisedActivity, req.body.activities[index], activityDoc, triesSoFar);
+        await sendToDeveloper(userDoc, localSanitisedActivity, req.body.activities[index], activityDoc, triesSoFar);
       });
     });
     res.status(200);
@@ -667,12 +666,14 @@ async function stravaStoreTokens(userId, devId, data, db) {
   // write resultant message to dev endpoint.
   return;
 }
-async function getStravaAthleteId(userId, devId, data, db) {
+async function getStravaAthleteId(userId, devId, data) {
   // get athlete id from strava.
+  const secretLookup = await db.collection("developers").doc(devId).get();
+  const lookup = await secretLookup.data()["secret_lookup"];
   stravaApi.config({
-    "client_id": configurations[devId]["stravaClientId"],
-    "client_secret": configurations[devId]["stravaClientSecret"],
-    "redirect_uri": "https://us-central1-rove-26.cloudfunctions.net/stravaCallback",
+    "client_id": configurations[lookup]["stravaClientId"],
+    "client_secret": configurations[lookup]["stravaClientSecret"],
+    "redirect_uri": callbackBaseUrl+"/stravaCallback",
   });
   const parameters = {
     "access_token": data["access_token"],
@@ -685,14 +686,17 @@ async function getStravaAthleteId(userId, devId, data, db) {
   return;
 }
 
-function stravaOauth(transactionData, transactionId) {
+async function stravaOauth(transactionData, transactionId) {
   const userId = transactionData.userId;
   const devId = transactionData.devId;
   // add parameters from user onto the callback redirect.
+  const secretLookup = await db.collection("developers").doc(devId).get();
+  const lookup = await secretLookup.data()["secret_lookup"];
   const parameters = {
-    client_id: configurations[devId]["stravaClientId"],
+    client_id: configurations[lookup]["stravaClientId"],
     response_type: "code",
-    redirect_uri: "https://us-central1-rove-26.cloudfunctions.net/stravaCallback?transactionId="+
+    redirect_uri: callbackBaseUrl+
+      "/stravaCallback?transactionId="+
       transactionId,
     approval_prompt: "force",
     scope: "profile:read_all,activity:read_all",
@@ -721,10 +725,12 @@ async function garminOauth(transactionData, transactionId) {
   // console.log(oauth_nonce);
   const oauthTimestamp = Math.round(new Date().getTime()/1000);
   // console.log(oauth_timestamp);
-  const consumerSecret = configurations[devId]["consumerSecret"];
+  const secretLookup = await db.collection("developers").doc(devId).get();
+  const lookup = await secretLookup.data()["secret_lookup"];
+  const consumerSecret = configurations[lookup]["consumerSecret"];
   const parameters = {
     oauth_nonce: oauthNonce,
-    oauth_consumer_key: configurations[devId]["oauth_consumer_key"],
+    oauth_consumer_key: configurations[lookup]["oauth_consumer_key"],
     oauth_timestamp: oauthTimestamp,
     oauth_signature_method: "HMAC-SHA1",
     oauth_version: "1.0",
@@ -740,7 +746,7 @@ async function garminOauth(transactionData, transactionId) {
   const encodedSignature = encodeURIComponent(signature);
   const url =
      "https://connectapi.garmin.com/oauth-service/oauth/request_token?oauth_consumer_key="+
-     configurations[devId]["oauth_consumer_key"]+
+     configurations[lookup]["oauth_consumer_key"]+
      "&oauth_nonce="+
      oauthNonce.toString()+
      "&oauth_signature_method=HMAC-SHA1&oauth_timestamp="+
@@ -759,25 +765,29 @@ async function garminOauth(transactionData, transactionId) {
   const oauthTokens = response.body.split("&");
   // set callbackURL for garmin Oauth with token and userId and devId.
   const callbackURL =
-     "oauth_callback=https://us-central1-rove-26.cloudfunctions.net/oauthCallbackHandlerGarmin?" +
-     oauthTokens[1] +
-         "-transactionId=" + transactionId;
+      "oauth_callback="+
+      callbackBaseUrl+
+      "/oauthCallbackHandlerGarmin?"+
+      oauthTokens[1]+
+      "-transactionId="+transactionId;
   // append to oauth garmin url.
-  const _url = "https://connect.garmin.com/oauthConfirm?" +
-   oauthTokens[0] +
-         "&" +
-         callbackURL;
+  const _url = "https://connect.garmin.com/oauthConfirm?"+
+      oauthTokens[0]+
+      "&"+
+      callbackURL;
   return _url;
 }
 
-function polarOauth(transactionData, transactionId) {
+async function polarOauth(transactionData, transactionId) {
   const userId = transactionData.userId;
   const devId =transactionData.devId;
+  const secretLookup = await db.collection("developers").doc(devId).get();
+  const lookup = await secretLookup.data()["secret_lookup"];
   // add parameters from user onto the callback redirect.
   const parameters = {
-    client_id: configurations[devId]["polarClientId"],
+    client_id: configurations[lookup]["polarClientId"],
     response_type: "code",
-    redirect_uri: "https://us-central1-rove-26.cloudfunctions.net/polarCallback",
+    redirect_uri: callbackBaseUrl+"/polarCallback",
     scope: "accesslink.read_all",
     state: transactionId,
   };
@@ -816,14 +826,16 @@ exports.polarCallback = functions.https.onRequest(async (req, res) => {
     res.send("Error: missing userId or DevId in callback: an unexpected error has occurred please close this window and try again");
     return;
   }
-  const clientIdClientSecret = configurations[devId]["polarClientId"]+":"+configurations[devId]["polarSecret"];
+  const secretLookup = await db.collection("developers").doc(devId).get();
+  const lookup = await secretLookup.data()["secret_lookup"];
+  const clientIdClientSecret = configurations[lookup]["polarClientId"]+":"+configurations[lookup]["polarSecret"];
    const buffer = new Buffer.from(clientIdClientSecret); // eslint-disable-line
   const base64String = buffer.toString("base64");
 
   const dataString = "code="+
      code+
      "&grant_type=authorization_code"+
-     "&redirect_uri=https://us-central1-rove-26.cloudfunctions.net/polarCallback";
+     "&redirect_uri="+callbackBaseUrl+"/polarCallback";
   const options = {
     url: "https://polarremote.com/v2/oauth2/token",
     method: "POST",
@@ -913,11 +925,11 @@ async function polarStoreTokens(userId, devId, data, db) {
   return;
 }
 
-function wahooOauth(transactionData, transactionId) {
+async function wahooOauth(transactionData, transactionId) {
   const userId = transactionData.userId;
-  const devId =transactionData.devId;
+  const devId = transactionData.devId;
   // add parameters from user onto the callback redirect.
-  oauthWahoo.setDevUser(transactionData, transactionId);
+  await oauthWahoo.setDevUser(transactionData, transactionId);
   return oauthWahoo.redirectUrl;
 }
 
@@ -926,14 +938,13 @@ exports.wahooCallback = functions.https.onRequest(async (req, res) => {
   const transactionId = (Url.parse(req.url, true).query)["state"];
   const transactionData = await getParametersFromTransactionId(transactionId);
   const data = Url.parse(req.url, true).query;
-  oauthWahoo.fromCallbackData(data, transactionData);
+  await oauthWahoo.fromCallbackData(data, transactionData);
   if (oauthWahoo.status.gotCode) {
     await oauthWahoo.getAndSaveAccessCodes();
   }
   if (!oauthWahoo.error) {
     const urlString = await successDevCallback(transactionData);
     res.redirect(urlString);
-    res.send("your authorization was successful please close this window");
   } else {
     res.send(oauthWahoo.errorMessage);
   }
@@ -941,9 +952,9 @@ exports.wahooCallback = functions.https.onRequest(async (req, res) => {
 
 exports.stravaWebhook = functions.https.onRequest(async (request, response) => {
   stravaApi.config({
-    "client_id": configurations["paulsTestDev"]["stravaClientId"],
-    "client_secret": configurations["paulsTestDev"]["stravaClientSecret"],
-    "redirect_uri": "https://us-central1-rove-26.cloudfunctions.net/stravaCallback",
+    "client_id": configurations["roveLiveSecrets"]["stravaClientId"],
+    "client_secret": configurations["roveLiveSecrets"]["stravaClientSecret"],
+    "redirect_uri": callbackBaseUrl+"/stravaCallback",
   });
   if (request.method === "POST") {
     if (!request.debug) {
@@ -1004,7 +1015,8 @@ exports.stravaWebhook = functions.https.onRequest(async (request, response) => {
       }
     }
     // save to a doc
-    const activityDoc = await userDocRef.ref.collection("activities").doc().set({"raw": activity, "sanitised": sanitisedActivity[0]});
+    const activityDoc = userDocRef.ref.collection("activities").doc();
+    await activityDoc.set({"raw": activity, "sanitised": sanitisedActivity[0]});
     // Send the information to an endpoint specified by the dev registered to a user.
     response.status(200);
     response.send("OK!");
@@ -1069,12 +1081,16 @@ exports.wahooWebhook = functions.https.onRequest(async (request, response) => {
     // save raw and sanitised activites as a backup for each user
     userDocsList.forEach(async (userDoc)=>{
       sanitisedActivity["userId"] = userDoc.data()["userId"];
-      const activityDoc = await userDoc.ref
+      // TODO: this is a bit of a cludge to prevent the userId
+      // being written incorrectly in this loop during async
+      // firebase writes.
+      const localSanitisedActivity = JSON.parse(JSON.stringify(sanitisedActivity));
+      const activityDoc = userDoc.ref
           .collection("activities")
-          .doc()
-          .set({"sanitised": sanitisedActivity, "raw": request.body});
+          .doc();
+      await activityDoc.set({"sanitised": localSanitisedActivity, "raw": request.body});
       const triesSoFar = 0; // this is our first try to write to developer
-      sendToDeveloper(userDoc, sanitisedActivity, request.body, activityDoc, triesSoFar);
+      await sendToDeveloper(userDoc, localSanitisedActivity, request.body, activityDoc, triesSoFar);
     });
     response.status(200);
     response.send("EVENT_RECEIVED");
@@ -1132,12 +1148,16 @@ exports.polarWebhook = functions.https.onRequest(async (request, response) => {
       // send to developer
       userDocsList.forEach(async (userDoc)=>{
         sanitisedActivity["userId"] = userDoc.data()["userId"];
-        const activityDoc = await userDoc
+        // TODO: this is a bit of a cludge to prevent the userId
+        // being written incorrectly in this loop during async
+        // firebase writes.
+        const localSanitisedActivity = JSON.parse(JSON.stringify(sanitisedActivity));
+        const activityDoc = userDoc
             .ref.collection("activities")
-            .doc()
-            .set({"sanitised": sanitisedActivity, "raw": activity});
+            .doc();
+        await activityDoc.set({"sanitised": localSanitisedActivity, "raw": activity});
         const triesSoFar = 0; // this is our first try to write to developer
-        sendToDeveloper(userDoc, sanitisedActivity, activity, activityDoc, triesSoFar);
+        await sendToDeveloper(userDoc, localSanitisedActivity, activity, activityDoc, triesSoFar);
       });
     }
     response.status(200);
@@ -1164,37 +1184,41 @@ async function sendToDeveloper(userDoc,
   const datastring = {"sanitised": sanitisedActivity, "raw": activity};
   const developerDoc = await db.collection("developers").doc(devId).get();
   const endpoint = developerDoc.data()["endpoint"];
-  if (endpoint == undefined || endpoint == null) {
-    // cannot send to developer as endpoint does not exist
-    console.log("Cannot send webhook payload to "+devId+" endpoint not provided");
-    return;
-  }
-  const options = {
-    method: "POST",
-    url: endpoint,
-    headers: {
-      "Accept": "application/json",
-      "Content-type": "application/json",
-    },
-    body: JSON.stringify(datastring),
-  };
-  const response = await got.post(options);
-  if (response.statusCode == 200) {
-    // the developer accepted the information TODO
-    /*
-     userDoc.ref
-         .collection("activities")
-         .doc(activityDoc)
-         .set({status: "sent", timestamp: new Date()}, {merge: true}); */
+  const userData = userDoc.data();
+  // check if the user is from notion.
+  if (userData["userId"] == "notion") {
+    notion.sendToNotionEndpoint(endpoint, developerDoc, sanitisedActivity);
   } else {
-    // call the retry functionality and increment the retry counter
-    if (triesSoFar <= MaxRetries) {
-      console.log("retrying sending to developer");
-      wait(waitTime[triesSoFar]);
-      sendToDeveloper(userDoc, sanitisedActivity, activity, activityDoc, triesSoFar+1);
+    if (endpoint == undefined || endpoint == null) {
+    // cannot send to developer as endpoint does not exist
+      console.log("Cannot send webhook payload to "+devId+" endpoint not provided");
+      return;
+    }
+    const options = {
+      method: "POST",
+      url: endpoint,
+      headers: {
+        "Accept": "application/json",
+        "Content-type": "application/json",
+      },
+      body: JSON.stringify(datastring),
+    };
+    const response = await got.post(options);
+    if (response.statusCode == 200) {
+    // the developer accepted the information TODO
+      activityDoc
+          .set({status: "sent", timestamp: new Date().toISOString()},
+              {merge: true});
     } else {
+    // call the retry functionality and increment the retry counter
+      if (triesSoFar <= MaxRetries) {
+        console.log("retrying sending to developer");
+        wait(waitTime[triesSoFar]);
+        sendToDeveloper(userDoc, sanitisedActivity, activity, activityDoc, triesSoFar+1);
+      } else {
       // max retries email developer
-      console.log("max retries on sending to developer reached - fail");
+        console.log("max retries on sending to developer reached - fail");
+      }
     }
   }
 }
@@ -1231,8 +1255,34 @@ exports.polarWebhookSetup = functions.https.onRequest(async (req, res) => {
   return;
 });
 
+exports.createNotionLink = functions.https.onRequest(async (req, res) => {
+  const databaseId = (Url.parse(req.url, true).query)["databaseId"];
+  const provider = (Url.parse(req.url, true).query)["provider"];
+  const key = (Url.parse(req.url, true).query)["key"];
+  // we need to create a new dev and a new user linked to this dev for the notion user.
+  // the endpoint of notion should be written in.
+
+  // create dev with secret_lookup notionUeser.
+  await db.collection("developers").doc(databaseId).set({
+    "secret_lookup": "roveLiveSecrets",
+    "callbackURL": "https://notion.so",
+    "deauthorize_endpoint": "",
+    "devKey": key,
+    "email": "",
+    "endpoint": databaseId});
+  // create user
+  await db.collection("users").doc(databaseId+"notion").set({
+    "devId": databaseId,
+    "userId": "notion",
+  });
+  // redirect the user to connectService with new dev and user credentials.
+  res.redirect("/connectService?userId="+databaseId+"notion"+"&devId="+databaseId+"&provider="+provider+"&devKey="+key);
+});
+
 async function polarWebhookUtility(devId, action, webhookId) {
-  const clientIdClientSecret = configurations[devId]["polarClientId"]+":"+configurations[devId]["polarSecret"];
+  const secretLookup = await db.collection("developers").doc(devId).get();
+  const lookup = await secretLookup.data()["secret_lookup"];
+  const clientIdClientSecret = configurations[lookup]["polarClientId"]+":"+configurations[lookup]["polarSecret"];
    const buffer = new Buffer.from(clientIdClientSecret); // eslint-disable-line
   const base64String = buffer.toString("base64");
   const _headers = {
@@ -1286,13 +1336,15 @@ async function oauthCallbackHandlerGarmin(oAuthCallback, transactionData) {
   let oauthTokenSecret = oAuthCallback["oauth_token_secret"].split("-");
   const userId = transactionData.userId;
   const devId = transactionData.devId;
-  const consumerSecret = configurations[devId]["consumerSecret"];
+  const secretLookup = await db.collection("developers").doc(devId).get();
+  const lookup = await secretLookup.data()["secret_lookup"];
+  const consumerSecret = configurations[lookup]["consumerSecret"];
   oauthTokenSecret = oauthTokenSecret[0];
   const parameters = {
     oauth_nonce: oauthNonce,
     oauth_verifier: oAuthCallback["oauth_verifier"],
     oauth_token: oAuthCallback["oauth_token"],
-    oauth_consumer_key: configurations[devId]["oauth_consumer_key"],
+    oauth_consumer_key: configurations[lookup]["oauth_consumer_key"],
     oauth_timestamp: oauthTimestamp,
     oauth_signature_method: "HMAC-SHA1",
     oauth_version: "1.0",
@@ -1303,7 +1355,7 @@ async function oauthCallbackHandlerGarmin(oAuthCallback, transactionData) {
   const encodingKey = consumerSecret + "&" + oauthTokenSecret;
   const signature = crypto.createHmac("sha1", encodingKey).update(baseString).digest().toString("base64");
   const encodedSignature = encodeURIComponent(signature);
-  const url = "https://connectapi.garmin.com/oauth-service/oauth/access_token?oauth_consumer_key="+configurations[devId]["oauth_consumer_key"]+"&oauth_nonce="+oauthNonce.toString()+"&oauth_signature_method=HMAC-SHA1&oauth_timestamp="+oauthTimestamp.toString()+"&oauth_signature="+encodedSignature+"&oauth_verifier="+oAuthCallback["oauth_verifier"]+"&oauth_token="+oAuthCallback["oauth_token"]+"&oauth_version=1.0";
+  const url = "https://connectapi.garmin.com/oauth-service/oauth/access_token?oauth_consumer_key="+configurations[lookup]["oauth_consumer_key"]+"&oauth_nonce="+oauthNonce.toString()+"&oauth_signature_method=HMAC-SHA1&oauth_timestamp="+oauthTimestamp.toString()+"&oauth_signature="+encodedSignature+"&oauth_verifier="+oAuthCallback["oauth_verifier"]+"&oauth_token="+oAuthCallback["oauth_token"]+"&oauth_version=1.0";
   const response = await got.post(url);
   // console.log(response.body);
   await firestoreData(response.body, userId, devId);
@@ -1350,8 +1402,10 @@ async function getGarminUserId(consumerSecret, garminAccessToken, garminAccessTo
   // console.log(oauth_nonce);
   const oauthTimestamp = Math.round(new Date().getTime()/1000);
   // console.log(oauth_timestamp);
+  const secretLookup = await db.collection("developers").doc(devId).get();
+  const lookup = await secretLookup.data()["secret_lookup"];
   const parameters = {
-    oauth_consumer_key: configurations[devId]["oauth_consumer_key"],
+    oauth_consumer_key: configurations[lookup]["oauth_consumer_key"],
     oauth_token: garminAccessToken,
     oauth_signature_method: "HMAC-SHA1",
     oauth_nonce: oauthNonce,
@@ -1367,7 +1421,7 @@ async function getGarminUserId(consumerSecret, garminAccessToken, garminAccessTo
   const options = {
     headers: {
       "Authorization": {
-        "oauth_consumer_key": configurations[devId]["oauth_consumer_key"],
+        "oauth_consumer_key": configurations[lookup]["oauth_consumer_key"],
         "oauth_token": garminAccessToken,
         "oauth_signature_method": "HMAC-SHA1",
         "oauth_signature": encodedSignature,
