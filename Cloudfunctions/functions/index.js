@@ -37,7 +37,11 @@ const callbackBaseUrl = "https://us-central1-"+process.env.GCLOUD_PROJECT+".clou
 exports.redirectPage = functions.https.onRequest( async (req, res) => {
   const transactionId = (Url.parse(req.url, true).query)["transactionId"];
   const provider = (Url.parse(req.url, true).query)["provider"];
-  const devId = (Url.parse(req.url, true).query)["devId"];
+  let devId = (Url.parse(req.url, true).query)["devId"];
+  const userId = (Url.parse(req.url, true).query)["userId"];
+  if (userId == "notion") {
+    devId = "Notion Templates";
+  }
   const params = "?transactionId="+transactionId+"&isRedirect=true";
   const html = await fs.promises.readFile("redirectPage.html");
   res.writeHead(200, {"Content-Type": "text/html"});
@@ -118,7 +122,7 @@ exports.connectService = functions.https.onRequest(async (req, res) => {
   // redirect to splash page if isRedirect is not set
   if (isRedirect == undefined || isRedirect == false) {
     // call redirect with the transaction id
-    res.redirect(callbackBaseUrl+"/redirectPage?transactionId="+transactionId+"&provider="+parameters.provider+"&devId="+parameters.devId);
+    res.redirect(callbackBaseUrl+"/redirectPage?transactionId="+transactionId+"&provider="+parameters.provider+"&devId="+parameters.devId+"&userId="+parameters.userId);
     return;
   }
 
@@ -951,6 +955,29 @@ exports.wahooCallback = functions.https.onRequest(async (req, res) => {
 });
 
 exports.stravaWebhook = functions.https.onRequest(async (request, response) => {
+  processStravaWebhook(request, response);
+  // handle subscription setup
+  if (request.method === "GET") {
+    const VERIFY_TOKEN = "STRAVA";
+    const mode = request.query["hub.mode"];
+    const token = request.query["hub.verify_token"];
+    const challenge = request.query["hub.challenge"];
+    if (mode && token) {
+      if (mode === "subscribe" && token === VERIFY_TOKEN) {
+        functions.logger.info("WEBHOOK_VERIFIED");
+        response.status(200).json({"hub.challenge": challenge});
+      } else {
+        response.sendStatus(403);
+      }
+    } else {
+      response.sendStatus(403);
+    }
+  }
+  // send response 200.
+  response.sendStatus(200);
+});
+
+async function processStravaWebhook(request, response) {
   stravaApi.config({
     "client_id": configurations["roveLiveSecrets"]["stravaClientId"],
     "client_secret": configurations["roveLiveSecrets"]["stravaClientSecret"],
@@ -966,8 +993,6 @@ exports.stravaWebhook = functions.https.onRequest(async (request, response) => {
     // get userbased on userid. (.where("id" == request.body.owner_id)).
     // if the status is a delete then do nothing.
     if (request.body.aspect_type == "delete") {
-      response.status(200);
-      response.send();
       return;
     }
     const userDoc = await db.collection("users").where("strava_id", "==", request.body.owner_id).get();
@@ -992,8 +1017,6 @@ exports.stravaWebhook = functions.https.onRequest(async (request, response) => {
       if ("authorized" in request.body.updates) {
         console.log("de-auth event");
         const result = await deleteStravaActivity(userDocRef, true);
-        response.status(result);
-        response.send();
         return;
       } else {
         activity = await stravaApi.activities.get({"access_token": payloadAccessToken, "id": request.body.object_id});
@@ -1005,8 +1028,6 @@ exports.stravaWebhook = functions.https.onRequest(async (request, response) => {
       if ("authorized" in request.body.updates) {
         console.log("de-auth event");
         const result = await deleteStravaActivity(userDocRef, true);
-        response.status(result);
-        response.send();
         return;
       } else {
         activity = await stravaApi.activities.get({"access_token": stravaAccessToken, "id": request.body.object_id});
@@ -1018,31 +1039,14 @@ exports.stravaWebhook = functions.https.onRequest(async (request, response) => {
     const activityDoc = userDocRef.ref.collection("activities").doc();
     await activityDoc.set({"raw": activity, "sanitised": sanitisedActivity[0]});
     // Send the information to an endpoint specified by the dev registered to a user.
-    response.status(200);
-    response.send("OK!");
+
     await sendToDeveloper(userDocRef,
         sanitisedActivity[0],
         activity,
         activityDoc,
         0);
-  } else if (request.method === "GET") {
-    const VERIFY_TOKEN = "STRAVA";
-    const mode = request.query["hub.mode"];
-    const token = request.query["hub.verify_token"];
-    const challenge = request.query["hub.challenge"];
-
-    if (mode && token) {
-      if (mode === "subscribe" && token === VERIFY_TOKEN) {
-        functions.logger.info("WEBHOOK_VERIFIED");
-        response.status(200).json({"hub.challenge": challenge});
-      } else {
-        response.sendStatus(403);
-      }
-    } else {
-      response.sendStatus(403);
-    }
   }
-});
+}
 
 exports.wahooWebhook = functions.https.onRequest(async (request, response) => {
   if (request.method === "POST") {
@@ -1262,21 +1266,21 @@ exports.createNotionLink = functions.https.onRequest(async (req, res) => {
   // we need to create a new dev and a new user linked to this dev for the notion user.
   // the endpoint of notion should be written in.
 
-  // create dev with secret_lookup notionUeser.
+  // create dev with secret_lookup notionUser.
   await db.collection("developers").doc(databaseId).set({
     "secret_lookup": "roveLiveSecrets",
     "callbackURL": "https://notion.so",
     "deauthorize_endpoint": "",
     "devKey": key,
     "email": "",
-    "endpoint": databaseId});
+    "endpoint": databaseId}, {merge: true});
   // create user
   await db.collection("users").doc(databaseId+"notion").set({
     "devId": databaseId,
     "userId": "notion",
-  });
+  }, {merge: true});
   // redirect the user to connectService with new dev and user credentials.
-  res.redirect("/connectService?userId="+databaseId+"notion"+"&devId="+databaseId+"&provider="+provider+"&devKey="+key);
+  res.redirect("/connectService?userId=notion"+"&devId="+databaseId+"&provider="+provider+"&devKey="+key);
 });
 
 async function polarWebhookUtility(devId, action, webhookId) {
