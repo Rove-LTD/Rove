@@ -335,10 +335,7 @@ async function deleteGarminActivity(userDoc, webhookCall) {
         .get();
     if (userQueryList.docs.length == 1) {
     // send post to garmin to de-auth.
-      const response = await got
-          .delete("https://apis.garmin.com/wellness-api/rest/user/registration",
-              {"Authorization": "Bearer " +
-                  userDoc.data()["garmin_access_token"]});
+      const response = await deleteGarminUser(userDoc);
       // check success if fail return 400
       if (response.statusCode != 204) {
         return 400;
@@ -362,6 +359,60 @@ async function deleteGarminActivity(userDoc, webhookCall) {
     await sendToDeauthoriseWebhook(userDoc);
     return 200; // 200 success, 400 failure
   } catch (error) {
+    return 400;
+  }
+}
+async function deleteGarminUser(userDoc) {
+  const oauthNonce = crypto.randomBytes(10).toString("hex");
+  // console.log(oauth_nonce);
+  const oauthTimestamp = Math.round(new Date().getTime()/1000);
+  // console.log(oauth_timestamp);
+  const devDoc = await db.collection("developers").doc(userDoc.data()["devId"]).get();
+  const lookup = await devDoc.data()["secret_lookup"];
+  let parameters = {
+    oauth_consumer_key: configurations[lookup]["oauth_consumer_key"],
+    oauth_token: userDoc.data()["garmin_access_token"],
+    oauth_signature_method: "HMAC-SHA1",
+    oauth_nonce: oauthNonce.toString(),
+    oauth_timestamp: oauthTimestamp.toString(),
+    oauth_version: "1.0",
+    uploadStartTimeInSeconds: 1658334373,
+    uploadEndTimeInSeconds: 1658420773,
+  };
+  const encodedParameters = encodeparams.collectParams(parameters);
+  const baseUrl = "https://apis.garmin.com/wellness-api/rest/user/registration";
+  const baseString = encodeparams.baseStringGen(encodedParameters, "DELETE", baseUrl);
+  const encodingKey = configurations[lookup]["consumerSecret"] + "&" + userDoc.data()["garmin_access_token_secret"];
+  const signature = crypto.createHmac("sha1", encodingKey).update(baseString).digest().toString("base64");
+  const encodedSignature = encodeURIComponent(signature);
+  parameters.oauth_signature = encodedSignature;
+  parameters = {
+    oauth_consumer_key: configurations[lookup]["oauth_consumer_key"],
+    oauth_token: userDoc.data()["garmin_access_token"],
+    oauth_signature_method: "HMAC-SHA1",
+    oauth_nonce: oauthNonce.toString(),
+    oauth_timestamp: oauthTimestamp.toString(),
+    oauth_version: "1.0",
+    oauth_signature: signature,
+  };
+  const options = {
+    headers: {
+      "Accept": "application/json;charset=UTF-8",
+      "Authorization": "OAuth "+encodeparams.authorizationString(parameters),
+    },
+    method: "DELETE",
+    url: baseUrl+"?uploadStartTimeInSeconds=1658334373&uploadEndTimeInSeconds=1658420773",
+  };
+  try {
+    const response = await got.delete(options);
+    if (response.statusCode == 204) {
+      // put userId in the database TODO:
+      return 204;
+    } else {
+      return 400;
+    }
+  } catch (error) {
+    console.log("Error deleting garmin user Id for "+userDoc.data()["userId"]);
     return 400;
   }
 }
@@ -761,7 +812,7 @@ async function garminOauth(transactionData, transactionId) {
   const baseUrl =
      "https://connectapi.garmin.com/oauth-service/oauth/request_token";
   const baseString = encodeparams
-      .baseStringGen(encodedParameters, "GET", baseUrl);
+      .baseStringGen(encodedParameters, "POST", baseUrl);
   const encodingKey = consumerSecret + "&";
   const signature = crypto.createHmac("sha1", encodingKey)
       .update(baseString).digest().toString("base64");
@@ -779,7 +830,7 @@ async function garminOauth(transactionData, transactionId) {
   let response = "";
   try {
     // get OAuth tokens from garmin
-    response = await got.get(url);
+    response = await got.post(url);
   } catch (error) {
     console.log(error.response.body);
     return error.response.body;
@@ -1427,13 +1478,15 @@ async function getGarminUserId(consumerSecret, garminAccessToken, garminAccessTo
   // console.log(oauth_timestamp);
   const secretLookup = await db.collection("developers").doc(devId).get();
   const lookup = await secretLookup.data()["secret_lookup"];
-  const parameters = {
+  let parameters = {
     oauth_consumer_key: configurations[lookup]["oauth_consumer_key"],
     oauth_token: garminAccessToken,
     oauth_signature_method: "HMAC-SHA1",
     oauth_nonce: oauthNonce,
     oauth_timestamp: oauthTimestamp,
     oauth_version: "1.0",
+    uploadStartTimeInSeconds: 1658334373,
+    uploadEndTimeInSeconds: 1658420773,
   };
   const encodedParameters = encodeparams.collectParams(parameters);
   const baseUrl = "https://apis.garmin.com/wellness-api/rest/user/id";
@@ -1441,21 +1494,22 @@ async function getGarminUserId(consumerSecret, garminAccessToken, garminAccessTo
   const encodingKey = consumerSecret + "&" + garminAccessTokenSecret;
   const signature = crypto.createHmac("sha1", encodingKey).update(baseString).digest().toString("base64");
   const encodedSignature = encodeURIComponent(signature);
+  parameters = {
+    oauth_consumer_key: configurations[lookup]["oauth_consumer_key"],
+    oauth_token: garminAccessToken,
+    oauth_signature_method: "HMAC-SHA1",
+    oauth_nonce: oauthNonce,
+    oauth_timestamp: oauthTimestamp,
+    oauth_version: "1.0",
+    oauth_signature: signature,
+  };
   const options = {
     headers: {
-      "Authorization": {
-        "oauth_consumer_key": configurations[lookup]["oauth_consumer_key"],
-        "oauth_token": garminAccessToken,
-        "oauth_signature_method": "HMAC-SHA1",
-        "oauth_signature": encodedSignature,
-        "oauth_nonce": oauthNonce,
-        "oauth_timestamp": oauthTimestamp,
-        "oauth_version": "1.0",
-      },
+      "Authorization": "OAuth "+encodeparams.authorizationString(parameters),
       "Accept": "application/json;charset=UTF-8",
     },
     method: "GET",
-    url: "https://apis.garmin.com/wellness-api/rest/user/id",
+    url: "https://apis.garmin.com/wellness-api/rest/user/id"+"?uploadStartTimeInSeconds=1658334373&uploadEndTimeInSeconds=1658420773",
   };
   try {
     const response = await got.get(options);

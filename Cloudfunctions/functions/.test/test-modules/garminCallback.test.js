@@ -47,7 +47,7 @@ describe("Testing that the Garmin callbacks work: ", () => {
       "redirectUrl": "https://redirectedURI?state=withMyState",
     });
   });
-  it('Garmin callback should check userId and DevId and write the access tokens to the database...', async () => {
+  it.only('Garmin callback should check userId and DevId and write the access tokens to the database...', async () => {
       //set up the stubbed response to mimic polar's response when called with the
       //code to get the token
       const responseObject1 = {
@@ -55,7 +55,7 @@ describe("Testing that the Garmin callbacks work: ", () => {
           headers: {
             'content-type': 'application/json'
           },
-          body: "token=garmin-access-token&secret=garmin-test-secret",
+          body: "token=1dc54595-fadc-4365-bd55-448027ba3e8d&secret=bVbUTenkbSuH9JnHj4U7VjoTNII1EzOttzj",
           expires_in: 21600,
       };
       const responseObject2 = {
