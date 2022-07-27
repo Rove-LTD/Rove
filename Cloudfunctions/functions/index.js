@@ -143,6 +143,87 @@ exports.connectService = functions.https.onRequest(async (req, res) => {
   res.redirect(url);
 });
 
+exports.getActivityList = functions.https.onRequest(async (req, res) => {
+  const transactionId = (Url.parse(req.url, true).query)["transactionId"];
+  let parameters = {};
+  if (transactionId == undefined) {
+    parameters.start = (Url.parse(req.url, true).query)["start"];
+    parameters.end = (Url.parse(req.url, true).query)["end"];
+    parameters.devId = (Url.parse(req.url, true).query)["devId"];
+    parameters.userId = (Url.parse(req.url, true).query)["userId"];
+    parameters.devKey = (Url.parse(req.url, true).query)["devKey"] || null;
+  } else {
+    parameters = await getParametersFromTransactionId(transactionId);
+    updateTransactionWithStatus(transactionId, "userClickedAuthButton");
+  }
+  let url = "";
+  console.log(callbackBaseUrl);
+  // parameter checks
+  // first check developer exists and the devKey matches
+  if (parameters.devId != null) {
+    const devDoc = await admin.firestore()
+        .collection("developers")
+        .doc(parameters.devId)
+        .get();
+
+    if (!devDoc.exists) {
+      url =
+         "error: the developerId was badly formatted, missing or not authorised";
+      res.status(400);
+      res.send(url);
+      return;
+    }
+    if (devDoc.data().devKey != parameters.devKey|| parameters.devKey == null) {
+      url =
+         "error: the developerId was badly formatted, missing or not authorised";
+      res.status(400);
+      res.send(url);
+      return;
+    }
+  } else {
+    url = "error: the developerId parameter is missing";
+    res.status(400);
+    res.send(url);
+    return;
+  }
+  // now check the userId has been given and that it is for a doc that the dev is assigned to.
+  if (parameters.userId == null) {
+    url = "error: the userId parameter is missing";
+    res.status(400);
+    res.send(url);
+    return;
+  } else {
+    const userDoc = await admin.firestore()
+        .collection("users")
+        .doc(parameters.userId)
+        .get();
+    if (!userDoc.exists) {
+      url =
+      "error: the userId was badly formatted, missing or not authorised";
+      res.status(400);
+      res.send(url);
+      return;
+    }
+    if (userDoc.data()["devId"] != parameters.devId) {
+      url =
+      "error: the userId was badly formatted, missing or not authorised";
+      res.status(400);
+      res.send(url);
+      return;
+    }
+  }
+  try {
+    Date(parameters.start);
+    Date(parameters.end);
+  } catch {
+    url =
+    "error: the start/end was badly formatted, or missing";
+    res.status(400);
+    res.send(url);
+    return;
+  }
+});
+
 exports.disconnectService = functions.https.onRequest(async (req, res) => {
   const provider = (Url.parse(req.url, true).query)["provider"];
   const devId = (Url.parse(req.url, true).query)["devId"];
