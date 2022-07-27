@@ -42,8 +42,8 @@ describe("Check the garmin Disconnect Service works: ", () => {
             "userId": testUser,
             "email": "paul.userTest@gmail.com",
             "garmin_connected": true,
-            "garmin_access_token": "1dc54595-fadc-4365-bd55-448027ba3e8d",
-            "garmin_access_token_secret": "bVbUTenkbSuH9JnHj4U7VjoTNII1EzOttzj",
+            "garmin_access_token": "test_access_token",
+            "garmin_access_token_secret": "test_access_token_secret",
         });
 
       await admin.firestore()
@@ -241,7 +241,7 @@ describe("Check the garmin Disconnect Service works: ", () => {
 
     sinon.restore();
   })
-  it.only('Check that service succeeds if user authorised already and IS the last one', async () => {
+  it('Check that service succeeds if user authorised already and IS the last one', async () => {
     // get rid of the second to last user
     await admin.firestore()
       .collection("users")
@@ -262,9 +262,10 @@ describe("Check the garmin Disconnect Service works: ", () => {
 
     // set up stubbed functions
     testResponse = {
-      json: ()=>{
+      body: ()=>{
         return {"success":"Application has been revoked"};
-      }
+      },
+      statusCode: 204,
     }
 
    const stubbedGot = sinon.stub(got, "delete");

@@ -47,7 +47,7 @@ describe("Testing that the Garmin callbacks work: ", () => {
       "redirectUrl": "https://redirectedURI?state=withMyState",
     });
   });
-  it.only('Garmin callback should check userId and DevId and write the access tokens to the database...', async () => {
+  it('Garmin callback should check userId and DevId and write the access tokens to the database...', async () => {
       //set up the stubbed response to mimic polar's response when called with the
       //code to get the token
       const responseObject1 = {
@@ -55,12 +55,12 @@ describe("Testing that the Garmin callbacks work: ", () => {
           headers: {
             'content-type': 'application/json'
           },
-          body: "token=1dc54595-fadc-4365-bd55-448027ba3e8d&secret=bVbUTenkbSuH9JnHj4U7VjoTNII1EzOttzj",
+          body: "token=garmin-access-token&secret=garmin-test-secret",
           expires_in: 21600,
       };
       const responseObject2 = {
           statusCode: 200,
-          body: {"userId": "d3315b1072421d0dd7c8f6b8e1de4df8"},
+          body: '{"userId": "test-garmin-user-id"}',
       };
 
       const expectedTestUserDoc = {
@@ -69,6 +69,7 @@ describe("Testing that the Garmin callbacks work: ", () => {
           email: devUserData.email,
           garmin_access_token: "garmin-access-token",
           garmin_access_token_secret: "garmin-test-secret",
+          garmin_user_id: "test-garmin-user-id",
           garmin_connected: true,
       }
 
