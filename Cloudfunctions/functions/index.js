@@ -1259,6 +1259,106 @@ exports.polarWebhookSetup = functions.https.onRequest(async (req, res) => {
   return;
 });
 
+async function getStravaDetailedActivity(userDoc, activityDoc) {
+  const stravaActivityId = await activityDoc.data()["raw"]["id"]
+  const devId = await userDoc.data()["devId"];
+  const secretLookup = await db.collection("developers").doc(devId).get();
+  const lookup = await secretLookup.data()["secret_lookup"];
+  stravaApi.config({
+    "client_id": configurations[lookup]["stravaClientId"],
+    "client_secret": configurations[lookup]["stravaClientSecret"],
+    "redirect_uri": callbackBaseUrl+"/stravaCallback",
+  });
+  // delete activities
+  // check if this is the last user with this stravaId and this is not a call from the webhook
+  let accessToken = userDoc.data()["strava_access_token"];
+  const userQueryList = await db.collection("users").
+      where("strava_id", "==", userDoc.data()["strava_id"])
+      .get();
+  if ( userQueryList.docs.length == 1) {
+    if (await checkStravaTokens(userDoc.id, db) == true) {
+      // token out of date, make request for new ones.
+      const payload = await stravaApi.oauth.refreshToken(userDoc.data()["strava_refresh_token"]);
+      await stravaTokenStorage(userDoc.id, payload, db);
+      accessToken = payload["access_token"];
+    }
+    const streamResponse = await stravaApi.streams.activity({"access_token": accessToken, "id": stravaActivityId, "keys": ["time", "distance", "latlng", "altitude", "velocity_smooth", "heartrate", "cadence", "watts", "temp", "moving", "grade_smooth"], "key_by_type": true});
+
+    console.log(streamResponse)
+  }
+}
+
+exports.getDetailedActivity = functions.https.onRequest(async (req, res) => {
+  const devId = Url.parse(req.url, true).query["devId"];
+  const devKey = Url.parse(req.url, true).query["devKey"];
+  const userId = Url.parse(req.url, true).query["userId"];
+  const activityId = Url.parse(req.url, true).query["activityId"];
+  const userPath = db.collection("users").doc(userId);
+
+  // firt, checking the devId and devKey
+  if (devId != null) {
+    await db.collection("developers").doc(devId).get()
+        .then((docSnapshot) => {
+          if (docSnapshot.exists) {
+            if (docSnapshot.data().devKey != devKey || devKey == null) {
+              res.status(400);
+              res.send("error: the developerId was badly formatted, missing or not authorised");
+              return;
+            }
+          } else {
+            res.status(400);
+            res.send("error: the developerId was badly formatted, missing or not authorised");
+            return;
+          }
+        });
+  } else {
+    res.status(400);
+    res.send("error: the developerId parameter is missing");
+    return;
+  }
+
+  // checking the userId is valid and matches the devId
+  if (userId != null) {
+    await userPath.get()
+        .then((docSnapshot) => {
+          if (docSnapshot.exists) {
+            if (docSnapshot.data().devId != devId) {
+              res.status(400);
+              res.send("error: the userId was badly formatted, missing or nor authorised");
+              return;
+            }
+          } else {
+            res.status(400);
+            res.send("error: the userId was badly formatted, missing or nor authorised");
+            return;
+          }
+        });
+  } else {
+    res.status(400);
+    res.send("error: the userId parameter is missing");
+    return;
+  }
+
+  // now check activity exist and get the detailed activity
+  if (activityId != null) {
+    await userPath.collection("activities").doc(activityId).get()
+        .then((docSnapshot) => {
+          if (docSnapshot.exists) {
+            const activity = docSnapshot.data();
+            const source = activity.data_source;
+            // based on source, get detailed activity
+          } else {
+            res.status(400);
+            res.send("error: the activity requested does not exist");
+          }
+        });
+  } else {
+    res.status(400);
+    res.send("error: the activityId parameter is missing");
+    return;
+  }
+});
+
 exports.createNotionLink = functions.https.onRequest(async (req, res) => {
   const databaseId = (Url.parse(req.url, true).query)["databaseId"];
   const provider = (Url.parse(req.url, true).query)["provider"];
@@ -1478,7 +1578,6 @@ async function createTransactionWithParameters(parameters) {
       .set(parameters);
   return transactionRef.id;
 }
-
 
 // Utility Functions and Constants -----------------------------
 const waitTime = {0: 0, 1: 1, 2: 10, 3: 60}; // time in minutes
