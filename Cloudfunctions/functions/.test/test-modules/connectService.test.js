@@ -130,10 +130,10 @@ describe("Testing that the developer can call API to connectService() and receiv
       }
       // set up the stub to mimic the response to the Garmin service
       const responseObject = {
-          body: "oauth_token=test-Oauth-token&oauth_token_secret=test-Oauth-secret"
+          body: "oauth_token=54da1391-216e-4702-8fa8-4ddf37184384&oauth_token_secret=GZsWVInG4RqPzItfkmZtgm5w7IZAJLgWKA7"
       };
 
-      const stubbedcall = sinon.stub(got, "get" );
+      const stubbedcall = sinon.stub(got, "post" );
       stubbedcall.returns(responseObject);
 
       await myFunctions.connectService(req, res);
