@@ -240,6 +240,7 @@ async function requestForDateRange(providers, userDoc, start, end) {
   // we want to synchronously run these functions together
   // so I will create a .then for each to add to an integer.
   let i = 0;
+  let activtyList = [];
   // if (providers["strava"]) {
   /*
     await getStravaActivityList(start, end, userDoc).then((response)=>{
@@ -252,31 +253,37 @@ async function requestForDateRange(providers, userDoc, start, end) {
   } else {
     i++;
   }*/
-  /*
-  if (providers["garmin"]) {
-    getGarminActivityList(start, end, userDoc).then((i)=>{
+  /* if (providers["garmin"]) {
+    await getGarminActivityList(start, end, userDoc).then((i)=>{
       i++;
     });
   } else {
     i++;
   }*/
   // sadly Polar is not available to list activities.
+  /*
   if (providers["wahoo"]) {
-    await getWahooActivityList(start, end, userDoc).then((i)=>{
+    getWahooActivityList(start, end, userDoc).then((wahooActivities)=>{
       i++;
+      activtyList = activtyList.concat(wahooActivities);
+      if (i == 2) {
+        return activtyList;
+      }
     });
   } else {
     i++;
   }
-  /*
   if (providers["polar"]) {
-    getPolarActivityList(start, end, userDoc).then((i)=>{
+    getPolarActivityList(start, end, userDoc).then((polarActivities)=>{
       i++;
+      activtyList = activtyList.concat(polarActivities);
+      if (i == 2) {
+        return activtyList;
+      }
     });
   } else {
     i++;
   }*/
-  return i;
 }
 async function getWahooActivityList(start, end, userDoc) {
   try {
@@ -297,7 +304,15 @@ async function getWahooActivityList(start, end, userDoc) {
       for (let i = 0; i<activityList.workouts.length; i++) {
         sanitisedList.push({"raw": activityList.workouts[i], "sanitised": filters.wahooSanitise(activityList.workouts[i])});
       }
-      return sanitisedList;
+      // now filter for start times
+      const startTime = start.getTime();
+      const endTime = end.getTime();
+      const listOfValidActivities = sanitisedList.filter((element)=>{
+        if (new Date(element.sanitised.start_time).getTime() > startTime && new Date(element.sanitised.start_time).getTime() < endTime) {
+          return element;
+        }
+      });
+      return listOfValidActivities;
     }
   } catch (error) {
     if (error == 401) { // unauthorised
@@ -307,26 +322,38 @@ async function getWahooActivityList(start, end, userDoc) {
   }
 }
 async function getPolarActivityList(start, end, userDoc) {
+  const userToken = userDoc.data()["polar_access_token"];
   try {
-    const accessToken = await oauthWahoo.getUserToken(userDoc);
+    const headers = {
+      "Accept": "application/json", "Authorization": "Bearer " + userToken,
+    };
     const options = {
-      url: "https://api.wahooligan.com/v1/workouts",
+      url: "https://www.polaraccesslink.com/v3/exercises",
       method: "GET",
-      headers: {
-        "Accept": "application/json",
-        "Authorization": "Bearer " + accessToken,
-      },
+      headers: headers,
     };
     const activityList = await got.get(options).json();
-    if (activityList.status == 200) {
-      return activityList;
+    const sanitisedList = [];
+    for (let i = 0; i<activityList.length; i++) {
+      sanitisedList.push({"raw": activityList[i], "sanitised": filters.polarSanatise(activityList[i])});
     }
+    const startTime = start.getTime();
+    const endTime = end.getTime();
+    const listOfValidActivities = sanitisedList.filter((element)=>{
+      if (new Date(element.sanitised.start_time).getTime() > startTime && new Date(element.sanitised.start_time).getTime() < endTime) {
+        return element;
+      }
+    });
+    return listOfValidActivities;
   } catch (error) {
     if (error == 401) { // unauthorised
       // consider refreshing the access code and trying again
     }
     return 400;
   }
+}
+async function getGarminActivityList(start, end, userDoc) {
+  // include the garmin fetcher here.
 }
 async function getStravaActivityList(start, end, userDoc) {
   const userDocData = await userDoc.data();
