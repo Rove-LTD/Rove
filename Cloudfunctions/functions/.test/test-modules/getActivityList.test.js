@@ -44,7 +44,11 @@ describe("Testing that the developer can call API to getActivityList() and recei
         .set({
             "devId": testDev,
             "userId": testUser,
-            "wahoo_user_id": "wahoo_test_user",
+            "wahoo_user_id": "1510441",
+            "wahoo_access_token": "WklaZLnmEbvEKSfekXsqmGPqU6Dpv57G3Djg-_g7O2Q",
+            "wahoo_refresh_token": "Bwne2YVNhoS8-HDGIgCa4icI2JHduz1wHRa6I-unF_U",
+            "wahoo_token_expires_at":"1659013205",
+            "wahoo_token_expires_in": "7200",
             "polar_user_id": "polar_test_user",
             "polar_access_token": "polar_test_access_token",
             "strava_id" : "12972711",

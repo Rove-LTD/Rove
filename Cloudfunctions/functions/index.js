@@ -226,11 +226,12 @@ exports.getActivityList = functions.https.onRequest(async (req, res) => {
   const providersConnected = {"polar": false, "garmin": false, "strava": false, "wahoo": false};
   providersConnected["polar"] = userDoc.data().hasOwnProperty("polar_user_id");
   providersConnected["garmin"] = userDoc.data().hasOwnProperty("garmin_access_token");
-  providersConnected["strava"] = userDoc.data().hasOwnProperty("wahoo_user_id");
-  providersConnected["wahoo"] = userDoc.data().hasOwnProperty("strava_id");
+  providersConnected["wahoo"] = userDoc.data().hasOwnProperty("wahoo_user_id");
+  providersConnected["strava"] = userDoc.data().hasOwnProperty("strava_id");
   // make the request for the services which are authenticated by the user
   const payload = await requestForDateRange(providersConnected, userDoc, start, end);
   url = "all checks passing";
+  // send to Dev first and then store all the activities.
   res.status(200);
   res.send("OK");
 });
@@ -239,8 +240,9 @@ async function requestForDateRange(providers, userDoc, start, end) {
   // we want to synchronously run these functions together
   // so I will create a .then for each to add to an integer.
   let i = 0;
-  if (providers["strava"]) {
-    getStravaActivityList(start, end, userDoc).then((response)=>{
+  // if (providers["strava"]) {
+  /*
+    await getStravaActivityList(start, end, userDoc).then((response)=>{
       console.log(response);
       i++;
       if (i == 0) {
@@ -249,7 +251,7 @@ async function requestForDateRange(providers, userDoc, start, end) {
     });
   } else {
     i++;
-  }
+  }*/
   /*
   if (providers["garmin"]) {
     getGarminActivityList(start, end, userDoc).then((i)=>{
@@ -257,22 +259,74 @@ async function requestForDateRange(providers, userDoc, start, end) {
     });
   } else {
     i++;
+  }*/
+  // sadly Polar is not available to list activities.
+  if (providers["wahoo"]) {
+    await getWahooActivityList(start, end, userDoc).then((i)=>{
+      i++;
+    });
+  } else {
+    i++;
   }
+  /*
   if (providers["polar"]) {
     getPolarActivityList(start, end, userDoc).then((i)=>{
       i++;
     });
   } else {
     i++;
-  }
-  if (providers["wahoo"]) {
-    getWahooActivityList(start, end, userDoc).then((i)=>{
-      i++;
-    });
-  } else {
-    i++;
   }*/
   return i;
+}
+async function getWahooActivityList(start, end, userDoc) {
+  try {
+    const accessToken = await oauthWahoo.getUserToken(userDoc);
+    const options = {
+      url: "https://api.wahooligan.com/v1/workouts",
+      method: "GET",
+      headers: {
+        "Accept": "application/json",
+        "Authorization": "Bearer " + accessToken,
+      },
+    };
+    const activityList = await got.get(options).json();
+    if (activityList.hasOwnProperty("workouts")) {
+      // delivers a list of the last 30 workouts...
+      // return a sanitised list
+      const sanitisedList = [];
+      for (let i = 0; i<activityList.workouts.length; i++) {
+        sanitisedList.push({"raw": activityList.workouts[i], "sanitised": filters.wahooSanitise(activityList.workouts[i])});
+      }
+      return sanitisedList;
+    }
+  } catch (error) {
+    if (error == 401) { // unauthorised
+      // consider refreshing the access code and trying again
+    }
+    return 400;
+  }
+}
+async function getPolarActivityList(start, end, userDoc) {
+  try {
+    const accessToken = await oauthWahoo.getUserToken(userDoc);
+    const options = {
+      url: "https://api.wahooligan.com/v1/workouts",
+      method: "GET",
+      headers: {
+        "Accept": "application/json",
+        "Authorization": "Bearer " + accessToken,
+      },
+    };
+    const activityList = await got.get(options).json();
+    if (activityList.status == 200) {
+      return activityList;
+    }
+  } catch (error) {
+    if (error == 401) { // unauthorised
+      // consider refreshing the access code and trying again
+    }
+    return 400;
+  }
 }
 async function getStravaActivityList(start, end, userDoc) {
   const userDocData = await userDoc.data();
