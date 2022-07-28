@@ -47,15 +47,15 @@ module.exports = {
     return signatureBaseString;
   },
   /**
-   *
+   * returns the Options required for a "got" call to the supplied url.
    * @param {String} url
    * @param {"GET, POST, DELETE"} method
    * @param {String} consumerSecret ROVE consumer Secret
    * @param {String} oauthConsumerKey ROVE consumer key
    * @param {String} garminAccessToken users Access Token
    * @param {String} garminAccessTokenSecret users token secret
-   * @param {{to: Int, from: int}} dateRange dates in seconds since epoch
-   * @return {Options} returns the "options" parameter needed for a got.get(options) call or a got.post(options) call.
+   * @param {{to: Int, from: Int}} dateRange dates in seconds since epoch
+   * @return {Options} returns the "options" parameter needed in got(options).
    */
   garminCallOptions: function(url, method, consumerSecret, oauthConsumerKey, garminAccessToken, garminAccessTokenSecret, dateRange) {
     const oauthNonce = crypto.randomBytes(10).toString("hex");
