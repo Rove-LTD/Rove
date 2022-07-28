@@ -1454,7 +1454,7 @@ async function getGarminUserId(consumerSecret, oauthConsumerKey, garminAccessTok
       oauthConsumerKey, // ROVE consumer key
       garminAccessToken, // users Access Token
       garminAccessTokenSecret, // users token secret
-      {from: 0, to: 0}); // dates in seconds since epoch
+  ); // dates in seconds since epoch
 
   try {
     const response = await got.get(options);
