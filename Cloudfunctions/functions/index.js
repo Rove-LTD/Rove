@@ -239,34 +239,34 @@ exports.getActivityList = functions.https.onRequest(async (req, res) => {
 async function requestForDateRange(providers, userDoc, start, end) {
   // we want to synchronously run these functions together
   // so I will create a .then for each to add to an integer.
+  let numOfProviders = 0;
   let i = 0;
   let activtyList = [];
-  // if (providers["strava"]) {
-  /*
-    await getStravaActivityList(start, end, userDoc).then((response)=>{
-      console.log(response);
+  if (providers["strava"]) {
+    numOfProviders ++;
+    getStravaActivityList(start, end, userDoc).then((stravaActivities)=>{
       i++;
-      if (i == 0) {
-        return;
+      activtyList = activtyList.concat(stravaActivities);
+      if (i == numOfProviders) {
+        return activtyList;
       }
     });
-  } else {
-    i++;
-  }*/
-  /* if (providers["garmin"]) {
+  }
+  if (providers["garmin"]) {
+    numOfProviders ++;
     await getGarminActivityList(start, end, userDoc).then((i)=>{
       i++;
     });
   } else {
     i++;
-  }*/
+  }
   // sadly Polar is not available to list activities.
-  /*
   if (providers["wahoo"]) {
+    numOfProviders ++;
     getWahooActivityList(start, end, userDoc).then((wahooActivities)=>{
       i++;
       activtyList = activtyList.concat(wahooActivities);
-      if (i == 2) {
+      if (i == numOfProviders) {
         return activtyList;
       }
     });
@@ -274,16 +274,17 @@ async function requestForDateRange(providers, userDoc, start, end) {
     i++;
   }
   if (providers["polar"]) {
+    numOfProviders ++;
     getPolarActivityList(start, end, userDoc).then((polarActivities)=>{
       i++;
       activtyList = activtyList.concat(polarActivities);
-      if (i == 2) {
+      if (i == numOfProviders) {
         return activtyList;
       }
     });
   } else {
     i++;
-  }*/
+  }
 }
 async function getWahooActivityList(start, end, userDoc) {
   try {
@@ -367,7 +368,12 @@ async function getStravaActivityList(start, end, userDoc) {
     "redirect_uri": callbackBaseUrl+"/stravaCallback",
   });
   const result = await stravaApi.athlete.listActivities({"before": Math.round(end.getTime() / 1000), "after": Math.round(start.getTime() / 1000), "access_token": accessToken});
-  return result;
+  const sanitisedActivities = filters.stravaSanitise(result);
+  const listOfValidActivities = [];
+  for (let i = 0; i<sanitisedActivities.length; i++) {
+    listOfValidActivities.push({"raw": result[i], "sanitised": sanitisedActivities[i]});
+  }
+  return listOfValidActivities;
 }
 
 exports.disconnectService = functions.https.onRequest(async (req, res) => {

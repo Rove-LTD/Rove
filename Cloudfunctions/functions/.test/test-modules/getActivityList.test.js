@@ -52,9 +52,9 @@ describe("Testing that the developer can call API to getActivityList() and recei
             "polar_user_id": "polar_test_user",
             "polar_access_token": "d717dd39d09b91939f835d66a640927d",
             "strava_id" : "12972711",
-            "strava_access_token": "7942b93b3ed45790ad17763d30754fb250e145b7",
+            "strava_access_token": "e703c5893d94dda02e74a87b5ae2d8082457869d",
             "strava_refresh_token": "077e305b5af2ed1667fa5406aec491b31ba50b5d",
-            "strava_token_expires_at": new Date().getTime()/1000 + 60,
+            "strava_token_expires_at": "1659032916",
             "garmin_access_token" :"garmin-test-access-token",
         }, {merge: true});
   
@@ -190,7 +190,7 @@ describe("Testing that the developer can call API to getActivityList() and recei
 it.only('External requests should return a list of activities...', async () => {
     // set the request object with the correct provider, developerId and userId
     const req = {
-        url: 'https://us-central1-rovetest-beea7.cloudfunctions.net/getActivityList?devId='+testDev+'&userId='+testUser+'&devKey=test-key&start=2022-07-22T09:15:33.000Z&end=2022-07-23T09:15:33.000Z',
+        url: 'https://us-central1-rovetest-beea7.cloudfunctions.net/getActivityList?devId='+testDev+'&userId='+testUser+'&devKey=test-key&start=2022-07-22T09:15:33.000Z&end=2022-07-28T09:15:33.000Z',
     };
     res = {
         send: (JSON)=> {assert.equal(JSON, [{
