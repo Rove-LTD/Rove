@@ -1,3 +1,4 @@
+/* eslint-disable no-prototype-builtins */
 /* eslint-disable no-multi-str */
 /* eslint-disable no-unused-vars */
 /* eslint-disable require-jsdoc */
@@ -187,16 +188,16 @@ exports.getActivityList = functions.https.onRequest(async (req, res) => {
     return;
   }
   // now check the userId has been given and that it is for a doc that the dev is assigned to.
+  const userDoc = await admin.firestore()
+      .collection("users")
+      .doc(parameters.devId+parameters.userId)
+      .get();
   if (parameters.userId == null) {
     url = "error: the userId parameter is missing";
     res.status(400);
     res.send(url);
     return;
   } else {
-    const userDoc = await admin.firestore()
-        .collection("users")
-        .doc(parameters.userId)
-        .get();
     if (!userDoc.exists) {
       url =
       "error: the userId was badly formatted, missing or not authorised";
@@ -212,17 +213,81 @@ exports.getActivityList = functions.https.onRequest(async (req, res) => {
       return;
     }
   }
-  try {
-    Date(parameters.start);
-    Date(parameters.end);
-  } catch {
+  const start = new Date(parameters.start);
+  const end = new Date(parameters.end);
+  if (start == "Invalid Date" || end == "Invalid Date") {
     url =
     "error: the start/end was badly formatted, or missing";
     res.status(400);
     res.send(url);
     return;
   }
+  // now we need to make a request to the user's authenticated services.
+  const providersConnected = {"polar": false, "garmin": false, "strava": false, "wahoo": false};
+  providersConnected["polar"] = userDoc.data().hasOwnProperty("polar_user_id");
+  providersConnected["garmin"] = userDoc.data().hasOwnProperty("garmin_access_token");
+  providersConnected["strava"] = userDoc.data().hasOwnProperty("wahoo_user_id");
+  providersConnected["wahoo"] = userDoc.data().hasOwnProperty("strava_id");
+  // make the request for the services which are authenticated by the user
+  const payload = await requestForDateRange(providersConnected, userDoc, start, end);
+  url = "all checks passing";
+  res.status(200);
+  res.send("OK");
 });
+
+async function requestForDateRange(providers, userDoc, start, end) {
+  // we want to synchronously run these functions together
+  // so I will create a .then for each to add to an integer.
+  let i = 0;
+  if (providers["strava"]) {
+    getStravaActivityList(start, end, userDoc).then((response)=>{
+      console.log(response);
+      i++;
+      if (i == 0) {
+        return;
+      }
+    });
+  } else {
+    i++;
+  }
+  /*
+  if (providers["garmin"]) {
+    getGarminActivityList(start, end, userDoc).then((i)=>{
+      i++;
+    });
+  } else {
+    i++;
+  }
+  if (providers["polar"]) {
+    getPolarActivityList(start, end, userDoc).then((i)=>{
+      i++;
+    });
+  } else {
+    i++;
+  }
+  if (providers["wahoo"]) {
+    getWahooActivityList(start, end, userDoc).then((i)=>{
+      i++;
+    });
+  } else {
+    i++;
+  }*/
+  return i;
+}
+async function getStravaActivityList(start, end, userDoc) {
+  const userDocData = await userDoc.data();
+  const devId = userDocData["devId"];
+  const accessToken = userDocData["strava_access_token"];
+  const secretLookup = await db.collection("developers").doc(devId).get();
+  const lookup = await secretLookup.data()["secret_lookup"];
+  stravaApi.config({
+    "client_id": configurations[lookup]["stravaClientId"],
+    "client_secret": configurations[lookup]["stravaClientSecret"],
+    "redirect_uri": callbackBaseUrl+"/stravaCallback",
+  });
+  const result = await stravaApi.athlete.listActivities({"before": Math.round(end.getTime() / 1000), "after": Math.round(start.getTime() / 1000), "access_token": accessToken});
+  return result;
+}
 
 exports.disconnectService = functions.https.onRequest(async (req, res) => {
   const provider = (Url.parse(req.url, true).query)["provider"];

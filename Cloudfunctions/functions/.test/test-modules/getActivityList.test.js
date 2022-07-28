@@ -19,7 +19,10 @@ const firebaseConfig = testParameters.firebaseConfig;
 const testUser = testParameters.testUser
 const testDev = testParameters.testDev
 const test = require('firebase-functions-test')(firebaseConfig, testParameters.testKeyFile);
+const admin = require("firebase-admin");
 const myFunctions = require('../../index.js');
+const startTime = "2022-07-22T07:15:33.000Z";
+const endTime = "2022-07-23T09:15:33.000Z"
 
 // -----------END INITIALISE ROVE TEST PARAMETERS----------------------------//
 
@@ -29,13 +32,53 @@ const myFunctions = require('../../index.js');
 // name as in the function we are testing
 const got = require('got');
 const { doesNotMatch } = require('assert');
+const { user } = require('firebase-functions/v1/auth');
 // ------------------------END OF STUB FUNCTIONS----------------------------//
 
 // --------------START CONNECTSERVICE TESTS----------------------------------//
 describe("Testing that the developer can call API to getActivityList() and receive redirection URL: ", () => {
-  it('should get error if the provider is not correct...', async () => {
+    before ('set up the userIds in the test User doc', async () => {
+        await admin.firestore()
+        .collection("users")
+        .doc(testDev+testUser)
+        .set({
+            "devId": testDev,
+            "userId": testUser,
+            "wahoo_user_id": "wahoo_test_user",
+            "polar_user_id": "polar_test_user",
+            "polar_access_token": "polar_test_access_token",
+            "strava_id" : "12972711",
+            "strava_access_token": "7942b93b3ed45790ad17763d30754fb250e145b7",
+            "strava_refresh_token": "077e305b5af2ed1667fa5406aec491b31ba50b5d",
+            "strava_token_expires_at": new Date().getTime()/1000 + 60,
+            "garmin_access_token" :"garmin-test-access-token",
+        }, {merge: true});
+  
+        activityDocs = await admin.firestore()
+            .collection("users")
+            .doc(testDev+testUser)
+            .collection("activities")
+            .get();
+        
+        activityDocs.forEach(async (doc)=>{
+            await doc.ref.delete();
+        });
+
+        await admin.firestore()
+            .collection("users")
+            .doc(testDev+testUser)
+            .collection("activities").doc().set({
+                raw: {},
+                sanitised: {
+                "start_time": startTime,
+                "userId": testUser,
+                "activity_name": "TestActivity"
+                }
+            })
+    });
+  it('should get error if the start/end is not correct...', async () => {
       // set the request object with the incorrect provider, correct developerId, devKey and userId
-      const req = {url: 'https://us-central1-rovetest-beea7.cloudfunctions.net/getActivityList?devId='+testDev+'&userId='+testUser+'&devKey=test-key&start=badFormat&end=badformat'};
+      const req = {url: 'https://us-central1-rovetest-beea7.cloudfunctions.net/getActivityList?devId='+testDev+'&userId='+testUser+'&devKey=test-key&start=bad-format&end=bad-format'};
       // set the assertions for the expected response object
       const res = {
           send: (url) => {
@@ -87,7 +130,7 @@ describe("Testing that the developer can call API to getActivityList() and recei
 
   it("Should get an error if the userId is not provided", async () => {
       // set the request object with the correct provider, developerId and userId
-      const req = {url: 'https://us-central1-rovetest-beea7.cloudfunctions.net/connectService?devId='+testDev+'&devKey=test-key&provider=wahoo'};
+      const req = {url: 'https://us-central1-rovetest-beea7.cloudfunctions.net/getActivityList?devId='+testDev+'&devKey=test-key&start=1658300257&end=1658905057'};
       // set the assertions for the expected response object
       const res = {
           send: (url) => {
@@ -98,131 +141,86 @@ describe("Testing that the developer can call API to getActivityList() and recei
           }
       }
 
-      await myFunctions.connectService(req, res);
+      await myFunctions.getActivityList(req, res);
   });
-  
-  it('should get a properly formatted strava redirect url...', async () => {
-      // set the request object with the correct provider, developerId and userId
-      const req = {url: 'https://us-central1-rovetest-beea7.cloudfunctions.net/connectService?devId='+testDev+'&userId='+testUser+'&devKey=test-key&provider=strava&isRedirect=true'};
-      // set the assertions for the expected response object
-      const res = {
-          redirect: async (url) => {
-              assert.include(url, "https://www.strava.com/oauth/authorize?client_id=72486&response_type=code&redirect_uri=https://us-central1-rovetest-beea7.cloudfunctions.net/stravaCallback?transactionId=");
-              assert.include(url, "&approval_prompt=force&scope=profile:read_all,activity:read_all");
-              recievedStravaUrl = url;
-          },
-      }
-
-      await myFunctions.connectService(req, res);
-
-  })
-  it('should get a properly formatted garmin redirect url...', async () => {
-      // set the request object with the correct provider, developerId and userId
-      const req = {url: 'https://us-central1-rovetest-beea7.cloudfunctions.net/connectService?devId='+testDev+'&userId='+testUser+'&devKey=test-key&provider=garmin&isRedirect=true'};
-      // set the assertions for the expected response object
-      const res = {
-          redirect: (url) => {
-              assert.include(url, "https://connect.garmin.com/oauthConfirm?oauth_token=");
-              assert.include(url, "&oauth_callback=https://us-central1-rovetest-beea7.cloudfunctions.net/oauthCallbackHandlerGarmin?oauth_token_secret=");
-              assert.include(url, "-transactionId=");
-              recievedGarminUrl = url;
-          },
-      }
-      // set up the stub to mimic the response to the Garmin service
-      const responseObject = {
-          body: "oauth_token=test-Oauth-token&oauth_token_secret=test-Oauth-secret"
-      };
-
-      const stubbedcall = sinon.stub(got, "get" );
-      stubbedcall.returns(responseObject);
-
-      await myFunctions.connectService(req, res);
-      // check the stubbed function was called with the correct arguments
-      calledWith = stubbedcall.args[0].toString();
-      assert.include(calledWith, "https://connectapi.garmin.com/oauth-service/oauth/request_token?oauth_consumer_key=eb0a9a22-db68-4188-a913-77ee997924a8&oauth_nonce=" );
-      assert.include(calledWith, "&oauth_signature_method=HMAC-SHA1&oauth_timestamp=");
-      assert.include(calledWith, "&oauth_signature=");
-      assert.include(calledWith, "&oauth_version=1.0");
-
-      sinon.restore();
-
-
-  })
-  it('should get a properly formatted polar redirect url...', async () => {
-      // set the request object with the correct provider, developerId and userId
-      const req = {url: 'https://us-central1-rovetest-beea7.cloudfunctions.net/connectService?devId='+testDev+'&userId='+testUser+'&devKey=test-key&provider=polar&isRedirect=true'};
-      // set the assertions for the expected response object
-      const res = {
-        redirect: (url) => {
-              assert.include(url, "https://flow.polar.com/oauth2/authorization?client_id=654623e7-7191-4cfe-aab5-0bc24785fdee&response_type=code&redirect_uri=https://us-central1-rovetest-beea7.cloudfunctions.net/polarCallback&scope=accesslink.read_all&state=");
-              recievedPolarUrl = url;
-          },
-      }
-
-      await myFunctions.connectService(req, res);
-
-  })
-
-  it('should get a properly formatted wahoo redirect url...', async () => {
-      // set the request object with the correct provider, developerId and userId
-      const req = {url: 'https://us-central1-rovetest-beea7.cloudfunctions.net/connectService?devId='+testDev+'&userId='+testUser+'&devKey=test-key&provider=wahoo&isRedirect=true'};
-      // set the assertions for the expected response object
-      const res = {
-        redirect: (url) => {
-              assert.include(url, "https://api.wahooligan.com/oauth/authorize?");
-              assert.include(url, "client_id=iA2JRS_dBkikcb0uEnHPtb6IDt1vDYNbityEEhp801I");
-              assert.include(url, "&redirect_uri=https://us-central1-rovetest-beea7.cloudfunctions.net/wahooCallback?state=");
-          },
-      }
-
-      await myFunctions.connectService(req, res);
-
-  })
-  it('should go to the redirect function when isRedirect=undefined', async () => {
-      // set the request object with the correct provider, developerId and userId
-      const req = {url: 'https://us-central1-rovetest-beea7.cloudfunctions.net/connectService?devId='+testDev+'&userId='+testUser+'&devKey=test-key&provider=wahoo'};
-      // set the assertions for the expected response object
-      const res = {
-        redirect: (url) => {
-              assert.include(url,"https://us-central1-rovetest-beea7.cloudfunctions.net/redirectPage?transactionId=");
-              assert.include(url, "&provider=wahoo");
-              assert.include(url, "&devId="+testDev);
-              assert.include(url, "?transactionId=");
-          },
-      }
-
-      await myFunctions.connectService(req, res);
-
-  })
-  it('the redirect function should send the HTML page needed', async () => {
-    let count = 0;
-    const htmlPage = await fs.promises.readFile("redirectPage.html");
-
+  it('Internal requests should return a list of activities from db...', async () => {
     // set the request object with the correct provider, developerId and userId
-    const req = {url: 'https://us-central1-rovetest-beea7.cloudfunctions.net/redirectPage?transactionId=testTransactionId&devId='+testDev+'&devKey=test-key&provider=wahoo'};
-    // set the assertions for the expected response object
-    const res = {
-      writeHead: (code, content)=>{
-        // could put assert here
-        assert.equal(code, 200);
-        assert.deepEqual(content, {"Content-Type": "text/html"} );
-      },
-      write: (html) => {
-        if (count == 0) { // first time write is called
-          assert.deepEqual(html, htmlPage);
-        } else if (count == 1) { // second time write is called
-          assert.equal(html, "<h2 style='text-align: center;font-family:DM Sans'>Data integrations provider for "+testDev+"</h2>\
-  <h2 style='text-align: center;font-family:DM Sans'>To authenticate wahoo click <a href=/connectService?transactionId=testTransactionId&isRedirect=true>here</a></h2>");
-        } else {
-          assert.equal(count, 1, "write should only be called twice");
-        }
-        count = count+1;
-      },
-      end: ()=>{
-        //could put an assert here
-      }
+    const req = {
+        url: 'https://us-central1-rovetest-beea7.cloudfunctions.net/getActivityList?devId='+testDev+'&userId='+testUser+'&devKey=test-key&start='+startTime+'&end='+endTime,
+    };
+    res = {
+        send: (JSON)=> {assert.equal(JSON, [{
+            raw: {},
+            sanitised: {
+            "start_time": startTime,
+            "userId": userId,
+            "activity_name": "TestActivity"
+            }
+            },]);},
+        status: (code)=>{assert.equal(code, 200);},
     }
 
-    await myFunctions.redirectPage(req, res);
-  });
+
+    await myFunctions.getActivityList(req, res);
+    const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+    await wait(1000);
+    //now check the database was updated correctly
+   const testUserDocs = await admin.firestore()
+   .collection("users")
+   .doc(testDev+testUser)
+   .collection("activities").where("sanitised.start_time", ">", "2022-07-22T09:15:33.000Z").where("sanitised.start_time", "<", "2022-07-23T09:15:33.000Z")
+   .get();
+
+   const sanatisedActivity = testUserDocs.docs[0].data();
+   const expectedResults = {
+    raw: {},
+    sanitised: {
+    "start_time": startTime,
+    "userId": userId,
+    "activity_name": "TestActivity"
+    }
+    }
+
+   assert.deepEqual(sanatisedActivity, expectedResults);
+})
+it.only('External requests should return a list of activities...', async () => {
+    // set the request object with the correct provider, developerId and userId
+    const req = {
+        url: 'https://us-central1-rovetest-beea7.cloudfunctions.net/getActivityList?devId='+testDev+'&userId='+testUser+'&devKey=test-key&start=2022-07-22T09:15:33.000Z&end=2022-07-23T09:15:33.000Z',
+    };
+    res = {
+        send: (JSON)=> {assert.equal(JSON, [{
+            raw: {},
+            sanitised: {
+            "start_time": startTime,
+            "userId": testUser,
+            "activity_name": "TestActivity"
+            }
+            },]);},
+        status: (code)=>{assert.equal(code, 200);},
+    }
+
+
+    await myFunctions.getActivityList(req, res);
+    const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+    await wait(1000);
+    //now check the database was updated correctly
+   const testUserDocs = await admin.firestore()
+   .collection("users")
+   .doc(testDev+testUser)
+   .collection("activities").where("sanitised.start_time", ">", "2022-07-22T09:15:33.000Z").where("sanitised.start_time", "<", "2022-07-23T09:15:33.000Z")
+   .get();
+
+   const sanatisedActivity = testUserDocs.docs[0].data();
+   const expectedResults = {
+    raw: {},
+    sanitised: {
+    "start_time": startTime,
+    "userId": userId,
+    "activity_name": "TestActivity"
+    }
+    }
+
+   assert.deepEqual(sanatisedActivity, expectedResults);
+})
 });
