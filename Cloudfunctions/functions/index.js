@@ -311,7 +311,7 @@ async function deleteStravaActivity(userDoc, webhookCall) {
   const activities = await userDoc.ref.collection("activities")
       .where("sanitised.data_source", "==", "strava")
       .get();
-  activities.forEach(async (doc)=>{
+  await activities.forEach(async (doc)=>{
     await doc.ref.delete();
   });
 

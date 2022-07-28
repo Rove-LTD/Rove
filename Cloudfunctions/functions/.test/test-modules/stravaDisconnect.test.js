@@ -28,9 +28,10 @@ myFunctions = require('../../index.js');
 // testing processes - these have to have the same constant
 // name as in the function we are testing
 const got = require('got');
+const stravaApi = require("strava-v3");
 //-------------TEST 2--- Test Callbacks from Strava-------
- describe("Check the Strava Disconnect Service works: ", () => {
-  before(async () => {
+ describe.only("Check the Strava Disconnect Service works: ", () => {
+  beforeEach(async () => {
     nowInSeconds = new Date()/1000
     notExpiredDate = nowInSeconds+1000;
     await admin.firestore()
@@ -69,20 +70,21 @@ const got = require('got');
       },
       send: (message) => {
         assert.equal(message,)
-      }
+      },
+      sendStatus: (code)=> {assert.equal(code, 200);},
     }
 
     // set up stubbed functions
     testResponse = {
-      json: ()=>{
-        return {"success":"Application has been revoked"};
-      }
+      access_token: "4c68a65e19eb899b8f68aa21e760b074bf035a95"
     }
 
-    const stubbedGot = sinon.stub(got, "delete");
+    const stubbedGot = sinon.stub(stravaApi.oauth, "deauthorize");
     stubbedGot.onFirstCall().returns(testResponse);
     
     await myFunctions.stravaWebhook(req, res);
+    const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+    await wait(1000);
     // check the got function was called with the correct options
     // check the wahoo fields were deleted from the database
     // check the wahoo activities were deleted from the database only for this user
@@ -125,15 +127,15 @@ const got = require('got');
 
     // set up stubbed functions
     testResponse = {
-      json: ()=>{
-        return {"success":"Application has been revoked"};
-      }
-    }
+      access_token: "4c68a65e19eb899b8f68aa21e760b074bf035a95"
+    };
 
-   //const stubbedGot = sinon.stub(got, "delete");
-   //stubbedGot.onFirstCall().returns(testResponse);
+    const stubbedGot = sinon.stub(stravaApi.oauth, "deauthorize");
+    stubbedGot.onFirstCall().returns(testResponse);
     
     await myFunctions.disconnectService(req, res);
+    const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+    await wait(1000);
     // check the got function was called with the correct options
     // check the wahoo fields were deleted from the database
     // check the wahoo activities were deleted from the database only for this user

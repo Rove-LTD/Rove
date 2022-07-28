@@ -73,6 +73,7 @@ const notion = require('../../notion');
     res = {
         send: (text)=> {assert.equal(text, "OK!");},
         status: (code)=>{assert.equal(code, 200);},
+        sendStatus: (code)=>{assert.equal(code, 200);},
     }
 
     await myFunctions.stravaWebhook(req, res);
