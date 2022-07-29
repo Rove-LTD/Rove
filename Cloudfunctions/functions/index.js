@@ -252,6 +252,7 @@ async function requestForDateRange(providers, userDoc, start, end) {
       }
     });
   }
+  /*
   if (providers["garmin"]) {
     numOfProviders ++;
     await getGarminActivityList(start, end, userDoc).then((i)=>{
@@ -259,7 +260,7 @@ async function requestForDateRange(providers, userDoc, start, end) {
     });
   } else {
     i++;
-  }
+  }*/
   // sadly Polar is not available to list activities.
   if (providers["wahoo"]) {
     numOfProviders ++;
