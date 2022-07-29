@@ -1,3 +1,4 @@
+/* eslint-disable no-prototype-builtins */
 /* eslint-disable no-multi-str */
 /* eslint-disable no-unused-vars */
 /* eslint-disable require-jsdoc */
@@ -142,6 +143,254 @@ exports.connectService = functions.https.onRequest(async (req, res) => {
   // send back URL to user device.
   res.redirect(url);
 });
+
+exports.getActivityList = functions.https.onRequest(async (req, res) => {
+  const transactionId = (Url.parse(req.url, true).query)["transactionId"];
+  let parameters = {};
+  if (transactionId == undefined) {
+    parameters.start = (Url.parse(req.url, true).query)["start"];
+    parameters.end = (Url.parse(req.url, true).query)["end"];
+    parameters.devId = (Url.parse(req.url, true).query)["devId"];
+    parameters.userId = (Url.parse(req.url, true).query)["userId"];
+    parameters.devKey = (Url.parse(req.url, true).query)["devKey"] || null;
+  } else {
+    parameters = await getParametersFromTransactionId(transactionId);
+    updateTransactionWithStatus(transactionId, "userClickedAuthButton");
+  }
+  let url = "";
+  console.log(callbackBaseUrl);
+  // parameter checks
+  // first check developer exists and the devKey matches
+  if (parameters.devId != null) {
+    const devDoc = await admin.firestore()
+        .collection("developers")
+        .doc(parameters.devId)
+        .get();
+
+    if (!devDoc.exists) {
+      url =
+         "error: the developerId was badly formatted, missing or not authorised";
+      res.status(400);
+      res.send(url);
+      return;
+    }
+    if (devDoc.data().devKey != parameters.devKey|| parameters.devKey == null) {
+      url =
+         "error: the developerId was badly formatted, missing or not authorised";
+      res.status(400);
+      res.send(url);
+      return;
+    }
+  } else {
+    url = "error: the developerId parameter is missing";
+    res.status(400);
+    res.send(url);
+    return;
+  }
+  // now check the userId has been given and that it is for a doc that the dev is assigned to.
+  const userDoc = await admin.firestore()
+      .collection("users")
+      .doc(parameters.devId+parameters.userId)
+      .get();
+  if (parameters.userId == null) {
+    url = "error: the userId parameter is missing";
+    res.status(400);
+    res.send(url);
+    return;
+  } else {
+    if (!userDoc.exists) {
+      url =
+      "error: the userId was badly formatted, missing or not authorised";
+      res.status(400);
+      res.send(url);
+      return;
+    }
+    if (userDoc.data()["devId"] != parameters.devId) {
+      url =
+      "error: the userId was badly formatted, missing or not authorised";
+      res.status(400);
+      res.send(url);
+      return;
+    }
+  }
+  const start = new Date(parameters.start);
+  const end = new Date(parameters.end);
+  if (start == "Invalid Date" || end == "Invalid Date") {
+    url =
+    "error: the start/end was badly formatted, or missing";
+    res.status(400);
+    res.send(url);
+    return;
+  }
+  // now we need to make a request to the user's authenticated services.
+  const providersConnected = {"polar": false, "garmin": false, "strava": false, "wahoo": false};
+  providersConnected["polar"] = userDoc.data().hasOwnProperty("polar_user_id");
+  providersConnected["garmin"] = userDoc.data().hasOwnProperty("garmin_access_token");
+  providersConnected["wahoo"] = userDoc.data().hasOwnProperty("wahoo_user_id");
+  providersConnected["strava"] = userDoc.data().hasOwnProperty("strava_id");
+  // make the request for the services which are authenticated by the user
+  const payload = await requestForDateRange(providersConnected, userDoc, start, end);
+  url = "all checks passing";
+  // send to Dev first and then store all the activities.
+  res.status(200);
+  res.send("OK");
+});
+
+async function requestForDateRange(providers, userDoc, start, end) {
+  // we want to synchronously run these functions together
+  // so I will create a .then for each to add to an integer.
+  let numOfProviders = 0;
+  let i = 0;
+  let activtyList = [];
+  /*
+  if (providers["strava"]) {
+    numOfProviders ++;
+    getStravaActivityList(start, end, userDoc).then((stravaActivities)=>{
+      i++;
+      activtyList = activtyList.concat(stravaActivities);
+      if (i == numOfProviders) {
+        return activtyList;
+      }
+    });
+  }*/
+  if (providers["garmin"]) {
+    numOfProviders ++;
+    await getGarminActivityList(start, end, userDoc).then((garminActivities)=>{
+      i++;
+      activtyList = activtyList.concat(garminActivities);
+      if (i == numOfProviders) {
+        return activtyList;
+      }
+    });
+  } else {
+    i++;
+  }
+  /*
+  // sadly Polar is not available to list activities.
+  if (providers["wahoo"]) {
+    numOfProviders ++;
+    getWahooActivityList(start, end, userDoc).then((wahooActivities)=>{
+      i++;
+      activtyList = activtyList.concat(wahooActivities);
+      if (i == numOfProviders) {
+        return activtyList;
+      }
+    });
+  } else {
+    i++;
+  }
+  if (providers["polar"]) {
+    numOfProviders ++;
+    getPolarActivityList(start, end, userDoc).then((polarActivities)=>{
+      i++;
+      activtyList = activtyList.concat(polarActivities);
+      if (i == numOfProviders) {
+        return activtyList;
+      }
+    });
+  } else {
+    i++;
+  }*/
+}
+async function getWahooActivityList(start, end, userDoc) {
+  try {
+    const accessToken = await oauthWahoo.getUserToken(userDoc);
+    const options = {
+      url: "https://api.wahooligan.com/v1/workouts",
+      method: "GET",
+      headers: {
+        "Accept": "application/json",
+        "Authorization": "Bearer " + accessToken,
+      },
+    };
+    const activityList = await got.get(options).json();
+    if (activityList.hasOwnProperty("workouts")) {
+      // delivers a list of the last 30 workouts...
+      // return a sanitised list
+      const sanitisedList = [];
+      for (let i = 0; i<activityList.workouts.length; i++) {
+        sanitisedList.push({"raw": activityList.workouts[i], "sanitised": filters.wahooSanitise(activityList.workouts[i])});
+      }
+      // now filter for start times
+      const startTime = start.getTime();
+      const endTime = end.getTime();
+      const listOfValidActivities = sanitisedList.filter((element)=>{
+        if (new Date(element.sanitised.start_time).getTime() > startTime && new Date(element.sanitised.start_time).getTime() < endTime) {
+          return element;
+        }
+      });
+      return listOfValidActivities;
+    }
+  } catch (error) {
+    if (error == 401) { // unauthorised
+      // consider refreshing the access code and trying again
+    }
+    return 400;
+  }
+}
+async function getPolarActivityList(start, end, userDoc) {
+  const userToken = userDoc.data()["polar_access_token"];
+  try {
+    const headers = {
+      "Accept": "application/json", "Authorization": "Bearer " + userToken,
+    };
+    const options = {
+      url: "https://www.polaraccesslink.com/v3/exercises",
+      method: "GET",
+      headers: headers,
+    };
+    const activityList = await got.get(options).json();
+    const sanitisedList = [];
+    for (let i = 0; i<activityList.length; i++) {
+      sanitisedList.push({"raw": activityList[i], "sanitised": filters.polarSanatise(activityList[i])});
+    }
+    const startTime = start.getTime();
+    const endTime = end.getTime();
+    const listOfValidActivities = sanitisedList.filter((element)=>{
+      if (new Date(element.sanitised.start_time).getTime() > startTime && new Date(element.sanitised.start_time).getTime() < endTime) {
+        return element;
+      }
+    });
+    return listOfValidActivities;
+  } catch (error) {
+    if (error == 401) { // unauthorised
+      // consider refreshing the access code and trying again
+    }
+    return 400;
+  }
+}
+async function getGarminActivityList(start, end, userDoc) {
+  // include the garmin fetcher here.
+  const url = "https://apis.garmin.com/wellness-api/rest/activities";
+  const userDocData = await userDoc.data();
+  const devId = userDocData["devId"];
+  const secretLookup = await db.collection("developers").doc(devId).get();
+  const lookup = await secretLookup.data()["secret_lookup"];
+  const consumerSecret = configurations[lookup]["consumerSecret"];
+  const oAuthConsumerSecret = configurations[lookup]["oauth_consumer_key"];
+  const options = await encodeparams.garminCallOptions(url, "GET", consumerSecret, oAuthConsumerSecret, userDocData["garmin_access_token"], userDocData["garmin_access_token_secret"], {from: start.getTime()/1000, to: end.getTime()/1000});
+  const activityList = await got.get(options);
+  return;
+}
+async function getStravaActivityList(start, end, userDoc) {
+  const userDocData = await userDoc.data();
+  const devId = userDocData["devId"];
+  const accessToken = userDocData["strava_access_token"];
+  const secretLookup = await db.collection("developers").doc(devId).get();
+  const lookup = await secretLookup.data()["secret_lookup"];
+  stravaApi.config({
+    "client_id": configurations[lookup]["stravaClientId"],
+    "client_secret": configurations[lookup]["stravaClientSecret"],
+    "redirect_uri": callbackBaseUrl+"/stravaCallback",
+  });
+  const result = await stravaApi.athlete.listActivities({"before": Math.round(end.getTime() / 1000), "after": Math.round(start.getTime() / 1000), "access_token": accessToken});
+  const sanitisedActivities = filters.stravaSanitise(result);
+  const listOfValidActivities = [];
+  for (let i = 0; i<sanitisedActivities.length; i++) {
+    listOfValidActivities.push({"raw": result[i], "sanitised": sanitisedActivities[i]});
+  }
+  return listOfValidActivities;
+}
 
 exports.disconnectService = functions.https.onRequest(async (req, res) => {
   const provider = (Url.parse(req.url, true).query)["provider"];
