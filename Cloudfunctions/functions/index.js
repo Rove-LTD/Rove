@@ -454,9 +454,18 @@ exports.disconnectService = functions.https.onRequest(async (req, res) => {
       }
     } else if (provider == "garmin") {
       if (userDocData["garmin_connected"] == true) {
-        result = deleteGarminActivity(userDoc, false);
+        result = await deleteGarminActivity(userDoc, false);
         // check success or fail. result 200 is success 400 is failure
+        if (result == 200) {
+          res.status(200);
+          message = JSON.stringify({status: "disconnected"});
+        } else {
+          res.status(result);
+          message = "error: unexpected problem";
+        }
       } else {
+        res.status(400);
+        message = "error: the userId was not authorised for this provider";
         // error the user is not authorizes already
       }
     } else if (provider == "polar") {
@@ -545,7 +554,7 @@ async function deleteStravaActivity(userDoc, webhookCall) {
   const activities = await userDoc.ref.collection("activities")
       .where("sanitised.data_source", "==", "strava")
       .get();
-  activities.forEach(async (doc)=>{
+  await activities.forEach(async (doc)=>{
     await doc.ref.delete();
   });
 
@@ -556,29 +565,65 @@ async function deleteStravaActivity(userDoc, webhookCall) {
 }
 
 async function deleteGarminActivity(userDoc, webhookCall) {
-  const userDocData = await userDoc.data();
   if (!webhookCall) {
-    const userQueryList = db.collection("users").
-        where("garmin_userId", "==", userDocData["garmin_userId"])
+    const userQueryList = await db.collection("users").
+        where("garmin_access_token",
+            "==",
+            userDoc.data()["garmin_access_token"])
         .get();
-    if ( userQueryList.docs.length == 1) {
+    if (userQueryList.docs.length == 1) {
     // send post to garmin to de-auth.
-      const response = await got
-          .delete("https://apis.garmin.com/wellness-api/rest/user/registration",
-              {"Authorization": "Bearer " + userDocData["garmin_access_token"]});
+      const response = await deleteGarminUser(userDoc);
       // check success if fail return 400
       if (response.statusCode != 204) {
         return 400;
       }
     }
   }
-  // delete garmin keys and activities.
-  await db.collection("users").doc(userDoc.id).update({
-    garmin_access_token: admin.firestore.FieldValue.delete(),
-    garmin_access_token_secret: admin.firestore.FieldValue.delete(),
-  });
-  sendToDeauthoriseWebhook(userDoc);
-  return 200; // 200 success, 400 failure
+  try {
+    // delete garmin keys and activities.
+    await db.collection("users").doc(userDoc.id).update({
+      garmin_access_token: admin.firestore.FieldValue.delete(),
+      garmin_access_token_secret: admin.firestore.FieldValue.delete(),
+      garmin_connected: admin.firestore.FieldValue.delete(),
+      garmin_user_id: admin.firestore.FieldValue.delete(),
+    });
+    // delete activities from provider.
+    const activities = await userDoc.ref.collection("activities")
+        .where("sanitised.data_source", "==", "garmin")
+        .get();
+    activities.forEach(async (doc)=>{
+      await doc.ref.delete();
+    });
+    await sendToDeauthoriseWebhook(userDoc);
+    return 200; // 200 success, 400 failure
+  } catch (error) {
+    return 400;
+  }
+}
+async function deleteGarminUser(userDoc) {
+  // console.log(oauth_timestamp);
+  const devDoc = await db.collection("developers").doc(userDoc.data()["devId"]).get();
+  const lookup = devDoc.data()["secret_lookup"];
+  const options = encodeparams.garminCallOptions(
+      "https://apis.garmin.com/wellness-api/rest/user/registration",
+      "DELETE",
+      configurations[lookup]["consumerSecret"],
+      configurations[lookup]["oauth_consumer_key"],
+      userDoc.data()["garmin_access_token"],
+      userDoc.data()["garmin_access_token_secret"],
+  );
+  try {
+    const response = await got.delete(options);
+    if (response.statusCode == 204) {
+      return response;
+    } else {
+      return 400;
+    }
+  } catch (error) {
+    console.log("Error deleting garmin user Id for "+userDoc.data()["userId"]);
+    return 400;
+  }
 }
 
 async function deletePolarActivity(userDoc, webhookCall) {
@@ -745,7 +790,6 @@ exports.oauthCallbackHandlerGarmin = functions.https
       await oauthCallbackHandlerGarmin(oAuthCallback, transactionData);
       const urlString = await successDevCallback(transactionData);
       res.redirect(urlString);
-      res.send("THANKS, YOU CAN NOW CLOSE THIS WINDOW");
     }),
 
 // callback from strava with token in
@@ -977,7 +1021,7 @@ async function garminOauth(transactionData, transactionId) {
   const baseUrl =
      "https://connectapi.garmin.com/oauth-service/oauth/request_token";
   const baseString = encodeparams
-      .baseStringGen(encodedParameters, "GET", baseUrl);
+      .baseStringGen(encodedParameters, "POST", baseUrl);
   const encodingKey = consumerSecret + "&";
   const signature = crypto.createHmac("sha1", encodingKey)
       .update(baseString).digest().toString("base64");
@@ -995,7 +1039,7 @@ async function garminOauth(transactionData, transactionId) {
   let response = "";
   try {
     // get OAuth tokens from garmin
-    response = await got.get(url);
+    response = await got.post(url);
   } catch (error) {
     console.log(error.response.body);
     return error.response.body;
@@ -1577,12 +1621,13 @@ async function oauthCallbackHandlerGarmin(oAuthCallback, transactionData) {
   const secretLookup = await db.collection("developers").doc(devId).get();
   const lookup = await secretLookup.data()["secret_lookup"];
   const consumerSecret = configurations[lookup]["consumerSecret"];
+  const oauthConsumerKey = configurations[lookup]["oauth_consumer_key"];
   oauthTokenSecret = oauthTokenSecret[0];
   const parameters = {
     oauth_nonce: oauthNonce,
     oauth_verifier: oAuthCallback["oauth_verifier"],
     oauth_token: oAuthCallback["oauth_token"],
-    oauth_consumer_key: configurations[lookup]["oauth_consumer_key"],
+    oauth_consumer_key: oauthConsumerKey,
     oauth_timestamp: oauthTimestamp,
     oauth_signature_method: "HMAC-SHA1",
     oauth_version: "1.0",
@@ -1593,7 +1638,7 @@ async function oauthCallbackHandlerGarmin(oAuthCallback, transactionData) {
   const encodingKey = consumerSecret + "&" + oauthTokenSecret;
   const signature = crypto.createHmac("sha1", encodingKey).update(baseString).digest().toString("base64");
   const encodedSignature = encodeURIComponent(signature);
-  const url = "https://connectapi.garmin.com/oauth-service/oauth/access_token?oauth_consumer_key="+configurations[lookup]["oauth_consumer_key"]+"&oauth_nonce="+oauthNonce.toString()+"&oauth_signature_method=HMAC-SHA1&oauth_timestamp="+oauthTimestamp.toString()+"&oauth_signature="+encodedSignature+"&oauth_verifier="+oAuthCallback["oauth_verifier"]+"&oauth_token="+oAuthCallback["oauth_token"]+"&oauth_version=1.0";
+  const url = "https://connectapi.garmin.com/oauth-service/oauth/access_token?oauth_consumer_key="+oauthConsumerKey+"&oauth_nonce="+oauthNonce.toString()+"&oauth_signature_method=HMAC-SHA1&oauth_timestamp="+oauthTimestamp.toString()+"&oauth_signature="+encodedSignature+"&oauth_verifier="+oAuthCallback["oauth_verifier"]+"&oauth_token="+oAuthCallback["oauth_token"]+"&oauth_version=1.0";
   const response = await got.post(url);
   // console.log(response.body);
   await firestoreData(response.body, userId, devId);
@@ -1603,14 +1648,17 @@ async function oauthCallbackHandlerGarmin(oAuthCallback, transactionData) {
     const garminAccessToken = (data[1].split("&"))[0];
     const garminAccessTokenSecret = data[2];
     const userDocId = devId+userId;
+    const garminUserId = await getGarminUserId(consumerSecret, oauthConsumerKey, garminAccessToken, garminAccessTokenSecret);
     const firestoreParameters = {
       "devId": devId,
       "userId": userId,
       "garmin_access_token": garminAccessToken,
       "garmin_access_token_secret": garminAccessTokenSecret,
+      "garmin_connected": true,
+      "garmin_user_id": garminUserId,
     };
     await db.collection("users").doc(userDocId).set(firestoreParameters, {merge: true});
-    getGarminUserId(consumerSecret, garminAccessToken, garminAccessTokenSecret, devId, userId);
+
     return true;
   }
 }
@@ -1635,52 +1683,26 @@ async function stravaTokenStorage(userDocId, data, db) {
   };
   await db.collection("users").doc(userDocId).set(parameters, {merge: true});
 }
-async function getGarminUserId(consumerSecret, garminAccessToken, garminAccessTokenSecret, devId, userId) {
-  const oauthNonce = crypto.randomBytes(10).toString("hex");
-  // console.log(oauth_nonce);
-  const oauthTimestamp = Math.round(new Date().getTime()/1000);
-  // console.log(oauth_timestamp);
-  const secretLookup = await db.collection("developers").doc(devId).get();
-  const lookup = await secretLookup.data()["secret_lookup"];
-  const parameters = {
-    oauth_consumer_key: configurations[lookup]["oauth_consumer_key"],
-    oauth_token: garminAccessToken,
-    oauth_signature_method: "HMAC-SHA1",
-    oauth_nonce: oauthNonce,
-    oauth_timestamp: oauthTimestamp,
-    oauth_version: "1.0",
-  };
-  const encodedParameters = encodeparams.collectParams(parameters);
-  const baseUrl = "https://apis.garmin.com/wellness-api/rest/user/id";
-  const baseString = encodeparams.baseStringGen(encodedParameters, "GET", baseUrl);
-  const encodingKey = consumerSecret + "&" + garminAccessTokenSecret;
-  const signature = crypto.createHmac("sha1", encodingKey).update(baseString).digest().toString("base64");
-  const encodedSignature = encodeURIComponent(signature);
-  const options = {
-    headers: {
-      "Authorization": {
-        "oauth_consumer_key": configurations[lookup]["oauth_consumer_key"],
-        "oauth_token": garminAccessToken,
-        "oauth_signature_method": "HMAC-SHA1",
-        "oauth_signature": encodedSignature,
-        "oauth_nonce": oauthNonce,
-        "oauth_timestamp": oauthTimestamp,
-        "oauth_version": "1.0",
-      },
-      "Accept": "application/json;charset=UTF-8",
-    },
-    method: "GET",
-    url: "https://apis.garmin.com/wellness-api/rest/user/id",
-  };
+async function getGarminUserId(consumerSecret, oauthConsumerKey, garminAccessToken, garminAccessTokenSecret) {
+  let garminUserId = "";
+  const options = encodeparams.garminCallOptions(
+      "https://apis.garmin.com/wellness-api/rest/user/id",
+      "GET",
+      consumerSecret, // ROVE consumer secret
+      oauthConsumerKey, // ROVE consumer key
+      garminAccessToken, // users Access Token
+      garminAccessTokenSecret, // users token secret
+  ); // dates in seconds since epoch
+
   try {
     const response = await got.get(options);
     if (response.statusCode == 200) {
-      // put userId in the database TODO:
+      garminUserId = JSON.parse(response.body).userId;
     }
   } catch (error) {
-    console.log("Error getting garmin user Id for "+userId);
+    console.log("Error getting garmin user Id");
   }
-  return;
+  return garminUserId;
 }
 
 async function getParametersFromTransactionId(transactionId) {

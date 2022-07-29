@@ -77,6 +77,7 @@ describe('ROVE full integration test scripts', () => {
     require ('./test-modules/wahooDisconnect.test.js');
     require ('./test-modules/stravaDisconnect.test.js');
     require ('./test-modules/polarDisconnect.test.js');
+    require ('./test-modules/garminDisconnect.test.js');
     require ('./test-modules/notion.test.js');
     require ('./test-modules/getActivityList.test.js');
 });
