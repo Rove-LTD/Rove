@@ -44,7 +44,7 @@ describe("Testing that the Webhooks work: ", () => {
           "strava_id" : "test_strava_id",
           "strava_access_token": "test_strava_access_token",
           "strava_refresh_token": "test_strava_refresh_token",
-          "strava_token_expires_at": new Date().getTime()/1000 + 60,
+          "strava_token_expires_at": new Date().getTime()/1000 + 600,
           "garmin_access_token" :"garmin-test-access-token",
       }, {merge: true});
 
@@ -214,7 +214,7 @@ describe("Testing that the Webhooks work: ", () => {
      assert.deepEqual(sanatisedActivity, expectedResults);
      sinon.restore();
   })
-  it('Strava Webhook should get event, sanatise, save and repond with status 200...', async () => {
+  it.only('Strava Webhook should get event, sanatise, save and repond with status 200...', async () => {
       //set up the stubbed response to mimic polar's response when called with the
       const stravaExercisePayload = require('./strava.json');
       stubbedStravaCall = sinon.stub(stravaApi.activities, "get");

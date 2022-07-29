@@ -1248,8 +1248,12 @@ exports.wahooCallback = functions.https.onRequest(async (req, res) => {
 });
 
 exports.stravaWebhook = functions.https.onRequest(async (request, response) => {
-  processStravaWebhook(request, response);
   // handle subscription setup
+  if (!request.debug) {
+    functions.logger.info("webhook event received!", {
+      body: request.body,
+    });
+  }
   if (request.method === "GET") {
     const VERIFY_TOKEN = "STRAVA";
     const mode = request.query["hub.mode"];
@@ -1265,23 +1269,42 @@ exports.stravaWebhook = functions.https.onRequest(async (request, response) => {
     } else {
       response.sendStatus(403);
     }
+  } else {
+    try {
+      const webhookDoc = await webhookInBox.push(request.body);
+      response.sendStatus(200);
+      // now we have saved the request and returned we can process it
+      processStravaWebhook(webhookDoc, request);
+    } catch (err) {
+      response.sendStatus(400);
+    }
   }
   // send response 200.
   response.sendStatus(200);
 });
 
-async function processStravaWebhook(request, response) {
+const webhookInBox = {
+  push: async function(data) {
+    const webhookDoc = db.collection("webhookInBox").doc();
+    await webhookDoc
+        .set({
+          status: "new",
+          body: JSON.stringify(data),
+        });
+    return webhookDoc;
+  },
+  delete: async function(webhookDoc) {
+    await webhookDoc.delete();
+  },
+};
+
+async function processStravaWebhook(webhookDoc, request) {
   stravaApi.config({
     "client_id": configurations["roveLiveSecrets"]["stravaClientId"],
     "client_secret": configurations["roveLiveSecrets"]["stravaClientSecret"],
     "redirect_uri": callbackBaseUrl+"/stravaCallback",
   });
   if (request.method === "POST") {
-    if (!request.debug) {
-      functions.logger.info("webhook event received!", {
-        body: request.body,
-      });
-    }
     let stravaAccessToken;
     // get userbased on userid. (.where("id" == request.body.owner_id)).
     // if the status is a delete then do nothing.
@@ -1338,6 +1361,8 @@ async function processStravaWebhook(request, response) {
         activity,
         activityDoc,
         0);
+
+    await webhookInBox.delete(webhookDoc);
   }
 }
 

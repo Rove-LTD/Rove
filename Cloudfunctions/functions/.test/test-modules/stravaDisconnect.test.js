@@ -30,7 +30,7 @@ myFunctions = require('../../index.js');
 const got = require('got');
 const stravaApi = require("strava-v3");
 //-------------TEST 2--- Test Callbacks from Strava-------
- describe.only("Check the Strava Disconnect Service works: ", () => {
+ describe("Check the Strava Disconnect Service works: ", () => {
   beforeEach(async () => {
     nowInSeconds = new Date()/1000
     notExpiredDate = nowInSeconds+1000;

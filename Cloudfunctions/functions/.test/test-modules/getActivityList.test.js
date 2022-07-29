@@ -188,7 +188,7 @@ describe("Testing that the developer can call API to getActivityList() and recei
 
    assert.deepEqual(sanatisedActivity, expectedResults);
 })
-it.only('External requests should return a list of activities...', async () => {
+it('External requests should return a list of activities...', async () => {
     // set the request object with the correct provider, developerId and userId
     const req = {
         url: 'https://us-central1-rovetest-beea7.cloudfunctions.net/getActivityList?devId='+testDev+'&userId='+testUser+'&devKey=test-key&start=2022-07-28T09:15:33.000Z&end=2022-07-29T09:15:33.000Z',
