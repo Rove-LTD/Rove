@@ -73,8 +73,6 @@ module.exports = {
     if (dateRange != undefined || dateRange != null) {
       parameters.uploadStartTimeInSeconds = dateRange.from;
       parameters.uploadEndTimeInSeconds = dateRange.to;
-      url = url+"?uploadStartTimeInSeconds="+dateRange.from +
-          "&uploadEndTimeInSeconds="+dateRange.to;
     }
     const encodedParameters = this.collectParams(parameters);
     const baseUrl = url;
@@ -90,6 +88,10 @@ module.exports = {
       oauth_version: "1.0",
       oauth_signature: signature,
     };
+    if (dateRange != undefined || dateRange != null) {
+      url = url+"?uploadStartTimeInSeconds="+dateRange.from +
+      "&uploadEndTimeInSeconds="+dateRange.to;
+    }
     const options = {
       headers: {
         "Authorization": "OAuth "+this.authorizationString(parameters),

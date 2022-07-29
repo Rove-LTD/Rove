@@ -242,6 +242,7 @@ async function requestForDateRange(providers, userDoc, start, end) {
   let numOfProviders = 0;
   let i = 0;
   let activtyList = [];
+  /*
   if (providers["strava"]) {
     numOfProviders ++;
     getStravaActivityList(start, end, userDoc).then((stravaActivities)=>{
@@ -251,16 +252,20 @@ async function requestForDateRange(providers, userDoc, start, end) {
         return activtyList;
       }
     });
-  }
-  /*
+  }*/
   if (providers["garmin"]) {
     numOfProviders ++;
-    await getGarminActivityList(start, end, userDoc).then((i)=>{
+    await getGarminActivityList(start, end, userDoc).then((garminActivities)=>{
       i++;
+      activtyList = activtyList.concat(garminActivities);
+      if (i == numOfProviders) {
+        return activtyList;
+      }
     });
   } else {
     i++;
-  }*/
+  }
+  /*
   // sadly Polar is not available to list activities.
   if (providers["wahoo"]) {
     numOfProviders ++;
@@ -285,7 +290,7 @@ async function requestForDateRange(providers, userDoc, start, end) {
     });
   } else {
     i++;
-  }
+  }*/
 }
 async function getWahooActivityList(start, end, userDoc) {
   try {
@@ -356,6 +361,16 @@ async function getPolarActivityList(start, end, userDoc) {
 }
 async function getGarminActivityList(start, end, userDoc) {
   // include the garmin fetcher here.
+  const url = "https://apis.garmin.com/wellness-api/rest/activities";
+  const userDocData = await userDoc.data();
+  const devId = userDocData["devId"];
+  const secretLookup = await db.collection("developers").doc(devId).get();
+  const lookup = await secretLookup.data()["secret_lookup"];
+  const consumerSecret = configurations[lookup]["consumerSecret"];
+  const oAuthConsumerSecret = configurations[lookup]["oauth_consumer_key"];
+  const options = await encodeparams.garminCallOptions(url, "GET", consumerSecret, oAuthConsumerSecret, userDocData["garmin_access_token"], userDocData["garmin_access_token_secret"], {from: start.getTime()/1000, to: end.getTime()/1000});
+  const activityList = await got.get(options);
+  return;
 }
 async function getStravaActivityList(start, end, userDoc) {
   const userDocData = await userDoc.data();

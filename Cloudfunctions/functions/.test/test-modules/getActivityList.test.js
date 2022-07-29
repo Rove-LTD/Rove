@@ -55,7 +55,8 @@ describe("Testing that the developer can call API to getActivityList() and recei
             "strava_access_token": "e703c5893d94dda02e74a87b5ae2d8082457869d",
             "strava_refresh_token": "077e305b5af2ed1667fa5406aec491b31ba50b5d",
             "strava_token_expires_at": "1659032916",
-            "garmin_access_token" :"garmin-test-access-token",
+            "garmin_access_token" :"58362aa6-f71c-499f-b0c6-a46371278298",
+            "garmin_access_token_secret": "HQ0o8k9gxNsULie2MknQDfY494fZ2Q5gh9T"
         }, {merge: true});
   
         activityDocs = await admin.firestore()
@@ -190,7 +191,7 @@ describe("Testing that the developer can call API to getActivityList() and recei
 it.only('External requests should return a list of activities...', async () => {
     // set the request object with the correct provider, developerId and userId
     const req = {
-        url: 'https://us-central1-rovetest-beea7.cloudfunctions.net/getActivityList?devId='+testDev+'&userId='+testUser+'&devKey=test-key&start=2022-07-22T09:15:33.000Z&end=2022-07-28T09:15:33.000Z',
+        url: 'https://us-central1-rovetest-beea7.cloudfunctions.net/getActivityList?devId='+testDev+'&userId='+testUser+'&devKey=test-key&start=2022-07-28T09:15:33.000Z&end=2022-07-29T09:15:33.000Z',
     };
     res = {
         send: (JSON)=> {assert.equal(JSON, [{
