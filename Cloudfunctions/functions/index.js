@@ -215,9 +215,15 @@ exports.getActivityList = functions.https.onRequest(async (req, res) => {
   }
   const start = new Date(parameters.start);
   const end = new Date(parameters.end);
-  if (start == "Invalid Date" || end == "Invalid Date") {
+  if (start == "Invalid Date" || end == "Invalid Date" || start.getTime() > end.getTime()) {
     url =
     "error: the start/end was badly formatted, or missing";
+    res.status(400);
+    res.send(url);
+    return;
+  }
+  if (end.getTime() - start.getTime() > (15*24*60*60*1000)) {
+    url = "error: the start and end time are too far apart";
     res.status(400);
     res.send(url);
     return;
