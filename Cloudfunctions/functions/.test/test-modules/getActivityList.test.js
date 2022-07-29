@@ -45,16 +45,16 @@ describe("Testing that the developer can call API to getActivityList() and recei
             "devId": testDev,
             "userId": testUser,
             "wahoo_user_id": "1510441",
-            "wahoo_access_token": "umHK1qxDIDG13xL8267NPsjb4N04rM-HR8YNyGwL1RA",
-            "wahoo_refresh_token": "RuEMUfod-SI9KTiNbfbhVzyopyU-yjBJiixr1Coq4iM",
-            "wahoo_token_expires_at":"1659020663",
+            "wahoo_access_token": "KqYZQw9vIUgpgXlE1tAUwQz-rWEevlZbrfICQzQGcYc",
+            "wahoo_refresh_token": "EoHcXrqpHpvRyT6EGNzzEk0ljVCMe2j7cVcruDxujEY",
+            "wahoo_token_expires_at":"1659098293",
             "wahoo_token_expires_in": "7200",
             "polar_user_id": "polar_test_user",
             "polar_access_token": "d717dd39d09b91939f835d66a640927d",
             "strava_id" : "12972711",
-            "strava_access_token": "e703c5893d94dda02e74a87b5ae2d8082457869d",
+            "strava_access_token": "752716c181f25585b2eba5f710a1a653581cb106",
             "strava_refresh_token": "077e305b5af2ed1667fa5406aec491b31ba50b5d",
-            "strava_token_expires_at": "1659032916",
+            "strava_token_expires_at": "1659104212",
             "garmin_access_token" :"58362aa6-f71c-499f-b0c6-a46371278298",
             "garmin_access_token_secret": "HQ0o8k9gxNsULie2MknQDfY494fZ2Q5gh9T"
         }, {merge: true});
@@ -191,7 +191,7 @@ describe("Testing that the developer can call API to getActivityList() and recei
 it.only('External requests should return a list of activities...', async () => {
     // set the request object with the correct provider, developerId and userId
     const req = {
-        url: 'https://us-central1-rovetest-beea7.cloudfunctions.net/getActivityList?devId='+testDev+'&userId='+testUser+'&devKey=test-key&start=2022-07-28T09:15:33.000Z&end=2022-07-29T09:15:33.000Z',
+        url: 'https://us-central1-rovetest-beea7.cloudfunctions.net/getActivityList?devId='+testDev+'&userId='+testUser+'&devKey=test-key&start=2022-07-27T09:15:33.000Z&end=2022-07-29T09:15:33.000Z',
     };
     res = {
         send: (JSON)=> {assert.equal(JSON, [{
