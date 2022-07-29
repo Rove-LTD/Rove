@@ -1260,10 +1260,11 @@ exports.polarWebhookSetup = functions.https.onRequest(async (req, res) => {
 });
 
 async function getStravaDetailedActivity(userDoc, activityDoc) {
-  const stravaActivityId = await activityDoc.data()["raw"]["id"]
-  const devId = await userDoc.data()["devId"];
+  const stravaActivityId = await activityDoc["raw"]["id"];
+  const devId = await userDoc["devId"];
   const secretLookup = await db.collection("developers").doc(devId).get();
   const lookup = await secretLookup.data()["secret_lookup"];
+  let streamResponse;
   stravaApi.config({
     "client_id": configurations[lookup]["stravaClientId"],
     "client_secret": configurations[lookup]["stravaClientSecret"],
@@ -1271,29 +1272,30 @@ async function getStravaDetailedActivity(userDoc, activityDoc) {
   });
   // delete activities
   // check if this is the last user with this stravaId and this is not a call from the webhook
-  let accessToken = userDoc.data()["strava_access_token"];
+  let accessToken = userDoc["strava_access_token"];
   const userQueryList = await db.collection("users").
-      where("strava_id", "==", userDoc.data()["strava_id"])
+      where("strava_id", "==", userDoc["strava_id"])
       .get();
   if ( userQueryList.docs.length == 1) {
-    if (await checkStravaTokens(userDoc.id, db) == true) {
+    if (await checkStravaTokens(userDoc["devId"]+userDoc["userId"], db) == true) {
       // token out of date, make request for new ones.
-      const payload = await stravaApi.oauth.refreshToken(userDoc.data()["strava_refresh_token"]);
-      await stravaTokenStorage(userDoc.id, payload, db);
+      const payload = await stravaApi.oauth.refreshToken(userDoc["strava_refresh_token"]);
+      await stravaTokenStorage(userDoc["devId"]+userDoc["userId"], payload, db);
       accessToken = payload["access_token"];
     }
-    const streamResponse = await stravaApi.streams.activity({"access_token": accessToken, "id": stravaActivityId, "keys": ["time", "distance", "latlng", "altitude", "velocity_smooth", "heartrate", "cadence", "watts", "temp", "moving", "grade_smooth"], "key_by_type": true});
-
-    console.log(streamResponse)
+    streamResponse = await stravaApi.streams.activity({"access_token": accessToken, "id": stravaActivityId, "types": ["time", "distance", "latlng", "altitude", "velocity_smooth", "heartrate", "cadence", "watts", "temp", "moving", "grade_smooth"], "key_by_type": true});
   }
+  console.log(streamResponse);
 }
 
 exports.getDetailedActivity = functions.https.onRequest(async (req, res) => {
-  const devId = Url.parse(req.url, true).query["devId"];
-  const devKey = Url.parse(req.url, true).query["devKey"];
-  const userId = Url.parse(req.url, true).query["userId"];
-  const activityId = Url.parse(req.url, true).query["activityId"];
+  const devId = req.body["devId"];
+  const devKey = req.body["devKey"];
+  const userId = req.body["userId"];
+  const activityId = req.body["activityId"];
   const userPath = db.collection("users").doc(userId);
+  let userDoc;
+  let activityDoc;
 
   // firt, checking the devId and devKey
   if (devId != null) {
@@ -1327,6 +1329,7 @@ exports.getDetailedActivity = functions.https.onRequest(async (req, res) => {
               res.send("error: the userId was badly formatted, missing or nor authorised");
               return;
             }
+            userDoc = docSnapshot.data();
           } else {
             res.status(400);
             res.send("error: the userId was badly formatted, missing or nor authorised");
@@ -1342,10 +1345,13 @@ exports.getDetailedActivity = functions.https.onRequest(async (req, res) => {
   // now check activity exist and get the detailed activity
   if (activityId != null) {
     await userPath.collection("activities").doc(activityId).get()
-        .then((docSnapshot) => {
+        .then(async (docSnapshot) => {
           if (docSnapshot.exists) {
-            const activity = docSnapshot.data();
-            const source = activity.data_source;
+            activityDoc = docSnapshot.data();
+            const source = activityDoc["sanitised"]["data_source"];
+            if (source == "strava") {
+              await getStravaDetailedActivity(userDoc, activityDoc);
+            }
             // based on source, get detailed activity
           } else {
             res.status(400);

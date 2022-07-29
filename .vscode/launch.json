@@ -13,6 +13,12 @@
         "<node_internals>/**"
       ],
       "program": "${workspaceFolder}/Cloudfunctions/functions/.test/test-modules/connectService.test.js"
+    },
+    {
+      "type": "node-terminal",
+      "name": "JavaScript Debug Terminal",
+      "request": "launch",
+      "cwd": "${workspaceFolder}"
     }
   ]
 }
