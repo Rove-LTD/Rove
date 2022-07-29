@@ -233,7 +233,7 @@ describe("Testing that the Webhooks work: ", () => {
       }
 
       await myFunctions.stravaWebhook(req, res);
-      // check polar was called with the right arguments
+      // check strava was called with the right arguments
       // assert(stubbedPolarCall.calledWith(), "polar arguments");
       const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
       await wait(1000);
