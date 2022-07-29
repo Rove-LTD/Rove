@@ -253,60 +253,19 @@ async function requestForDateRange(providers, userDoc, start, end) {
     numOfProviders ++;
     activtyList = activtyList.concat(getStravaActivityList(start, end, userDoc));
   }
-  /* .then((stravaActivities)=>{
-      i++;
-      activtyList = activtyList.concat(stravaActivities);
-      if (i == numOfProviders) {
-        return activtyList;
-      }
-    });
-  } else {
-    i++;
-  } */
   if (providers["garmin"]) {
     numOfProviders ++;
     activtyList = activtyList.concat(getGarminActivityList(start, end, userDoc));
   }
-  /*
-    .then((garminActivities)=>{
-      i++;
-      activtyList = activtyList.concat(garminActivities);
-      if (i == numOfProviders) {
-        return activtyList;
-      }
-    });
-  } else {
-    i++;
-  }*/
   // sadly Polar is not available to list activities.
   if (providers["wahoo"]) {
     numOfProviders ++;
     activtyList = activtyList.concat(getWahooActivityList(start, end, userDoc));
   }
-  /* .then((wahooActivities)=>{
-      i++;
-      activtyList = activtyList.concat(wahooActivities);
-      if (i == numOfProviders) {
-        return activtyList;
-      }
-    });
-  } else {
-    i++;
-  } */
   if (providers["polar"]) {
     numOfProviders ++;
     activtyList = activtyList.concat(getPolarActivityList(start, end, userDoc));
   }
-  /* .then((polarActivities)=>{
-      i++;
-      activtyList = activtyList.concat(polarActivities);
-      if (i == numOfProviders) {
-        return activtyList;
-      }
-    });
-  } else {
-    i++;
-  } */
   try {
     let returnList = await Promise.all(activtyList);
     returnList = returnList.flat();
