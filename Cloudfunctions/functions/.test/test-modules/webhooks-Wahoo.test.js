@@ -30,7 +30,7 @@ myFunctions = require('../../index.js');
 const got = require('got');
 //-------------TEST --- webhooks-------
 describe("Testing that the Webhooks work: ", () => {
-  before ('set up the userIds in the test User doc', async () => {
+    before ('set up the userIds in the test User doc', async () => {
       await admin.firestore()
       .collection("users")
       .doc(testDev+testUser)
@@ -56,8 +56,8 @@ describe("Testing that the Webhooks work: ", () => {
       activityDocs.forEach(async (doc)=>{
           await doc.ref.delete();
       });
-  });
-  it('Webhooks should log event and repond with status 200...', async () => {
+    });
+    it('Webhooks should log event and repond with status 200...', async () => {
       // set the request object with the correct provider, developerId and userId
       const req = {
           debug: true,
@@ -115,8 +115,8 @@ describe("Testing that the Webhooks work: ", () => {
      sanatisedActivity.timestamp = "not tested";
 
      assert.deepEqual(sanatisedActivity, expectedResults);
-  })
-  it('Webhooks should repond with status 401 if method incorrect...', async () => {
+    });
+    it('Webhooks should repond with status 401 if method incorrect...', async () => {
     // set the request object with the correct provider, developerId and userId
     const req = {
         debug: true,
@@ -129,50 +129,50 @@ describe("Testing that the Webhooks work: ", () => {
     }
 
     await myFunctions.wahooWebhook(req, res);
-})
-it('Webhooks should repond with status 401 if webhook token is incorrect...', async () => {
-    // set the request object with the correct provider, developerId and userId
-    const req = {
-        debug: true,
-        url: "https://us-central1-rovetest-beea7.cloudfunctions.net/wahooWebhook",
-        method: "POST",
-        body:{"user":{"id": "wahoo_test_user"},"event_type":"workout_summary","workout_summary":{"duration_active_accum":"9.0","workout":{"name":"Cycling","workout_token":"ELEMNT AE48:274","workout_type_id":0,"id":147564736,"updated_at":"2022-06-13T16:39:08.000Z","plan_id":null,"minutes":0,"starts":"2022-06-13T16:38:51.000Z","created_at":"2022-06-13T16:39:08.000Z"},"speed_avg":"0.0","duration_total_accum":"9.0","cadence_avg":"0.0","id":140473420,"work_accum":"0.0","power_bike_tss_last":null,"ascent_accum":"0.0","power_bike_np_last":null,"duration_paused_accum":"0.0","created_at":"2022-06-13T16:39:09.000Z","updated_at":"2022-06-13T16:39:09.000Z","power_avg":"0.0","file":{"url":"https://cdn.wahooligan.com/wahoo-cloud/production/uploads/workout_file/file/WpHvKL3irWsv2vHzGzGF_Q/2022-06-13-163851-ELEMNT_AE48-274-0.fit"},"distance_accum":"0.0","heart_rate_avg":"0.0","calories_accum":"0.0"},"webhook_token":"incorrect"}
-};
-    res = {
-        send: (text)=>{assert.equal(text, "NOT AUTHORISED")},
-        status: (code)=>{assert.equal(code, 401);},
-    }
+    });
+    it('Webhooks should repond with status 401 if webhook token is incorrect...', async () => {
+        // set the request object with the correct provider, developerId and userId
+        const req = {
+            debug: true,
+            url: "https://us-central1-rovetest-beea7.cloudfunctions.net/wahooWebhook",
+            method: "POST",
+            body:{"user":{"id": "wahoo_test_user"},"event_type":"workout_summary","workout_summary":{"duration_active_accum":"9.0","workout":{"name":"Cycling","workout_token":"ELEMNT AE48:274","workout_type_id":0,"id":147564736,"updated_at":"2022-06-13T16:39:08.000Z","plan_id":null,"minutes":0,"starts":"2022-06-13T16:38:51.000Z","created_at":"2022-06-13T16:39:08.000Z"},"speed_avg":"0.0","duration_total_accum":"9.0","cadence_avg":"0.0","id":140473420,"work_accum":"0.0","power_bike_tss_last":null,"ascent_accum":"0.0","power_bike_np_last":null,"duration_paused_accum":"0.0","created_at":"2022-06-13T16:39:09.000Z","updated_at":"2022-06-13T16:39:09.000Z","power_avg":"0.0","file":{"url":"https://cdn.wahooligan.com/wahoo-cloud/production/uploads/workout_file/file/WpHvKL3irWsv2vHzGzGF_Q/2022-06-13-163851-ELEMNT_AE48-274-0.fit"},"distance_accum":"0.0","heart_rate_avg":"0.0","calories_accum":"0.0"},"webhook_token":"incorrect"}
+    };
+        res = {
+            send: (text)=>{assert.equal(text, "NOT AUTHORISED")},
+            status: (code)=>{assert.equal(code, 401);},
+        }
 
-    await myFunctions.wahooWebhook(req, res);
-})
-it.only('Webhooks should write webhook message and error if sanitise fails and repond with status 200...', async () => {
-    // set the request object with incorrect event_type and no workout_summary
-    const req = {
-        debug: true,
-        url: "https://us-central1-rovetest-beea7.cloudfunctions.net/wahooWebhook",
-        method: "POST",
-        body:{"user":{"id":"wahoo_test_user"},"event_type":"incorrect","workout_summar_nothere":{"duration_active_accum":"9.0","workout":{"name":"Cycling","workout_token":"ELEMNT AE48:274","workout_type_id":"incorrect","id":147564736,"updated_at":"2022-06-13T16:39:08.000Z","plan_id":null,"minutes":0,"starts":"2022-06-13T16:38:51.000Z","created_at":"2022-06-13T16:39:08.000Z"},"speed_avg":"0.0","duration_total_accum":"9.0","cadence_avg":"0.0","id":140473420,"work_accum":"0.0","power_bike_tss_last":null,"ascent_accum":"0.0","power_bike_np_last":null,"duration_paused_accum":"0.0","created_at":"2022-06-13T16:39:09.000Z","updated_at":"2022-06-13T16:39:09.000Z","power_avg":"0.0","file":{"url":"https://cdn.wahooligan.com/wahoo-cloud/production/uploads/workout_file/file/WpHvKL3irWsv2vHzGzGF_Q/2022-06-13-163851-ELEMNT_AE48-274-0.fit"},"distance_accum":"0.0","heart_rate_avg":"0.0","calories_accum":"0.0"},"webhook_token":"348a6fe2-3719-4647-a233-933b8c404d6b"}
-};
-    res = {
-        sendStatus: (code)=>{assert.equal(code, 200);},
-    }
+        await myFunctions.wahooWebhook(req, res);
+    });
+    it('Webhooks should write webhook message and error if sanitise fails and repond with status 200...', async () => {
+        // set the request object with incorrect event_type and no workout_summary
+        const req = {
+            debug: true,
+            url: "https://us-central1-rovetest-beea7.cloudfunctions.net/wahooWebhook",
+            method: "POST",
+            body: {"user":{"id":"wahoo_test_user"},"event_type":"incorrect","workout_summar_nothere":{"duration_active_accum":"9.0","workout":{"name":"Cycling","workout_token":"ELEMNT AE48:274","workout_type_id":"incorrect","id":147564736,"updated_at":"2022-06-13T16:39:08.000Z","plan_id":null,"minutes":0,"starts":"2022-06-13T16:38:51.000Z","created_at":"2022-06-13T16:39:08.000Z"},"speed_avg":"0.0","duration_total_accum":"9.0","cadence_avg":"0.0","id":140473420,"work_accum":"0.0","power_bike_tss_last":null,"ascent_accum":"0.0","power_bike_np_last":null,"duration_paused_accum":"0.0","created_at":"2022-06-13T16:39:09.000Z","updated_at":"2022-06-13T16:39:09.000Z","power_avg":"0.0","file":{"url":"https://cdn.wahooligan.com/wahoo-cloud/production/uploads/workout_file/file/WpHvKL3irWsv2vHzGzGF_Q/2022-06-13-163851-ELEMNT_AE48-274-0.fit"},"distance_accum":"0.0","heart_rate_avg":"0.0","calories_accum":"0.0"},"webhook_token":"348a6fe2-3719-4647-a233-933b8c404d6b"},
+        };
+        res = {
+            sendStatus: (code)=>{assert.equal(code, 200);},
+        }
 
-    await myFunctions.wahooWebhook(req, res);
-    const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
-    await wait(1000);
-    //now check the database was updated correctly
-   const testWebhookDocs = await admin.firestore()
-   .collection("webhookInBox")
-   .get();
+        await myFunctions.wahooWebhook(req, res);
+        const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+        await wait(1000);
+        //now check the database was updated correctly
+    const testWebhookDocs = await admin.firestore()
+    .collection("webhookInBox")
+    .get();
 
-   const webhookDoc = testWebhookDocs.docs[0].data();
-   const expectedResults = {
-        body: '{"user":{"id":"wahoo_test_user"},"event_type":"incorrect","workout_summar_nothere":{"duration_active_accum":"9.0","workout":{"name":"Cycling","workout_token":"ELEMNT AE48:274","workout_type_id":"incorrect","id":147564736,"updated_at":"2022-06-13T16:39:08.000Z","plan_id":null,"minutes":0,"starts":"2022-06-13T16:38:51.000Z","created_at":"2022-06-13T16:39:08.000Z"},"speed_avg":"0.0","duration_total_accum":"9.0","cadence_avg":"0.0","id":140473420,"work_accum":"0.0","power_bike_tss_last":null,"ascent_accum":"0.0","power_bike_np_last":null,"duration_paused_accum":"0.0","created_at":"2022-06-13T16:39:09.000Z","updated_at":"2022-06-13T16:39:09.000Z","power_avg":"0.0","file":{"url":"https://cdn.wahooligan.com/wahoo-cloud/production/uploads/workout_file/file/WpHvKL3irWsv2vHzGzGF_Q/2022-06-13-163851-ELEMNT_AE48-274-0.fit"},"distance_accum":"0.0","heart_rate_avg":"0.0","calories_accum":"0.0"},"webhook_token":"348a6fe2-3719-4647-a233-933b8c404d6b"}',
-        method: "POST",
-        status: "error: don't recognise the wahoo event_type: incorrect",
-    }
+    const webhookDoc = testWebhookDocs.docs[0].data();
+    const expectedResults = {
+            body: '{"user":{"id":"wahoo_test_user"},"event_type":"incorrect","workout_summar_nothere":{"duration_active_accum":"9.0","workout":{"name":"Cycling","workout_token":"ELEMNT AE48:274","workout_type_id":"incorrect","id":147564736,"updated_at":"2022-06-13T16:39:08.000Z","plan_id":null,"minutes":0,"starts":"2022-06-13T16:38:51.000Z","created_at":"2022-06-13T16:39:08.000Z"},"speed_avg":"0.0","duration_total_accum":"9.0","cadence_avg":"0.0","id":140473420,"work_accum":"0.0","power_bike_tss_last":null,"ascent_accum":"0.0","power_bike_np_last":null,"duration_paused_accum":"0.0","created_at":"2022-06-13T16:39:09.000Z","updated_at":"2022-06-13T16:39:09.000Z","power_avg":"0.0","file":{"url":"https://cdn.wahooligan.com/wahoo-cloud/production/uploads/workout_file/file/WpHvKL3irWsv2vHzGzGF_Q/2022-06-13-163851-ELEMNT_AE48-274-0.fit"},"distance_accum":"0.0","heart_rate_avg":"0.0","calories_accum":"0.0"},"webhook_token":"348a6fe2-3719-4647-a233-933b8c404d6b"}',
+            method: "POST",
+            status: "error: don't recognise the wahoo event_type: incorrect",
+        }
 
-   assert.deepEqual(webhookDoc, expectedResults);
-   await testWebhookDocs.docs[0].ref.delete();
-})
+    assert.deepEqual(webhookDoc, expectedResults);
+    await testWebhookDocs.docs[0].ref.delete();
+    });
 }); //End TEST
