@@ -301,7 +301,33 @@ exports.wahooSanitise = function (activity) {
     255:"UNKNOWN",}
  
   let summaryActivity = {};
-  if (activity.hasOwnProperty("workout_summary")) {
+  if (activity.event_type == "workout_summary") {
+    summaryActivity = {
+    "activity_id": activity.workout_summary.id,
+    "activity_name": activity.workout_summary.workout.name,
+    "activity_type":  wahooWorkoutType[activity.workout_summary.workout.workout_type_id], // TODO: complete the sanitisation.
+    "distance_in_meters": activity.workout_summary.distance_accum, //checkunits
+    "average_pace_in_meters_per_second" : activity.workout_summary.speed_avg, //checkunits
+    "active_calories": activity.workout_summary.calories_accum,
+    "activity_duration_in_seconds": activity.workout_summary.duration_total_accum,
+    "start_time" : activity.workout_summary.workout.starts,
+    "average_heart_rate_bpm" : activity.workout_summary.heart_rate_avg,
+    "average_cadence" : activity.workout_summary.cadence_avg,
+    "elevation_gain" : activity.workout_summary.ascent_accum,
+    "elevation_loss": null,
+    "data_source" : "wahoo",
+    // --------TODO: Here is additional data we need to agree on -------
+    "work_accum": activity.workout_summary.work_accum,
+    "power_bike_tss_last": activity.workout_summary.power_bike_tss_last,
+    "ascent_accum": activity.workout_summary.ascent_accum,
+    "power_bike_np_last": activity.workout_summary.power_bike_np_last,
+    "duration_paused_accum": activity.workout_summary.duration_paused_accum,
+    "created_at": activity.workout_summary.created_at,
+    "updated_at": activity.workout_summary.updated_at,
+    "power_avg": activity.workout_summary.power_avg,
+    "file": activity.workout_summary.file,
+    };
+  } else if (activity.hasOwnProperty("workout_summary")) {
     if (activity.workout_summary == null) {
       summaryActivity = {"activity_name": activity.name,};
     } else {
@@ -330,32 +356,6 @@ exports.wahooSanitise = function (activity) {
       "power_avg": activity.workout_summary.power_avg,
       "file": activity.workout_summary.file,
       };}
-  } else if (activity.event_type == "workout_summary") {
-    summaryActivity = {
-    "activity_id": activity.workout_summary.id,
-    "activity_name": activity.workout_summary.workout.name,
-    "activity_type":  wahooWorkoutType[activity.workout_summary.workout.workout_type_id], // TODO: complete the sanitisation.
-    "distance_in_meters": activity.workout_summary.distance_accum, //checkunits
-    "average_pace_in_meters_per_second" : activity.workout_summary.speed_avg, //checkunits
-    "active_calories": activity.workout_summary.calories_accum,
-    "activity_duration_in_seconds": activity.workout_summary.duration_total_accum,
-    "start_time" : activity.workout_summary.workout.starts,
-    "average_heart_rate_bpm" : activity.workout_summary.heart_rate_avg,
-    "average_cadence" : activity.workout_summary.cadence_avg,
-    "elevation_gain" : activity.workout_summary.ascent_accum,
-    "elevation_loss": null,
-    "data_source" : "wahoo",
-    // --------TODO: Here is additional data we need to agree on -------
-    "work_accum": activity.workout_summary.work_accum,
-    "power_bike_tss_last": activity.workout_summary.power_bike_tss_last,
-    "ascent_accum": activity.workout_summary.ascent_accum,
-    "power_bike_np_last": activity.workout_summary.power_bike_np_last,
-    "duration_paused_accum": activity.workout_summary.duration_paused_accum,
-    "created_at": activity.workout_summary.created_at,
-    "updated_at": activity.workout_summary.updated_at,
-    "power_avg": activity.workout_summary.power_avg,
-    "file": activity.workout_summary.file,
-    };
   } else {
     // we dont recognise this event type yet
     throw new SanatiseError("don't recognise the wahoo event_type: "+activity.event_type);

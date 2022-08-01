@@ -27,6 +27,14 @@ const configurations = contentsOfDotEnvFile["config"];
 
 admin.initializeApp();
 const db = admin.firestore();
+switch (process.env.GCLOUD_PROJECT) {
+  case "rove-26":
+    configurations.lookup = "roveLiveSecrets";
+    break;
+  case "rovetest-beea7":
+    configurations.lookup = "roveTestSecrets";
+    break;
+}
 const oauthWahoo = new OauthWahoo(configurations, db);
 const callbackBaseUrl = "https://us-central1-"+process.env.GCLOUD_PROJECT+".cloudfunctions.net";
 
@@ -1248,12 +1256,12 @@ exports.wahooCallback = functions.https.onRequest(async (req, res) => {
 });
 
 exports.stravaWebhook = functions.https.onRequest(async (request, response) => {
-  // handle subscription setup
   if (!request.debug) {
     functions.logger.info("webhook event received!", {
       body: request.body,
     });
   }
+  // handle subscription setup
   if (request.method === "GET") {
     const VERIFY_TOKEN = "STRAVA";
     const mode = request.query["hub.mode"];
@@ -1269,39 +1277,44 @@ exports.stravaWebhook = functions.https.onRequest(async (request, response) => {
     } else {
       response.sendStatus(403);
     }
-  } else {
+  } else { // save the webhook message and asynchronously process
     try {
-      const webhookDoc = await webhookInBox.push(request.body);
+      const webhookDoc = await webhookInBox.push(request);
       response.sendStatus(200);
       // now we have saved the request and returned we can process it
+      // asynchronously
       processStravaWebhook(webhookDoc, request);
     } catch (err) {
       response.sendStatus(400);
+      console.log("Error saving webhook message - returned status 400");
     }
   }
-  // send response 200.
-  response.sendStatus(200);
 });
 
 const webhookInBox = {
-  push: async function(data) {
+  push: async function(request) {
     const webhookDoc = db.collection("webhookInBox").doc();
     await webhookDoc
         .set({
           status: "new",
-          body: JSON.stringify(data),
+          method: request.method,
+          body: JSON.stringify(request.body),
         });
     return webhookDoc;
   },
   delete: async function(webhookDoc) {
     await webhookDoc.delete();
   },
+  writeError: async function(webhookDoc, error) {
+    console.log(error.errorMessage);
+    webhookDoc.set({status: "error: "+error.errorMessage}, {merge: true});
+  },
 };
 
 async function processStravaWebhook(webhookDoc, request) {
   stravaApi.config({
-    "client_id": configurations["roveLiveSecrets"]["stravaClientId"],
-    "client_secret": configurations["roveLiveSecrets"]["stravaClientSecret"],
+    "client_id": configurations[configurations.lookup]["stravaClientId"],
+    "client_secret": configurations[configurations.lookup]["stravaClientSecret"],
     "redirect_uri": callbackBaseUrl+"/stravaCallback",
   });
   if (request.method === "POST") {
@@ -1367,67 +1380,77 @@ async function processStravaWebhook(webhookDoc, request) {
 }
 
 exports.wahooWebhook = functions.https.onRequest(async (request, response) => {
-  if (request.method === "POST") {
-    if (!request.debug) {
-      functions.logger.info("---> Wahoo 'POST' webhook event received!", {
-        query: request.query,
-        body: request.body,
-      });
-    }
-    // check the webhook token is correct
-    // TODO: parameterise - should be a lookup in a collection("wahooWebhookTokens")
-    if (request.body.webhook_token != "97661c16-6359-4854-9498-a49c07b6ec11") {
-      console.log("Wahoo Webhook event recieved that did not have the correct webhook token");
-      response.status(401);
-      response.send("NOT AUTHORISED");
-      return;
-    }
-    const userDocsList = [];
-    const userQuery = await db.collection("users")
-        .where("wahoo_user_id", "==", request.body.user.id).get();
-    userQuery.docs.forEach((doc)=>{
-      userDocsList.push(doc);
+  if (!request.debug) {
+    functions.logger.info("---> Wahoo "+request.method+" webhook event received!", {
+      query: request.query,
+      body: request.body,
     });
-    // now we have a list of user Id's that are interested in this
-    //  data
-    // 1) sanatise and 2) send
-    let sanitisedActivity;
-    try {
-      sanitisedActivity = filters.wahooSanitise(request.body);
-    } catch (error) {
-      console.log(error.errorMessage);
-      response.status(404);
-      response.send("Event type not recognised");
-      return;
-    }
-    // save raw and sanitised activites as a backup for each user
-    userDocsList.forEach(async (userDoc)=>{
-      sanitisedActivity["userId"] = userDoc.data()["userId"];
-      // TODO: this is a bit of a cludge to prevent the userId
-      // being written incorrectly in this loop during async
-      // firebase writes.
-      const localSanitisedActivity = JSON.parse(JSON.stringify(sanitisedActivity));
-      const activityDoc = userDoc.ref
-          .collection("activities")
-          .doc();
-      await activityDoc.set({"sanitised": localSanitisedActivity, "raw": request.body});
-      const triesSoFar = 0; // this is our first try to write to developer
-      await sendToDeveloper(userDoc, localSanitisedActivity, request.body, activityDoc, triesSoFar);
-    });
-    response.status(200);
-    response.send("EVENT_RECEIVED");
+  }
+  // check the webhook token is correct
+  if (request.body.webhook_token !=
+      configurations[configurations.lookup].wahooWebhookToken) {
+    console.log("Wahoo Webhook event recieved that did not have the correct webhook token");
+    response.status(401);
+    response.send("NOT AUTHORISED");
     return;
-  } else {
-    if (!request.debug) {
-      functions.logger.info("---> Wahoo 'GET' webhook event received!", {
-        query: request.query,
-        body: request.body,
-      });
+  }
+  if (request.method === "POST") {
+    try {
+      const webhookDoc = await webhookInBox.push(request);
+      response.sendStatus(200);
+      // now we have saved the request and returned we can process it
+      // asynchronously
+      await processWahooWebhook(webhookDoc, request);
+    } catch (err) {
+      response.sendStatus(400);
+      console.log("Error saving webhook message - returned status 400");
     }
+  } else {
     response.status(200);
     response.send("EVENT_RECEIVED");
   }
 });
+
+async function processWahooWebhook(webhookDoc, request) {
+  const userDocsList = [];
+  const userQuery = await db.collection("users")
+      .where("wahoo_user_id", "==", request.body.user.id).get();
+  userQuery.docs.forEach((doc)=>{
+    userDocsList.push(doc);
+  });
+  // now we have a list of user Id's that are interested in this
+  //  data
+  // 1) sanatise and 2) send
+  let sanitisedActivity;
+  try {
+    sanitisedActivity = filters.wahooSanitise(request.body);
+  } catch (error) {
+    webhookInBox.writeError(webhookDoc, error);
+    return;
+  }
+  // save raw and sanitised activites as a backup for each user
+  userDocsList.forEach(async (userDoc)=>{
+    sanitisedActivity["userId"] = userDoc.data()["userId"];
+    // TODO: this is a bit of a cludge to prevent the userId
+    // being written incorrectly in this loop during async
+    // firebase writes.
+    const localSanitisedActivity = JSON.parse(JSON.stringify(sanitisedActivity));
+    const activityDoc = userDoc.ref
+        .collection("activities")
+        .doc();
+    try {
+      await activityDoc.set({"sanitised": localSanitisedActivity,
+        "raw": request.body});
+    } catch (error) {
+      webhookInBox.writeError(webhookDoc, error);
+      return;
+    }
+    webhookInBox.delete(webhookDoc);
+    const triesSoFar = 0; // this is our first try to write to developer
+    await sendToDeveloper(userDoc, localSanitisedActivity, request.body, activityDoc, triesSoFar);
+  });
+  return;
+}
 
 exports.polarWebhook = functions.https.onRequest(async (request, response) => {
   if (request.method === "POST") {
