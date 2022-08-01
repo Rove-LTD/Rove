@@ -8,12 +8,12 @@
  * Sanatise Error class is used to throw an error message from the
  * sanatise functions
  */
-class SanatiseError {
+class SanatiseError extends Error {
   /**
    * @param {String} message
    */
   constuctor(message) {
-    this.errorMessage = message;
+    this.message = message;
   }
 }
 

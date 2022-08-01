@@ -1306,8 +1306,8 @@ const webhookInBox = {
     await webhookDoc.delete();
   },
   writeError: async function(webhookDoc, error) {
-    console.log(error.errorMessage);
-    webhookDoc.set({status: "error: "+error.errorMessage}, {merge: true});
+    console.log(error.message);
+    webhookDoc.set({status: "error: "+error.message}, {merge: true});
   },
 };
 
@@ -1394,20 +1394,32 @@ exports.wahooWebhook = functions.https.onRequest(async (request, response) => {
     response.send("NOT AUTHORISED");
     return;
   }
+  // if POST, record webhook message and respond with 200
+  // then process asynchronously
   if (request.method === "POST") {
     try {
       const webhookDoc = await webhookInBox.push(request);
       response.sendStatus(200);
-      // now we have saved the request and returned we can process it
-      // asynchronously
-      await processWahooWebhook(webhookDoc, request);
+      // now we have saved the request and returned ok to the provider
+      // we can process the message asynchronously
+      try {
+        await processWahooWebhook(webhookDoc, request);
+        webhookInBox.delete(webhookDoc);
+      } catch (error) {
+        webhookInBox.writeError(webhookDoc, error);
+      }
+      return;
     } catch (err) {
       response.sendStatus(400);
       console.log("Error saving webhook message - returned status 400");
     }
-  } else {
+  } else if (request.method === "GET") {
+    // if GET respond to webhook initialisation request
     response.status(200);
     response.send("EVENT_RECEIVED");
+  } else {
+    response.sendStatus(401);
+    console.log("unknown method from Wahoo webhook");
   }
 });
 
@@ -1421,13 +1433,8 @@ async function processWahooWebhook(webhookDoc, request) {
   // now we have a list of user Id's that are interested in this
   //  data
   // 1) sanatise and 2) send
-  let sanitisedActivity;
-  try {
-    sanitisedActivity = filters.wahooSanitise(request.body);
-  } catch (error) {
-    webhookInBox.writeError(webhookDoc, error);
-    return;
-  }
+  const sanitisedActivity = filters.wahooSanitise(request.body);
+
   // save raw and sanitised activites as a backup for each user
   userDocsList.forEach(async (userDoc)=>{
     sanitisedActivity["userId"] = userDoc.data()["userId"];
@@ -1438,16 +1445,10 @@ async function processWahooWebhook(webhookDoc, request) {
     const activityDoc = userDoc.ref
         .collection("activities")
         .doc();
-    try {
-      await activityDoc.set({"sanitised": localSanitisedActivity,
-        "raw": request.body});
-    } catch (error) {
-      webhookInBox.writeError(webhookDoc, error);
-      return;
-    }
-    webhookInBox.delete(webhookDoc);
+    await activityDoc.set({"sanitised": localSanitisedActivity,
+      "raw": request.body});
     const triesSoFar = 0; // this is our first try to write to developer
-    await sendToDeveloper(userDoc, localSanitisedActivity, request.body, activityDoc, triesSoFar);
+    sendToDeveloper(userDoc, localSanitisedActivity, request.body, activityDoc, triesSoFar);
   });
   return;
 }

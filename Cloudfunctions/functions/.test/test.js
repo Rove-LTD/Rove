@@ -25,6 +25,7 @@ const devTestNotionData = testParameters.devTestNotionData
 const devUserNotionData = testParameters.devUserNotionData
 const test = require('firebase-functions-test')(firebaseConfig, testParameters.testKeyFile);
 const admin = require("firebase-admin");
+const WahooService = require('../.utilities/wahooService');
 // -----------END INITIALISE ROVE TEST PARAMETERS----------------------------//
 
 describe('ROVE full integration test scripts', () => {
@@ -72,6 +73,7 @@ describe('ROVE full integration test scripts', () => {
     require ('./test-modules/wahooCallback.test.js');
     require ('./test-modules/garminCallback.test.js');
     require ('./test-modules/webhooks.test.js');
+    require ('./test-modules/webhooks-Wahoo.test.js');
     require ('./test-modules/utility.test.js');
     require ('./test-modules/disconnectServiceFailure.test.js');
     require ('./test-modules/wahooDisconnect.test.js');
