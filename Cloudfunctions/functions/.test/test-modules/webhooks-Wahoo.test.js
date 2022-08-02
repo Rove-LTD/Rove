@@ -33,7 +33,7 @@ myFunctions = require('../../index.js');
 // name as in the function we are testing
 const got = require('got');
 //-------------TEST --- webhooks-------
-describe.only("Testing that the Webhooks work: ", () => {
+describe("Testing that the Webhooks work: ", () => {
     before ('set up the userIds in the test User doc', async () => {
       await admin.firestore()
       .collection("users")
