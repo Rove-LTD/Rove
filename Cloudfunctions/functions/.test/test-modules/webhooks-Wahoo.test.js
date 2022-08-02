@@ -111,6 +111,7 @@ describe("Testing that the Wahoo Webhooks work: ", () => {
     const testWebhookDocs = await admin.firestore()
         .collection("webhookInBox")
         .where("status", "==", "new")
+        .where("provider", "==", "wahoo")
         .get();
     
     const expectedResults = successfulWebhookMessage;
@@ -153,7 +154,7 @@ describe("Testing that the Wahoo Webhooks work: ", () => {
                 average_cadence: "0.0",
                 elevation_gain: "0.0",
                 elevation_loss: null,
-                data_source: "wahoo",
+                provider: "wahoo",
                 work_accum: "0.0",
                 power_bike_tss_last: null,
                 ascent_accum: "0.0",
