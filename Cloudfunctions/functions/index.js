@@ -1257,7 +1257,7 @@ exports.wahooCallback = functions.https.onRequest(async (req, res) => {
 
 exports.stravaWebhook = functions.https.onRequest(async (request, response) => {
   if (!request.debug) {
-    functions.logger.info("webhook event received!", {
+    functions.logger.info("---> Strava "+request.method+" webhook event received!", {
       body: request.body,
     });
   }
@@ -1277,111 +1277,133 @@ exports.stravaWebhook = functions.https.onRequest(async (request, response) => {
     } else {
       response.sendStatus(403);
     }
-  } else { // save the webhook message and asynchronously process
+  } else if (request.method === "POST") {
+    // check the webhook token is correct
+    if (request.body.subscription_id !=
+        configurations[configurations.lookup].stravaSubscriptionId) {
+      console.log("Strava Webhook event recieved that did not have the correct subscription Id");
+      response.status(401);
+      response.send("NOT AUTHORISED");
+      return;
+    }
+    // save the webhook message and asynchronously process
     try {
       const webhookDoc = await webhookInBox.push(request, "strava");
       response.sendStatus(200);
-      // now we have saved the request and returned we can process it
-      // asynchronously
-      processStravaWebhook(webhookDoc, request);
+      // now we have saved the request and returned ok to the provider
+      // the message will trigger an asynchronous process
     } catch (err) {
       response.sendStatus(400);
       console.log("Error saving webhook message - returned status 400");
     }
+  } else {
+    response.sendStatus(401);
+    console.log("unknown method from Wahoo webhook");
   }
 });
 
-async function processStravaWebhook(webhookDoc, request) {
+async function processStravaWebhook(webhookDoc) {
+  const webhookBody = JSON.parse(webhookDoc.data()["body"]);
+  const userDocsList = [];
   stravaApi.config({
     "client_id": configurations[configurations.lookup]["stravaClientId"],
     "client_secret": configurations[configurations.lookup]["stravaClientSecret"],
     "redirect_uri": callbackBaseUrl+"/stravaCallback",
   });
-  if (request.method === "POST") {
-    let stravaAccessToken;
-    // get userbased on userid. (.where("id" == request.body.owner_id)).
-    // if the status is a delete then do nothing.
-    if (request.body.aspect_type == "delete") {
-      return;
-    }
-    const userDoc = await db.collection("users").where("strava_id", "==", request.body.owner_id).get();
-    // if user de-authorizing.
-    const userDocRef = userDoc.docs[0];
-    if (userDoc.docs.length == 1) {
-      stravaAccessToken = userDocRef.data()["strava_access_token"];
-    } else {
-      // there is an issue if there is more than one user with a userId in the DB.
-      console.log("error in number of users registered to strava webhook: " + request.body.owner_id);
-      return;
-    }
-    // console.log(stravaAccessToken);
-    // check the tokens are valid
-    let activity;
-    let sanitisedActivity;
-    if (await checkStravaTokens(userDocRef.id, db) == true) {
-      // token out of date, make request for new ones.
-      const payload = await stravaApi.oauth.refreshToken(userDocRef.data()["strava_refresh_token"]);
-      await stravaTokenStorage(userDocRef.id, payload, db);
-      const payloadAccessToken = payload["access_token"];
-      if ("authorized" in request.body.updates) {
-        console.log("de-auth event");
-        const result = await deleteStravaActivity(userDocRef, true);
-        return;
-      } else {
-        activity = await stravaApi.activities.get({"access_token": payloadAccessToken, "id": request.body.object_id});
-        sanitisedActivity = filters.stravaSanitise([activity]);
-        sanitisedActivity[0]["userId"] = userDocRef.data()["userId"];
-      }
-    } else {
-      // token in date, can get activities as required.
-      if ("authorized" in request.body.updates) {
-        console.log("de-auth event");
-        const result = await deleteStravaActivity(userDocRef, true);
-        return;
-      } else {
-        activity = await stravaApi.activities.get({"access_token": stravaAccessToken, "id": request.body.object_id});
-        sanitisedActivity = filters.stravaSanitise([activity]);
-        sanitisedActivity[0]["userId"] = userDocRef.data()["userId"];
-      }
-    }
-    // save to a doc
-    const activityDoc = userDocRef.ref.collection("activities").doc();
-    await activityDoc.set({"raw": activity, "sanitised": sanitisedActivity[0]});
-    // Send the information to an endpoint specified by the dev registered to a user.
-
-    await sendToDeveloper(userDocRef,
-        sanitisedActivity[0],
-        activity,
-        activityDoc,
-        0);
-
-    await webhookInBox.delete(webhookDoc);
+  // get userbased on userid. (.where("id" == request.body.owner_id)).
+  // if the status is a delete then do nothing.
+  if (webhookBody.aspect_type == "delete") {
+    return; // TODO: put in delete logic
   }
+
+  const userQuery = await db.collection("users")
+      .where("strava_id", "==", webhookBody.owner_id)
+      .get();
+  if (userQuery.docs.length == 0) {
+    // there is an issue if there are no users with a userId in the DB.
+    throw Error("zero users registered to strava webhook owner_id "+webhookBody.owner_id);
+  }
+  userQuery.docs.forEach((doc)=>{
+    userDocsList.push(doc);
+  });
+  // now we have a list of userDoc's that are interested in this
+  //  data
+  // 1) get data from Strava, 2) sanatise and 3) save and send
+  const userDocRef = userQuery.docs[0];
+  const stravaAccessToken = userDocRef.data()["strava_access_token"];
+  // check the tokens are valid
+  let activity;
+  let sanitisedActivity;
+  if (await checkStravaTokens(userDocRef.id, db) == true) {
+    // token out of date, make request for new ones.
+    const payload = await stravaApi.oauth.refreshToken(userDocRef.data()["strava_refresh_token"]);
+    await stravaTokenStorage(userDocRef.id, payload, db);
+    const payloadAccessToken = payload["access_token"];
+    if (webhookBody.aspect_type == "update") {
+      // TODO process updates
+      if ("authorized" in webhookBody.updates) {
+        console.log("de-auth event");
+        const result = await deleteStravaActivity(userDocRef, true);
+        return;
+      }
+      return;
+    }
+    activity = await stravaApi.activities
+        .get({"access_token": payloadAccessToken, "id": webhookBody.object_id});
+    sanitisedActivity = filters.stravaSanitise([activity]);
+  } else {
+    if (webhookBody.aspect_type == "update") {
+      // TODO process updates
+      if ("authorized" in webhookBody.updates) {
+        console.log("de-auth event");
+        const result = await deleteStravaActivity(userDocRef, true);
+        return;
+      }
+      return;
+    }
+    activity = await stravaApi.activities
+        .get({"access_token": stravaAccessToken, "id": webhookBody.object_id});
+    sanitisedActivity = filters.stravaSanitise([activity]);
+  }
+  userDocsList.forEach(async (userDoc)=>{
+    sanitisedActivity[0]["userId"] = userDoc.data()["userId"];
+    // TODO: this is a bit of a cludge to prevent the userId
+    // being written incorrectly in this loop during async
+    // firebase writes.
+    const localSanitisedActivity = JSON.parse(JSON.stringify(sanitisedActivity[0]));
+    const activityDoc = userDoc.ref
+        .collection("activities")
+        .doc();
+    await activityDoc.set({"sanitised": localSanitisedActivity,
+      "raw": activity});
+    const triesSoFar = 0; // this is our first try to write to developer
+    sendToDeveloper(userDoc, localSanitisedActivity, activity, activityDoc, triesSoFar);
+  });
 }
 
 exports.wahooWebhook = functions.https.onRequest(async (request, response) => {
   if (!request.debug) {
     functions.logger.info("---> Wahoo "+request.method+" webhook event received!", {
-      query: request.query,
       body: request.body,
     });
-  }
-  // check the webhook token is correct
-  if (request.body.webhook_token !=
-      configurations[configurations.lookup].wahooWebhookToken) {
-    console.log("Wahoo Webhook event recieved that did not have the correct webhook token");
-    response.status(401);
-    response.send("NOT AUTHORISED");
-    return;
   }
   // if POST, record webhook message and respond with 200
   // then process asynchronously
   if (request.method === "POST") {
+    // check the webhook token is correct
+    if (request.body.webhook_token !=
+        configurations[configurations.lookup].wahooWebhookToken) {
+      console.log("Wahoo Webhook event recieved that did not have the correct webhook token");
+      response.status(401);
+      response.send("NOT AUTHORISED");
+      return;
+    }
+    // save the webhook message and asynchronously process
     try {
       const webhookDoc = await webhookInBox.push(request, "wahoo");
       response.sendStatus(200);
       // now we have saved the request and returned ok to the provider
-      // we can process the message asynchronously
+      // the message will trigger an asynchronous process
     } catch (err) {
       response.sendStatus(400);
       console.log("Error saving webhook message - returned status 400");
@@ -1401,7 +1423,20 @@ exports.processWebhookInBox = functions.firestore
     .onCreate(async (snap, context) => {
       console.log("processing webhook inbox written to... with doc: "+snap.id);
       try {
-        await processWahooWebhook(snap);
+        switch (snap.data()["provider"]) {
+          case "strava":
+            await processStravaWebhook(snap);
+            break;
+          case "wahoo":
+            await processWahooWebhook(snap);
+            break;
+          case "polar":
+            await processPolarWebhook(snap);
+            break;
+          case "garmin":
+            await processGarminWebhook(snap);
+            break;
+        }
         webhookInBox.delete(snap.ref);
       } catch (error) {
         webhookInBox.writeError(snap.ref, error);
@@ -1413,7 +1448,13 @@ async function processWahooWebhook(webhookDoc) {
   const webhookBody = JSON.parse(webhookDoc.data()["body"]);
   const userDocsList = [];
   const userQuery = await db.collection("users")
-      .where("wahoo_user_id", "==", webhookBody.user.id).get();
+      .where("wahoo_user_id", "==", webhookBody.user.id)
+      .get();
+  if (userQuery.docs.length == 0) {
+    // there is an issue if there are no users with a userId in the DB.
+    console.log("error: zero users registered to wahoo webhook: " + webhookBody.owner_id);
+    throw Error("zero users registered to wahoo webhook owner_id "+webhookBody.user.id);
+  }
   userQuery.docs.forEach((doc)=>{
     userDocsList.push(doc);
   });

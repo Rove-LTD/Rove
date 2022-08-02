@@ -28,7 +28,7 @@ myFunctions = require('../../index.js');
 // testing processes - these have to have the same constant
 // name as in the function we are testing
 const got = require('got');
-const stravaApi = require("strava-v3");
+//const stravaApi = require("strava-v3");
 //-------------TEST --- webhooks-------
 describe("Testing that the Webhooks work: ", () => {
   before ('set up the userIds in the test User doc', async () => {
@@ -146,58 +146,6 @@ describe("Testing that the Webhooks work: ", () => {
           "timestamp": "not tested",
       }
      sanatisedActivity.timestamp = "not tested";
-     assert.deepEqual(sanatisedActivity, expectedResults);
-     sinon.restore();
-  })
-  it('Strava Webhook should get event, sanatise, save and repond with status 200...', async () => {
-      //set up the stubbed response to mimic polar's response when called with the
-      const stravaExercisePayload = require('./strava.json');
-      stubbedStravaCall = sinon.stub(stravaApi.activities, "get");
-      stubbedStravaCall.onFirstCall().returns(stravaExercisePayload);
-      // set the request object with the correct provider, developerId and userId
-      const req = {
-          debug: true,
-          url: "https://us-central1-rovetest-beea7.cloudfunctions.net/stravaWebhook",
-          method: "POST",
-          "body":{"updates":{},"object_type":"activity","object_id":7345142595,"owner_id":"test_strava_id","subscription_id":217520,"aspect_type":"create","event_time":1655824005}
-      };
-      res = {
-          send: (text)=> {assert.equal(text, "OK!");},
-          status: (code)=>{assert.equal(code, 200);},
-          sendStatus: (code)=> {assert.equal(code, 200);},
-      }
-
-      await myFunctions.stravaWebhook(req, res);
-      // check strava was called with the right arguments
-      // assert(stubbedPolarCall.calledWith(), "polar arguments");
-      const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
-      await wait(1000);
-      //now check the database was updated correctly
-     const testUserDocs = await admin.firestore()
-     .collection("users")
-     .doc(testDev+testUser)
-     .collection("activities")
-     .where("raw.id", "==", 12345678987654321)
-     .get();
-
-     const sanatisedActivity = testUserDocs.docs[0].data()["sanitised"];
-     const expectedResults = { // TODO:
-          userId: testUser,
-          activity_id: 12345678987654321,
-          activity_name: "Happy Friday",
-          activity_type: "Ride",
-          distance_in_meters: 28099, //float no trailing 0
-          average_pace_in_meters_per_second:"6.7", //float
-          active_calories: 781,
-          activity_duration_in_seconds: 4207,
-          start_time: '2018-02-16T06:52:54.000Z', //ISO 8601 UTC
-          average_heart_rate_bpm: null,
-         // max_heart_rate_bpm: null,
-          average_cadence: "78.5",
-          elevation_gain: "446.6",
-          elevation_loss:"17.2",
-          provider: "strava",
-      }
      assert.deepEqual(sanatisedActivity, expectedResults);
      sinon.restore();
   })
