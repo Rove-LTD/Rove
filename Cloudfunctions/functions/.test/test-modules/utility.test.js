@@ -80,7 +80,7 @@ describe("Testing that the developer can set up polar webhook", () => {
         sinon.restore();
     });
 
-    it('should register up polar webhook correctly...', async () => {
+    it('should register a polar webhook correctly...', async () => {
         // set the request object with the incorrect provider, correct developerId, devKey and userId
         const req = {url: 'https//test.com/?devId='+testDev+"&action=register"};
         // set the assertions for the expected response object
@@ -106,7 +106,7 @@ describe("Testing that the developer can set up polar webhook", () => {
         await myFunctions.polarWebhookSetup(req, res);
 
     });
-    it('should get up polar webhook correctly...', async () => {
+    it('should get a polar webhook correctly...', async () => {
         // set the request object with the incorrect provider, correct developerId, devKey and userId
         const req = {url: 'https//test.com/?devId='+testDev+"&action=get"};
         // set the assertions for the expected response object

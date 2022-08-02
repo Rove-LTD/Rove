@@ -1,3 +1,4 @@
+/* eslint-disable no-prototype-builtins */
 /* eslint-disable no-multi-str */
 /* eslint-disable no-unused-vars */
 /* eslint-disable require-jsdoc */
@@ -26,6 +27,14 @@ const configurations = contentsOfDotEnvFile["config"];
 
 admin.initializeApp();
 const db = admin.firestore();
+switch (process.env.GCLOUD_PROJECT) {
+  case "rove-26":
+    configurations.lookup = "roveLiveSecrets";
+    break;
+  case "rovetest-beea7":
+    configurations.lookup = "roveTestSecrets";
+    break;
+}
 const oauthWahoo = new OauthWahoo(configurations, db);
 const callbackBaseUrl = "https://us-central1-"+process.env.GCLOUD_PROJECT+".cloudfunctions.net";
 
@@ -70,7 +79,7 @@ exports.connectService = functions.https.onRequest(async (req, res) => {
     updateTransactionWithStatus(transactionId, "userClickedAuthButton");
   }
   let url = "";
-  console.log(callbackBaseUrl);
+  // console.log(callbackBaseUrl);
   // parameter checks
   // first check developer exists and the devKey matches
   if (parameters.devId != null) {
@@ -142,6 +151,254 @@ exports.connectService = functions.https.onRequest(async (req, res) => {
   // send back URL to user device.
   res.redirect(url);
 });
+
+exports.getActivityList = functions.https.onRequest(async (req, res) => {
+  const transactionId = (Url.parse(req.url, true).query)["transactionId"];
+  let parameters = {};
+  if (transactionId == undefined) {
+    parameters.start = (Url.parse(req.url, true).query)["start"];
+    parameters.end = (Url.parse(req.url, true).query)["end"];
+    parameters.devId = (Url.parse(req.url, true).query)["devId"];
+    parameters.userId = (Url.parse(req.url, true).query)["userId"];
+    parameters.devKey = (Url.parse(req.url, true).query)["devKey"] || null;
+  } else {
+    parameters = await getParametersFromTransactionId(transactionId);
+    updateTransactionWithStatus(transactionId, "userClickedAuthButton");
+  }
+  let url = "";
+  console.log(callbackBaseUrl);
+  // parameter checks
+  // first check developer exists and the devKey matches
+  if (parameters.devId != null) {
+    const devDoc = await admin.firestore()
+        .collection("developers")
+        .doc(parameters.devId)
+        .get();
+
+    if (!devDoc.exists) {
+      url =
+         "error: the developerId was badly formatted, missing or not authorised";
+      res.status(400);
+      res.send(url);
+      return;
+    }
+    if (devDoc.data().devKey != parameters.devKey|| parameters.devKey == null) {
+      url =
+         "error: the developerId was badly formatted, missing or not authorised";
+      res.status(400);
+      res.send(url);
+      return;
+    }
+  } else {
+    url = "error: the developerId parameter is missing";
+    res.status(400);
+    res.send(url);
+    return;
+  }
+  // now check the userId has been given and that it is for a doc that the dev is assigned to.
+  const userDoc = await admin.firestore()
+      .collection("users")
+      .doc(parameters.devId+parameters.userId)
+      .get();
+  if (parameters.userId == null) {
+    url = "error: the userId parameter is missing";
+    res.status(400);
+    res.send(url);
+    return;
+  } else {
+    if (!userDoc.exists) {
+      url =
+      "error: the userId was badly formatted, missing or not authorised";
+      res.status(400);
+      res.send(url);
+      return;
+    }
+    if (userDoc.data()["devId"] != parameters.devId) {
+      url =
+      "error: the userId was badly formatted, missing or not authorised";
+      res.status(400);
+      res.send(url);
+      return;
+    }
+  }
+  const start = new Date(parameters.start);
+  const end = new Date(parameters.end);
+  if (start == "Invalid Date" || end == "Invalid Date") {
+    url =
+    "error: the start/end was badly formatted, or missing";
+    res.status(400);
+    res.send(url);
+    return;
+  }
+  // now we need to make a request to the user's authenticated services.
+  const providersConnected = {"polar": false, "garmin": false, "strava": false, "wahoo": false};
+  providersConnected["polar"] = userDoc.data().hasOwnProperty("polar_user_id");
+  providersConnected["garmin"] = userDoc.data().hasOwnProperty("garmin_access_token");
+  providersConnected["wahoo"] = userDoc.data().hasOwnProperty("wahoo_user_id");
+  providersConnected["strava"] = userDoc.data().hasOwnProperty("strava_id");
+  // make the request for the services which are authenticated by the user
+  const payload = await requestForDateRange(providersConnected, userDoc, start, end);
+  url = "all checks passing";
+  // send to Dev first and then store all the activities.
+  res.status(200);
+  res.send("OK");
+});
+
+async function requestForDateRange(providers, userDoc, start, end) {
+  // we want to synchronously run these functions together
+  // so I will create a .then for each to add to an integer.
+  let numOfProviders = 0;
+  let i = 0;
+  let activtyList = [];
+  /*
+  if (providers["strava"]) {
+    numOfProviders ++;
+    getStravaActivityList(start, end, userDoc).then((stravaActivities)=>{
+      i++;
+      activtyList = activtyList.concat(stravaActivities);
+      if (i == numOfProviders) {
+        return activtyList;
+      }
+    });
+  }*/
+  if (providers["garmin"]) {
+    numOfProviders ++;
+    await getGarminActivityList(start, end, userDoc).then((garminActivities)=>{
+      i++;
+      activtyList = activtyList.concat(garminActivities);
+      if (i == numOfProviders) {
+        return activtyList;
+      }
+    });
+  } else {
+    i++;
+  }
+  /*
+  // sadly Polar is not available to list activities.
+  if (providers["wahoo"]) {
+    numOfProviders ++;
+    getWahooActivityList(start, end, userDoc).then((wahooActivities)=>{
+      i++;
+      activtyList = activtyList.concat(wahooActivities);
+      if (i == numOfProviders) {
+        return activtyList;
+      }
+    });
+  } else {
+    i++;
+  }
+  if (providers["polar"]) {
+    numOfProviders ++;
+    getPolarActivityList(start, end, userDoc).then((polarActivities)=>{
+      i++;
+      activtyList = activtyList.concat(polarActivities);
+      if (i == numOfProviders) {
+        return activtyList;
+      }
+    });
+  } else {
+    i++;
+  }*/
+}
+async function getWahooActivityList(start, end, userDoc) {
+  try {
+    const accessToken = await oauthWahoo.getUserToken(userDoc);
+    const options = {
+      url: "https://api.wahooligan.com/v1/workouts",
+      method: "GET",
+      headers: {
+        "Accept": "application/json",
+        "Authorization": "Bearer " + accessToken,
+      },
+    };
+    const activityList = await got.get(options).json();
+    if (activityList.hasOwnProperty("workouts")) {
+      // delivers a list of the last 30 workouts...
+      // return a sanitised list
+      const sanitisedList = [];
+      for (let i = 0; i<activityList.workouts.length; i++) {
+        sanitisedList.push({"raw": activityList.workouts[i], "sanitised": filters.wahooSanitise(activityList.workouts[i])});
+      }
+      // now filter for start times
+      const startTime = start.getTime();
+      const endTime = end.getTime();
+      const listOfValidActivities = sanitisedList.filter((element)=>{
+        if (new Date(element.sanitised.start_time).getTime() > startTime && new Date(element.sanitised.start_time).getTime() < endTime) {
+          return element;
+        }
+      });
+      return listOfValidActivities;
+    }
+  } catch (error) {
+    if (error == 401) { // unauthorised
+      // consider refreshing the access code and trying again
+    }
+    return 400;
+  }
+}
+async function getPolarActivityList(start, end, userDoc) {
+  const userToken = userDoc.data()["polar_access_token"];
+  try {
+    const headers = {
+      "Accept": "application/json", "Authorization": "Bearer " + userToken,
+    };
+    const options = {
+      url: "https://www.polaraccesslink.com/v3/exercises",
+      method: "GET",
+      headers: headers,
+    };
+    const activityList = await got.get(options).json();
+    const sanitisedList = [];
+    for (let i = 0; i<activityList.length; i++) {
+      sanitisedList.push({"raw": activityList[i], "sanitised": filters.polarSanatise(activityList[i])});
+    }
+    const startTime = start.getTime();
+    const endTime = end.getTime();
+    const listOfValidActivities = sanitisedList.filter((element)=>{
+      if (new Date(element.sanitised.start_time).getTime() > startTime && new Date(element.sanitised.start_time).getTime() < endTime) {
+        return element;
+      }
+    });
+    return listOfValidActivities;
+  } catch (error) {
+    if (error == 401) { // unauthorised
+      // consider refreshing the access code and trying again
+    }
+    return 400;
+  }
+}
+async function getGarminActivityList(start, end, userDoc) {
+  // include the garmin fetcher here.
+  const url = "https://apis.garmin.com/wellness-api/rest/activities";
+  const userDocData = await userDoc.data();
+  const devId = userDocData["devId"];
+  const secretLookup = await db.collection("developers").doc(devId).get();
+  const lookup = await secretLookup.data()["secret_lookup"];
+  const consumerSecret = configurations[lookup]["consumerSecret"];
+  const oAuthConsumerSecret = configurations[lookup]["oauth_consumer_key"];
+  const options = await encodeparams.garminCallOptions(url, "GET", consumerSecret, oAuthConsumerSecret, userDocData["garmin_access_token"], userDocData["garmin_access_token_secret"], {from: start.getTime()/1000, to: end.getTime()/1000});
+  const activityList = await got.get(options);
+  return;
+}
+async function getStravaActivityList(start, end, userDoc) {
+  const userDocData = await userDoc.data();
+  const devId = userDocData["devId"];
+  const accessToken = userDocData["strava_access_token"];
+  const secretLookup = await db.collection("developers").doc(devId).get();
+  const lookup = await secretLookup.data()["secret_lookup"];
+  stravaApi.config({
+    "client_id": configurations[lookup]["stravaClientId"],
+    "client_secret": configurations[lookup]["stravaClientSecret"],
+    "redirect_uri": callbackBaseUrl+"/stravaCallback",
+  });
+  const result = await stravaApi.athlete.listActivities({"before": Math.round(end.getTime() / 1000), "after": Math.round(start.getTime() / 1000), "access_token": accessToken});
+  const sanitisedActivities = filters.stravaSanitise(result);
+  const listOfValidActivities = [];
+  for (let i = 0; i<sanitisedActivities.length; i++) {
+    listOfValidActivities.push({"raw": result[i], "sanitised": sanitisedActivities[i]});
+  }
+  return listOfValidActivities;
+}
 
 exports.disconnectService = functions.https.onRequest(async (req, res) => {
   const provider = (Url.parse(req.url, true).query)["provider"];
@@ -999,7 +1256,11 @@ exports.wahooCallback = functions.https.onRequest(async (req, res) => {
 });
 
 exports.stravaWebhook = functions.https.onRequest(async (request, response) => {
-  processStravaWebhook(request, response);
+  if (!request.debug) {
+    functions.logger.info("---> Strava "+request.method+" webhook event received!", {
+      body: request.body,
+    });
+  }
   // handle subscription setup
   if (request.method === "GET") {
     const VERIFY_TOKEN = "STRAVA";
@@ -1016,144 +1277,209 @@ exports.stravaWebhook = functions.https.onRequest(async (request, response) => {
     } else {
       response.sendStatus(403);
     }
+  } else if (request.method === "POST") {
+    // check the webhook token is correct
+    if (request.body.subscription_id !=
+        configurations[configurations.lookup].stravaSubscriptionId) {
+      console.log("Strava Webhook event recieved that did not have the correct subscription Id");
+      response.status(401);
+      response.send("NOT AUTHORISED");
+      return;
+    }
+    // save the webhook message and asynchronously process
+    try {
+      const webhookDoc = await webhookInBox.push(request, "strava");
+      response.sendStatus(200);
+      // now we have saved the request and returned ok to the provider
+      // the message will trigger an asynchronous process
+    } catch (err) {
+      response.sendStatus(400);
+      console.log("Error saving webhook message - returned status 400");
+    }
+  } else {
+    response.sendStatus(401);
+    console.log("unknown method from Wahoo webhook");
   }
-  // send response 200.
-  response.sendStatus(200);
 });
 
-async function processStravaWebhook(request, response) {
+async function processStravaWebhook(webhookDoc) {
+  const webhookBody = JSON.parse(webhookDoc.data()["body"]);
+  const userDocsList = [];
   stravaApi.config({
-    "client_id": configurations["roveLiveSecrets"]["stravaClientId"],
-    "client_secret": configurations["roveLiveSecrets"]["stravaClientSecret"],
+    "client_id": configurations[configurations.lookup]["stravaClientId"],
+    "client_secret": configurations[configurations.lookup]["stravaClientSecret"],
     "redirect_uri": callbackBaseUrl+"/stravaCallback",
   });
-  if (request.method === "POST") {
-    if (!request.debug) {
-      functions.logger.info("webhook event received!", {
-        body: request.body,
-      });
-    }
-    let stravaAccessToken;
-    // get userbased on userid. (.where("id" == request.body.owner_id)).
-    // if the status is a delete then do nothing.
-    if (request.body.aspect_type == "delete") {
-      return;
-    }
-    const userDoc = await db.collection("users").where("strava_id", "==", request.body.owner_id).get();
-    // if user de-authorizing.
-    const userDocRef = userDoc.docs[0];
-    if (userDoc.docs.length == 1) {
-      stravaAccessToken = userDocRef.data()["strava_access_token"];
-    } else {
-      // there is an issue if there is more than one user with a userId in the DB.
-      console.log("error in number of users registered to strava webhook: " + request.body.owner_id);
-      return;
-    }
-    // console.log(stravaAccessToken);
-    // check the tokens are valid
-    let activity;
-    let sanitisedActivity;
-    if (await checkStravaTokens(userDocRef.id, db) == true) {
-      // token out of date, make request for new ones.
-      const payload = await stravaApi.oauth.refreshToken(userDocRef.data()["strava_refresh_token"]);
-      await stravaTokenStorage(userDocRef.id, payload, db);
-      const payloadAccessToken = payload["access_token"];
-      if ("authorized" in request.body.updates) {
-        console.log("de-auth event");
-        const result = await deleteStravaActivity(userDocRef, true);
-        return;
-      } else {
-        activity = await stravaApi.activities.get({"access_token": payloadAccessToken, "id": request.body.object_id});
-        sanitisedActivity = filters.stravaSanitise([activity]);
-        sanitisedActivity[0]["userId"] = userDocRef.data()["userId"];
-      }
-    } else {
-      // token in date, can get activities as required.
-      if ("authorized" in request.body.updates) {
-        console.log("de-auth event");
-        const result = await deleteStravaActivity(userDocRef, true);
-        return;
-      } else {
-        activity = await stravaApi.activities.get({"access_token": stravaAccessToken, "id": request.body.object_id});
-        sanitisedActivity = filters.stravaSanitise([activity]);
-        sanitisedActivity[0]["userId"] = userDocRef.data()["userId"];
-      }
-    }
-    // save to a doc
-    const activityDoc = userDocRef.ref.collection("activities").doc();
-    await activityDoc.set({"raw": activity, "sanitised": sanitisedActivity[0]});
-    // Send the information to an endpoint specified by the dev registered to a user.
-
-    await sendToDeveloper(userDocRef,
-        sanitisedActivity[0],
-        activity,
-        activityDoc,
-        0);
+  // get userbased on userid. (.where("id" == request.body.owner_id)).
+  // if the status is a delete then do nothing.
+  if (webhookBody.aspect_type == "delete") {
+    return; // TODO: put in delete logic
   }
+
+  const userQuery = await db.collection("users")
+      .where("strava_id", "==", webhookBody.owner_id)
+      .get();
+  if (userQuery.docs.length == 0) {
+    // there is an issue if there are no users with a userId in the DB.
+    throw Error("zero users registered to strava webhook owner_id "+webhookBody.owner_id);
+  }
+  userQuery.docs.forEach((doc)=>{
+    userDocsList.push(doc);
+  });
+  // now we have a list of userDoc's that are interested in this
+  //  data
+  // 1) get data from Strava, 2) sanatise and 3) save and send
+  const userDocRef = userQuery.docs[0];
+  const stravaAccessToken = userDocRef.data()["strava_access_token"];
+  // check the tokens are valid
+  let activity;
+  let sanitisedActivity;
+  if (await checkStravaTokens(userDocRef.id, db) == true) {
+    // token out of date, make request for new ones.
+    const payload = await stravaApi.oauth.refreshToken(userDocRef.data()["strava_refresh_token"]);
+    await stravaTokenStorage(userDocRef.id, payload, db);
+    const payloadAccessToken = payload["access_token"];
+    if (webhookBody.aspect_type == "update") {
+      // TODO process updates
+      if ("authorized" in webhookBody.updates) {
+        console.log("de-auth event");
+        const result = await deleteStravaActivity(userDocRef, true);
+        return;
+      }
+      return;
+    }
+    activity = await stravaApi.activities
+        .get({"access_token": payloadAccessToken, "id": webhookBody.object_id});
+    sanitisedActivity = filters.stravaSanitise([activity]);
+  } else {
+    if (webhookBody.aspect_type == "update") {
+      // TODO process updates
+      if ("authorized" in webhookBody.updates) {
+        console.log("de-auth event");
+        const result = await deleteStravaActivity(userDocRef, true);
+        return;
+      }
+      return;
+    }
+    activity = await stravaApi.activities
+        .get({"access_token": stravaAccessToken, "id": webhookBody.object_id});
+    sanitisedActivity = filters.stravaSanitise([activity]);
+  }
+  userDocsList.forEach(async (userDoc)=>{
+    sanitisedActivity[0]["userId"] = userDoc.data()["userId"];
+    // TODO: this is a bit of a cludge to prevent the userId
+    // being written incorrectly in this loop during async
+    // firebase writes.
+    const localSanitisedActivity = JSON.parse(JSON.stringify(sanitisedActivity[0]));
+    const activityDoc = userDoc.ref
+        .collection("activities")
+        .doc();
+    await activityDoc.set({"sanitised": localSanitisedActivity,
+      "raw": activity});
+    const triesSoFar = 0; // this is our first try to write to developer
+    sendToDeveloper(userDoc, localSanitisedActivity, activity, activityDoc, triesSoFar);
+  });
 }
 
 exports.wahooWebhook = functions.https.onRequest(async (request, response) => {
+  if (!request.debug) {
+    functions.logger.info("---> Wahoo "+request.method+" webhook event received!", {
+      body: request.body,
+    });
+  }
+  // if POST, record webhook message and respond with 200
+  // then process asynchronously
   if (request.method === "POST") {
-    if (!request.debug) {
-      functions.logger.info("---> Wahoo 'POST' webhook event received!", {
-        query: request.query,
-        body: request.body,
-      });
-    }
     // check the webhook token is correct
-    // TODO: parameterise - should be a lookup in a collection("wahooWebhookTokens")
-    if (request.body.webhook_token != "97661c16-6359-4854-9498-a49c07b6ec11") {
+    if (request.body.webhook_token !=
+        configurations[configurations.lookup].wahooWebhookToken) {
       console.log("Wahoo Webhook event recieved that did not have the correct webhook token");
       response.status(401);
       response.send("NOT AUTHORISED");
       return;
     }
-    const userDocsList = [];
-    const userQuery = await db.collection("users")
-        .where("wahoo_user_id", "==", request.body.user.id).get();
-    userQuery.docs.forEach((doc)=>{
-      userDocsList.push(doc);
-    });
-    // now we have a list of user Id's that are interested in this
-    //  data
-    // 1) sanatise and 2) send
-    let sanitisedActivity;
+    // save the webhook message and asynchronously process
     try {
-      sanitisedActivity = filters.wahooSanitise(request.body);
-    } catch (error) {
-      console.log(error.errorMessage);
-      response.status(404);
-      response.send("Event type not recognised");
-      return;
+      const webhookDoc = await webhookInBox.push(request, "wahoo");
+      response.sendStatus(200);
+      // now we have saved the request and returned ok to the provider
+      // the message will trigger an asynchronous process
+    } catch (err) {
+      response.sendStatus(400);
+      console.log("Error saving webhook message - returned status 400");
     }
-    // save raw and sanitised activites as a backup for each user
-    userDocsList.forEach(async (userDoc)=>{
-      sanitisedActivity["userId"] = userDoc.data()["userId"];
-      // TODO: this is a bit of a cludge to prevent the userId
-      // being written incorrectly in this loop during async
-      // firebase writes.
-      const localSanitisedActivity = JSON.parse(JSON.stringify(sanitisedActivity));
-      const activityDoc = userDoc.ref
-          .collection("activities")
-          .doc();
-      await activityDoc.set({"sanitised": localSanitisedActivity, "raw": request.body});
-      const triesSoFar = 0; // this is our first try to write to developer
-      await sendToDeveloper(userDoc, localSanitisedActivity, request.body, activityDoc, triesSoFar);
-    });
+  } else if (request.method === "GET") {
+    // if GET respond to webhook initialisation request
     response.status(200);
     response.send("EVENT_RECEIVED");
-    return;
   } else {
-    if (!request.debug) {
-      functions.logger.info("---> Wahoo 'GET' webhook event received!", {
-        query: request.query,
-        body: request.body,
-      });
-    }
-    response.status(200);
-    response.send("EVENT_RECEIVED");
+    response.sendStatus(401);
+    console.log("unknown method from Wahoo webhook");
   }
 });
+
+exports.processWebhookInBox = functions.firestore
+    .document("webhookInBox/{docId}")
+    .onCreate(async (snap, context) => {
+      console.log("processing webhook inbox written to... with doc: "+snap.id);
+      try {
+        switch (snap.data()["provider"]) {
+          case "strava":
+            await processStravaWebhook(snap);
+            break;
+          case "wahoo":
+            await processWahooWebhook(snap);
+            break;
+          case "polar":
+            await processPolarWebhook(snap);
+            break;
+          case "garmin":
+            await processGarminWebhook(snap);
+            break;
+        }
+        webhookInBox.delete(snap.ref);
+      } catch (error) {
+        webhookInBox.writeError(snap.ref, error);
+      }
+      return;
+    });
+
+async function processWahooWebhook(webhookDoc) {
+  const webhookBody = JSON.parse(webhookDoc.data()["body"]);
+  const userDocsList = [];
+  const userQuery = await db.collection("users")
+      .where("wahoo_user_id", "==", webhookBody.user.id)
+      .get();
+  if (userQuery.docs.length == 0) {
+    // there is an issue if there are no users with a userId in the DB.
+    console.log("error: zero users registered to wahoo webhook: " + webhookBody.owner_id);
+    throw Error("zero users registered to wahoo webhook owner_id "+webhookBody.user.id);
+  }
+  userQuery.docs.forEach((doc)=>{
+    userDocsList.push(doc);
+  });
+  // now we have a list of user Id's that are interested in this
+  //  data
+  // 1) sanatise and 2) send
+  const sanitisedActivity = filters.wahooSanitise(webhookBody);
+
+  // save raw and sanitised activites as a backup for each user
+  userDocsList.forEach(async (userDoc)=>{
+    sanitisedActivity["userId"] = userDoc.data()["userId"];
+    // TODO: this is a bit of a cludge to prevent the userId
+    // being written incorrectly in this loop during async
+    // firebase writes.
+    const localSanitisedActivity = JSON.parse(JSON.stringify(sanitisedActivity));
+    const activityDoc = userDoc.ref
+        .collection("activities")
+        .doc();
+    await activityDoc.set({"sanitised": localSanitisedActivity,
+      "raw": webhookBody});
+    const triesSoFar = 0; // this is our first try to write to developer
+    sendToDeveloper(userDoc, localSanitisedActivity, webhookBody, activityDoc, triesSoFar);
+  });
+  return;
+}
 
 exports.polarWebhook = functions.https.onRequest(async (request, response) => {
   if (request.method === "POST") {
@@ -1231,44 +1557,54 @@ async function sendToDeveloper(userDoc,
   const devId = userDoc.data()["devId"];
   const datastring = {"sanitised": sanitisedActivity, "raw": activity};
   const developerDoc = await db.collection("developers").doc(devId).get();
-  const endpoint = developerDoc.data()["endpoint"];
-  const userData = userDoc.data();
-  // check if the user is from notion.
-  if (userData["userId"] == "notion") {
-    notion.sendToNotionEndpoint(endpoint, developerDoc, sanitisedActivity);
+  // if the developer or the user document have the "suppress_webhook" field
+  // set to "true" then return without sending the activity.
+  if (developerDoc.data()["suppress_webhook"]) {
+    // the developer does not want webhook data to be sent
+    activityDoc
+        .set({status: "suppressed", timestamp: new Date().toISOString()},
+            {merge: true});
   } else {
-    if (endpoint == undefined || endpoint == null) {
-    // cannot send to developer as endpoint does not exist
-      console.log("Cannot send webhook payload to "+devId+" endpoint not provided");
-      return;
-    }
-    const options = {
-      method: "POST",
-      url: endpoint,
-      headers: {
-        "Accept": "application/json",
-        "Content-type": "application/json",
-      },
-      body: JSON.stringify(datastring),
-    };
-    const response = await got.post(options);
-    if (response.statusCode == 200) {
-    // the developer accepted the information TODO
-      activityDoc
-          .set({status: "sent", timestamp: new Date().toISOString()},
-              {merge: true});
+    const endpoint = developerDoc.data()["endpoint"];
+    const userData = userDoc.data();
+    // check if the user is from notion.
+    if (userData["userId"] == "notion") {
+      notion.sendToNotionEndpoint(endpoint, developerDoc, sanitisedActivity);
     } else {
-    // call the retry functionality and increment the retry counter
-      if (triesSoFar <= MaxRetries) {
-        console.log("retrying sending to developer");
-        wait(waitTime[triesSoFar]);
-        sendToDeveloper(userDoc, sanitisedActivity, activity, activityDoc, triesSoFar+1);
+      if (endpoint == undefined || endpoint == null) {
+      // cannot send to developer as endpoint does not exist
+        console.log("Cannot send webhook payload to "+devId+" endpoint not provided");
+        return;
+      }
+      const options = {
+        method: "POST",
+        url: endpoint,
+        headers: {
+          "Accept": "application/json",
+          "Content-type": "application/json",
+        },
+        body: JSON.stringify(datastring),
+      };
+      const response = await got.post(options);
+      if (response.statusCode == 200) {
+      // the developer accepted the information TODO
+        activityDoc
+            .set({status: "sent", timestamp: new Date().toISOString()},
+                {merge: true});
       } else {
-      // max retries email developer
-        console.log("max retries on sending to developer reached - fail");
+      // call the retry functionality and increment the retry counter
+        if (triesSoFar <= MaxRetries) {
+          console.log("retrying sending to developer");
+          wait(waitTime[triesSoFar]);
+          sendToDeveloper(userDoc, sanitisedActivity, activity, activityDoc, triesSoFar+1);
+        } else {
+        // max retries email developer
+          console.log("max retries on sending to developer reached - fail");
+        }
       }
     }
   }
+  return;
 }
 
 exports.polarWebhookSetup = functions.https.onRequest(async (req, res) => {
@@ -1505,3 +1841,25 @@ async function createTransactionWithParameters(parameters) {
 // Utility Functions and Constants -----------------------------
 const waitTime = {0: 0, 1: 1, 2: 10, 3: 60}; // time in minutes
 const wait = (mins) => new Promise((resolve) => setTimeout(resolve, mins*60*1000));
+
+const webhookInBox = {
+  push: async function(request, provider) {
+    const webhookDoc = db.collection("webhookInBox").doc();
+    await webhookDoc
+        .set({
+          provider: provider,
+          status: "new",
+          method: request.method,
+          body: JSON.stringify(request.body),
+        });
+    return webhookDoc;
+  },
+  delete: async function(webhookDoc) {
+    await webhookDoc.delete();
+  },
+  writeError: async function(webhookDoc, error) {
+    console.log(error.message);
+    await webhookDoc.set({status: "error: "+error.message}, {merge: true});
+  },
+};
+
