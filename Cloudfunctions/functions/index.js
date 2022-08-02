@@ -237,10 +237,10 @@ exports.getActivityList = functions.https.onRequest(async (req, res) => {
   // make the request for the services which are authenticated by the user
   const payload = await requestForDateRange(providersConnected, userDoc, start, end);
   url = "all checks passing";
-  console.log(payload);
-  // send to Dev first and then store all the activities.
+  // console.log(payload);
   res.status(200);
   res.send(payload);
+  // send to Dev first and then store all the activities.
 });
 
 async function requestForDateRange(providers, userDoc, start, end) {
@@ -285,7 +285,8 @@ async function getWahooActivityList(start, end, userDoc) {
         "Authorization": "Bearer " + accessToken,
       },
     };
-    const activityList = await got.get(options).json();
+    let activityList = await got.get(options);
+    activityList = JSON.parse(activityList.body);
     if (activityList.hasOwnProperty("workouts")) {
       // delivers a list of the last 30 workouts...
       // return a sanitised list
@@ -321,7 +322,8 @@ async function getPolarActivityList(start, end, userDoc) {
       method: "GET",
       headers: headers,
     };
-    const activityList = await got.get(options).json();
+    let activityList = await got.get(options);
+    activityList = JSON.parse(activityList.body);
     const sanitisedList = [];
     for (let i = 0; i<activityList.length; i++) {
       sanitisedList.push({"raw": activityList[i], "sanitised": filters.polarSanatise(activityList[i])});
@@ -355,7 +357,8 @@ async function getGarminActivityList(start, end, userDoc) {
   while (start.getTime() < end.getTime()) {
     requestEndTime = new Date(start.getTime() + (24*60*60*1000));
     const options = await encodeparams.garminCallOptions(url, "GET", consumerSecret, oAuthConsumerSecret, userDocData["garmin_access_token"], userDocData["garmin_access_token_secret"], {from: start.getTime()/1000, to: requestEndTime.getTime()/1000});
-    const currentActivityList = await got.get(options).json();
+    let currentActivityList = await got.get(options);
+    currentActivityList = JSON.parse(currentActivityList.body);
     activityList = activityList.concat(currentActivityList);
     start = new Date(start.getTime() + (24*60*60*1000));
   }
