@@ -33,7 +33,7 @@ myFunctions = require('../../index.js');
 // name as in the function we are testing
 const got = require('got');
 //-------------TEST --- webhooks-------
-describe("Testing that the Webhooks work: ", () => {
+describe("Testing that the Wahoo Webhooks work: ", () => {
     before ('set up the userIds in the test User doc', async () => {
       await admin.firestore()
       .collection("users")
@@ -81,6 +81,15 @@ describe("Testing that the Webhooks work: ", () => {
     });
     after('clean-up the webhookInbox documents',async ()=>{
 
+        const testWebhookDocs = await admin.firestore()
+        .collection("webhookInBox")
+        .where("status", "==", "new")
+        .where("provider", "==", "wahoo")
+        .get();
+
+        testWebhookDocs.docs.forEach ((doc)=>{
+            doc.ref.delete();
+        })
     })
     it('Webhooks should log event and repond with status 200...', async () => {
       // set the request object with the correct provider, developerId and userId

@@ -79,7 +79,7 @@ exports.connectService = functions.https.onRequest(async (req, res) => {
     updateTransactionWithStatus(transactionId, "userClickedAuthButton");
   }
   let url = "";
-  console.log(callbackBaseUrl);
+  // console.log(callbackBaseUrl);
   // parameter checks
   // first check developer exists and the devKey matches
   if (parameters.devId != null) {
