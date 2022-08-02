@@ -105,7 +105,7 @@ const notion = require('../../notion');
         average_cadence: "78.5",
         elevation_gain: "446.6",
         elevation_loss:"17.2",
-        data_source: "strava",
+        provider: "strava",
     }
    assert.deepEqual(sanatisedActivity, expectedResults);
    sinon.restore();

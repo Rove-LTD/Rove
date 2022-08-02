@@ -139,7 +139,7 @@ describe("Testing that the Webhooks work: ", () => {
               average_cadence: null,
               elevation_gain: null,
               elevation_loss: null,
-              data_source: "polar",
+              provider: "polar",
           },
           raw: polarExercisePayload.json(),
           "status": "sent",
@@ -196,7 +196,7 @@ describe("Testing that the Webhooks work: ", () => {
           average_cadence: "78.5",
           elevation_gain: "446.6",
           elevation_loss:"17.2",
-          data_source: "strava",
+          provider: "strava",
       }
      assert.deepEqual(sanatisedActivity, expectedResults);
      sinon.restore();
@@ -259,7 +259,7 @@ describe("Testing that the Webhooks work: ", () => {
               average_cadence: null,
               elevation_gain: null,
               elevation_loss: null,
-              data_source: "garmin",
+              provider: "garmin",
           },
           raw: {
               "activeKilocalories": 391,

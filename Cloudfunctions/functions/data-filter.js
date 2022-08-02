@@ -37,7 +37,7 @@ class standard_format {
     let average_cadence = null;
     let elevation_gain = null;
     let elevation_loss = null;
-    let data_source = null;
+    let provider = null;
   }
 }
 
@@ -51,7 +51,7 @@ class standard_format {
       "distance_in_meters": activity["distance"],
       "active_calories": activity["calories"],
       "start_time": new Date(activity["start_time"]).toISOString(),
-      "data_source": "polar",
+      "provider": "polar",
       "average_pace_in_meters_per_second": null
     }
     const duration = td.parse(activity["duration"]);
@@ -147,7 +147,7 @@ for (let i=0; i<activities.length; i++) {
     "average_cadence" : parseFloat(activities[i]["average_cadence"]).toFixed(1),
     "elevation_gain" : parseFloat(activities[i]["elev_high"]).toFixed(1),
     "elevation_loss" : parseFloat(activities[i]["elev_low"]).toFixed(1),
-    "data_source" : "strava",
+    "provider" : "strava",
     };
     for (const property in summaryActivity) {
         if (typeof summaryActivity[property] == "undefined") {
@@ -176,7 +176,7 @@ exports.garminSanitise = function(activities) {
             "average_cadence": parseFloat(activities[i]["averageRunCadenceInStepsPerMinute"]).toFixed(1),
             "elevation_gain": parseFloat(activities[i]["totalElevationGainInMeters"]).toFixed(1),
             "elevation_loss" : parseFloat(activities[i]["totalElevationLossInMeters"]).toFixed(1),
-            "data_source" : "garmin",
+            "provider" : "garmin",
             };
         }
         else if (activities[i]["activityType"] == "CYCLING") {
@@ -193,7 +193,7 @@ exports.garminSanitise = function(activities) {
                 "average_cadence": null,
                 "elevation_gain": parseFloat(activities[i]["totalElevationGainInMeters"]).toFixed(1),
                 "elevation_loss" : parseFloat(activities[i]["totalElevationLossInMeters"]).toFixed(1),
-                "data_source" : "garmin",
+                "provider" : "garmin",
                 };
         }
         else if (activities[i]["activityType"] == "LAP_SWIMMING") {
@@ -210,7 +210,7 @@ exports.garminSanitise = function(activities) {
                 "average_cadence": parseFloat(activities[i]["averageSwimCadenceInStrokesPerMinute"]).toFixed(1),
                 "elevation_gain": null,
                 "elevation_loss" : null,
-                "data_source" : "garmin",
+                "provider" : "garmin",
                 };
         } else {
             summaryActivity = {
@@ -227,7 +227,7 @@ exports.garminSanitise = function(activities) {
                 "average_cadence": null,
                 "elevation_gain": null,
                 "elevation_loss" : null,
-                "data_source" : "garmin",
+                "provider" : "garmin",
                 };
         }
         for (const property in summaryActivity) {
@@ -315,7 +315,7 @@ exports.wahooSanitise = function (activity) {
     "average_cadence" : activity.workout_summary.cadence_avg,
     "elevation_gain" : activity.workout_summary.ascent_accum,
     "elevation_loss": null,
-    "data_source" : "wahoo",
+    "provider" : "wahoo",
     // --------TODO: Here is additional data we need to agree on -------
     "work_accum": activity.workout_summary.work_accum,
     "power_bike_tss_last": activity.workout_summary.power_bike_tss_last,
