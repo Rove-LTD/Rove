@@ -1279,7 +1279,7 @@ exports.stravaWebhook = functions.https.onRequest(async (request, response) => {
     }
   } else { // save the webhook message and asynchronously process
     try {
-      const webhookDoc = await webhookInBox.push(request);
+      const webhookDoc = await webhookInBox.push(request, "strava");
       response.sendStatus(200);
       // now we have saved the request and returned we can process it
       // asynchronously
@@ -1290,26 +1290,6 @@ exports.stravaWebhook = functions.https.onRequest(async (request, response) => {
     }
   }
 });
-
-const webhookInBox = {
-  push: async function(request) {
-    const webhookDoc = db.collection("webhookInBox").doc();
-    await webhookDoc
-        .set({
-          status: "new",
-          method: request.method,
-          body: JSON.stringify(request.body),
-        });
-    return webhookDoc;
-  },
-  delete: async function(webhookDoc) {
-    await webhookDoc.delete();
-  },
-  writeError: async function(webhookDoc, error) {
-    console.log(error.message);
-    webhookDoc.set({status: "error: "+error.message}, {merge: true});
-  },
-};
 
 async function processStravaWebhook(webhookDoc, request) {
   stravaApi.config({
@@ -1398,17 +1378,10 @@ exports.wahooWebhook = functions.https.onRequest(async (request, response) => {
   // then process asynchronously
   if (request.method === "POST") {
     try {
-      const webhookDoc = await webhookInBox.push(request);
+      const webhookDoc = await webhookInBox.push(request, "wahoo");
       response.sendStatus(200);
       // now we have saved the request and returned ok to the provider
       // we can process the message asynchronously
-      try {
-        await processWahooWebhook(webhookDoc, request);
-        webhookInBox.delete(webhookDoc);
-      } catch (error) {
-        webhookInBox.writeError(webhookDoc, error);
-      }
-      return;
     } catch (err) {
       response.sendStatus(400);
       console.log("Error saving webhook message - returned status 400");
@@ -1423,17 +1396,31 @@ exports.wahooWebhook = functions.https.onRequest(async (request, response) => {
   }
 });
 
-async function processWahooWebhook(webhookDoc, request) {
+exports.processWebhookInBox = functions.firestore
+    .document("webhookInBox/{docId}")
+    .onCreate(async (snap, context) => {
+      console.log("processing webhook inbox written to... with doc: "+snap.id);
+      try {
+        await processWahooWebhook(snap);
+        webhookInBox.delete(snap.ref);
+      } catch (error) {
+        webhookInBox.writeError(snap.ref, error);
+      }
+      return;
+    });
+
+async function processWahooWebhook(webhookDoc) {
+  const webhookBody = JSON.parse(webhookDoc.data()["body"]);
   const userDocsList = [];
   const userQuery = await db.collection("users")
-      .where("wahoo_user_id", "==", request.body.user.id).get();
+      .where("wahoo_user_id", "==", webhookBody.user.id).get();
   userQuery.docs.forEach((doc)=>{
     userDocsList.push(doc);
   });
   // now we have a list of user Id's that are interested in this
   //  data
   // 1) sanatise and 2) send
-  const sanitisedActivity = filters.wahooSanitise(request.body);
+  const sanitisedActivity = filters.wahooSanitise(webhookBody);
 
   // save raw and sanitised activites as a backup for each user
   userDocsList.forEach(async (userDoc)=>{
@@ -1446,9 +1433,9 @@ async function processWahooWebhook(webhookDoc, request) {
         .collection("activities")
         .doc();
     await activityDoc.set({"sanitised": localSanitisedActivity,
-      "raw": request.body});
+      "raw": webhookBody});
     const triesSoFar = 0; // this is our first try to write to developer
-    sendToDeveloper(userDoc, localSanitisedActivity, request.body, activityDoc, triesSoFar);
+    sendToDeveloper(userDoc, localSanitisedActivity, webhookBody, activityDoc, triesSoFar);
   });
   return;
 }
@@ -1813,3 +1800,25 @@ async function createTransactionWithParameters(parameters) {
 // Utility Functions and Constants -----------------------------
 const waitTime = {0: 0, 1: 1, 2: 10, 3: 60}; // time in minutes
 const wait = (mins) => new Promise((resolve) => setTimeout(resolve, mins*60*1000));
+
+const webhookInBox = {
+  push: async function(request, provider) {
+    const webhookDoc = db.collection("webhookInBox").doc();
+    await webhookDoc
+        .set({
+          provider: provider,
+          status: "new",
+          method: request.method,
+          body: JSON.stringify(request.body),
+        });
+    return webhookDoc;
+  },
+  delete: async function(webhookDoc) {
+    await webhookDoc.delete();
+  },
+  writeError: async function(webhookDoc, error) {
+    console.log(error.message);
+    await webhookDoc.set({status: "error: "+error.message}, {merge: true});
+  },
+};
+
