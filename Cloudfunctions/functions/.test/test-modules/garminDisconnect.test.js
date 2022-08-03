@@ -131,7 +131,7 @@ describe("Check the garmin Disconnect Service works: ", () => {
 
     sinon.restore();
   });
-  it('Check that service returns with error if garmin reports and error', async () => {
+  it('Check that service returns with error if garmin reports an error', async () => {
     // for this the second test user should not exist data needs to be 
 
     await admin.firestore()

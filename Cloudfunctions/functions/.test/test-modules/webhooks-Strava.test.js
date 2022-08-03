@@ -33,6 +33,7 @@ myFunctions = require('../../index.js');
 // name as in the function we are testing
 const got = require('got');
 const stravaApi = require("strava-v3");
+const webhookInBox = require('../../webhookInBox');
 //-------------TEST --- webhooks-------
 describe("Testing that the strava Webhooks work: ", () => {
     before ('set up the userIds in the test User doc', async () => {
@@ -64,11 +65,6 @@ describe("Testing that the strava Webhooks work: ", () => {
             status: "added before the tests to be successful",
         }
 
-        await admin.firestore()
-            .collection("webhookInBox")
-            .doc(successfulWebhookMessageDoc)
-            .set(successfulWebhookMessage);
-
             unsuccessfulWebhookMessage = {
                 provider: "strava",
                 method: "POST",
@@ -76,53 +72,33 @@ describe("Testing that the strava Webhooks work: ", () => {
                 status: "added before the tests to be successful",
             }
 
-            await admin.firestore()
-                .collection("webhookInBox")
-                .doc(unsuccessfulWebhookMessageDoc)
-                .set(unsuccessfulWebhookMessage);
-
     });
     after('clean-up the webhookInbox documents',async ()=>{
 
-        const testWebhookDocs = await admin.firestore()
-        .collection("webhookInBox")
-        .where("status", "==", "new")
-        .where("provider", "==", "strava")
-        .get();
-
-        testWebhookDocs.docs.forEach ((doc)=>{
-            doc.ref.delete();
-        })
     })
     it('Webhooks should log event and repond with status 200...', async () => {
       // set the request object with the correct provider, developerId and userId
-      const req = {
-        debug: true,
-        url: "https://us-central1-rovetest-beea7.cloudfunctions.net/stravaWebhook",
-        method: "POST",
-        body: {"updates":{},"object_type":"activity","object_id":7345142595,"owner_id":"test_strava_id","subscription_id":217520,"aspect_type":"create","event_time":1655824005}
-    };
-    res = {
-        sendStatus: (code)=>{assert.equal(code, 200);},
-    }
+        const req = {
+            debug: true,
+            url: "https://us-central1-rovetest-beea7.cloudfunctions.net/stravaWebhook",
+            method: "POST",
+            body: {"updates":{},"object_type":"activity","object_id":7345142595,"owner_id":"test_strava_id","subscription_id":217520,"aspect_type":"create","event_time":1655824005}
+        };
+        res = {
+            sendStatus: (code)=>{assert.equal(code, 200);},
+        }
 
-    await myFunctions.stravaWebhook(req, res);
+        // set up stubs so that WebhookInBox is not written to
+        // this would trigger the function in the online environment
+        const stubbedWebhookInBox = sinon.stub(webhookInBox, "push");
+        stubbedWebhookInBox.onCall().returns("testDoc");
 
-    const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
-    await wait(1000);
-    //now check the database was updated correctly
-    const testWebhookDocs = await admin.firestore()
-        .collection("webhookInBox")
-        .where("status", "==", "new")
-        .where("provider", "==", "strava")
-        .get();
-    
-    const expectedResults = successfulWebhookMessage;
-    expectedResults.status = "new";
+        await myFunctions.stravaWebhook(req, res);
 
-    assert.equal(testWebhookDocs.docs.length, 1);
-    assert.deepEqual(testWebhookDocs.docs[0].data(), expectedResults)
-    // TODO delete - await testWebhookDocs.docs[0].ref.delete();
+        // check the webhookInBox was called correctly
+        assert(stubbedWebhookInBox.calledOnceWithExactly(req, "strava"),
+                "webhookInBox called with wrong args");
+        sinon.restore();
 
     });
     it('read webhookInBox event and process it successfully...', async () => {
@@ -131,6 +107,7 @@ describe("Testing that the strava Webhooks work: ", () => {
         const stravaExercisePayload = require('./strava.json');
         stubbedStravaCall = sinon.stub(stravaApi.activities, "get");
         stubbedStravaCall.onFirstCall().returns(stravaExercisePayload);
+        const stubbedWebhookInBox = sinon.stub(webhookInBox, "delete");
 
         const snapshot = test.firestore.makeDocumentSnapshot(successfulWebhookMessage, "webhookInBox/"+successfulWebhookMessageDoc);
 
@@ -139,6 +116,8 @@ describe("Testing that the strava Webhooks work: ", () => {
 
         const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
         await wait(1000);
+        // check the webhookInBox function was called with the correct args
+        assert(stubbedWebhookInBox.calledOnceWith(snapshot.ref), "webhookInBox called incorrectly");
         //now check the database was updated correctly
         const testUserDocs = await admin.firestore()
             .collection("users")
@@ -167,21 +146,27 @@ describe("Testing that the strava Webhooks work: ", () => {
         }
         assert.deepEqual(sanatisedActivity, expectedResults);
         sinon.restore();
-  
       });
     it('Webhooks should repond with status 401 if method incorrect...', async () => {
-    // set the request object with the correct provider, developerId and userId
-    const req = {
-        debug: true,
-        url: "https://us-central1-rovetest-beea7.cloudfunctions.net/stravaWebhook",
-        method: "incorrect",
-        body: {"updates":{},"object_type":"activity","object_id":7345142595,"owner_id":"test_strava_id","subscription_id":217520,"aspect_type":"create","event_time":1655824005}
-    };
-    res = {
-        sendStatus: (code)=>{assert.equal(code, 401);},
-    }
+        // set the request object with the correct provider, developerId and userId
+        const req = {
+            debug: true,
+            url: "https://us-central1-rovetest-beea7.cloudfunctions.net/stravaWebhook",
+            method: "incorrect",
+            body: {"updates":{},"object_type":"activity","object_id":7345142595,"owner_id":"test_strava_id","subscription_id":217520,"aspect_type":"create","event_time":1655824005}
+        };
+        res = {
+            sendStatus: (code)=>{assert.equal(code, 401);},
+        }
+        // set up stubs so that WebhookInBox is not written to
+        // this would trigger the function in the online environment
+        const stubbedWebhookInBox = sinon.stub(webhookInBox, "push");
+        stubbedWebhookInBox.onCall().returns("testDoc");
 
-    await myFunctions.stravaWebhook(req, res);
+        await myFunctions.stravaWebhook(req, res);
+        // check the inBox was not written to
+        assert.equal(stubbedWebhookInBox.notCalled, true);
+        sinon.restore();
     });
     it('Webhooks should repond with status 401 if webhook token is incorrect...', async () => {
         // set the request object with the correct provider, developerId and userId
@@ -195,8 +180,14 @@ describe("Testing that the strava Webhooks work: ", () => {
             send: (text)=>{assert.equal(text, "NOT AUTHORISED")},
             status: (code)=>{assert.equal(code, 401);},
         }
-
+        // set up stubs so that WebhookInBox is not written to
+        // this would trigger the function in the online environment
+        const stubbedWebhookInBox = sinon.stub(webhookInBox, "push");
+        stubbedWebhookInBox.onCall().returns("testDoc");
         await myFunctions.stravaWebhook(req, res);
+        // check the inBox was not written to
+        assert.equal(stubbedWebhookInBox.notCalled, true);
+        sinon.restore();
     });
     it('read webhook inbox message and error if no users that match strava_id...', async () => {
 
@@ -204,20 +195,14 @@ describe("Testing that the strava Webhooks work: ", () => {
 
     const snapshot = test.firestore.makeDocumentSnapshot(data, "webhookInBox/"+unsuccessfulWebhookMessageDoc);
     wrapped = test.wrap(myFunctions.processWebhookInBox);
+    // set up stubs so that WebhookInBox is updated 
+    const stubbedWebhookInBox = sinon.stub(webhookInBox, "writeError");
     await wrapped(snapshot);
-
-    const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
-    await wait(1000);
-    //now check the database was updated correctly
-    const webhookDoc = await admin.firestore()
-        .collection("webhookInBox")
-        .doc(unsuccessfulWebhookMessageDoc)
-        .get();
-
-    const expectedResults = unsuccessfulWebhookMessage;
-    expectedResults.status = 
-            "error: zero users registered to strava webhook owner_id incorrect_strava_id";
-
-    assert.deepEqual(webhookDoc.data(), expectedResults);
+    args = stubbedWebhookInBox.getCall(0).args; //this first call
+    // check webhookInBox called with the correct parameters
+    assert(stubbedWebhookInBox.calledOnce, "webhookInBox called too many times");
+    assert.equal(args[1].message, "zero users registered to strava webhook owner_id incorrect_strava_id");
+    assert.equal(args[0], snapshot.ref);
+    sinon.restore();
     });
 }); //End TEST
