@@ -21,12 +21,14 @@ const contentsOfDotEnvFile = require("./config.json");
 const filters = require("./data-filter");
 const fs = require("fs");
 const notion = require("./notion");
-
 const configurations = contentsOfDotEnvFile["config"];
 // find a way to decrypt and encrypt this information
 
 admin.initializeApp();
 const db = admin.firestore();
+const storage = admin.storage();
+
+
 switch (process.env.GCLOUD_PROJECT) {
   case "rove-26":
     configurations.lookup = "roveLiveSecrets";
@@ -1509,9 +1511,27 @@ exports.polarWebhook = functions.https.onRequest(async (request, response) => {
         headers: headers,
       };
       const activity = await got.get(options).json();
+      options.url = options.url + "/fit";
+      options.method = "GET";
+      const fitFile = await got.get(options);
+      // const storage = getStorage();
+      // const storageRef = ref(storage, "public");
+      // 'file' comes from the Blob or File API
+      const contents = fitFile.body;
+      const storageRef = storage.bucket("gs://rovetest-beea7.appspot.com/");
+
+      const response = await storageRef.file("/public/testFitFile.fit").save(contents);
+      const urlOptions = {
+        version: "v4",
+        action: "read",
+        expires: Date.now() + 7*24*60*60*1000, // 7 days
+      };
+      const downloadURL = await storageRef.file("/public/testFitFile.fit").getSignedUrl(urlOptions);
+      // generates a download url for the new fit file.
       let sanitisedActivity;
       try {
         sanitisedActivity = filters.polarSanatise(activity);
+        sanitisedActivity.raw["file"] = {"url": downloadURL};
       } catch (error) {
         console.log(error.errorMessage);
         response.status(404);

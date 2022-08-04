@@ -39,8 +39,9 @@ describe("Testing that the Webhooks work: ", () => {
           "devId": testDev,
           "userId": testUser,
           "wahoo_user_id": "wahoo_test_user",
-          "polar_user_id": "polar_test_user",
-          "polar_access_token": "polar_test_access_token",
+          "polar_user_id": "45395466",
+          "polar_access_token": "d717dd39d09b91939f835d66a640927d",
+          "polar_token_expires_at": 2120383593,
           "strava_id" : "test_strava_id",
           "strava_access_token": "test_strava_access_token",
           "strava_refresh_token": "test_strava_refresh_token",
@@ -58,7 +59,7 @@ describe("Testing that the Webhooks work: ", () => {
           await doc.ref.delete();
       });
   });
-  it('Polar Webhook should get event, sanatise, save and repond with status 200...', async () => {
+  it.only('Polar Webhook should get event, sanatise, save and repond with status 200...', async () => {
       //set up the stubbed response to mimic polar's response when called with the
       const polarExercisePayload = {
           json() { return {
@@ -89,8 +90,8 @@ describe("Testing that the Webhooks work: ", () => {
               }
           }
       }
-      stubbedPolarCall = sinon.stub(got, "get");
-      stubbedPolarCall.onFirstCall().returns(polarExercisePayload);
+      // stubbedPolarCall = sinon.stub(got, "get");
+      // stubbedPolarCall.onFirstCall().returns(polarExercisePayload);
       // set the request object with the correct provider, developerId and userId
       const req = {
           debug: true,
@@ -98,8 +99,8 @@ describe("Testing that the Webhooks work: ", () => {
           method: "POST",
           body: {
               "event": "EXERCISE",
-              "user_id": "polar_test_user",
-              "entity_id": "aQlC83",
+              "user_id": "45395466",
+              "entity_id": "ymeoBNZw",
               "timestamp": "2018-05-15T14:22:24Z",
               "url": "https://www.polaraccesslink.com/v3/exercises/aQlC83"
             }
