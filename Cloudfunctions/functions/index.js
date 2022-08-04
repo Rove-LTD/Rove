@@ -1511,25 +1511,25 @@ exports.polarWebhook = functions.https.onRequest(async (request, response) => {
         headers: headers,
       };
       const activity = await got.get(options).json();
+      // now we go for FIT file.
       options.url = options.url + "/fit";
       options.method = "GET";
       const fitFile = await got.get(options);
-      // const storage = getStorage();
-      // const storageRef = ref(storage, "public");
-      // 'file' comes from the Blob or File API
       const contents = fitFile.body;
+      // storing FIT file in bucket under activityId.fit
       const storageRef = storage.bucket("gs://rovetest-beea7.appspot.com/");
       await storageRef.file("public/"+request.body.entity_id+".fit").save(contents);
+      // create signed URL for developer to download file.
       const urlOptions = {
         version: "v4",
         action: "read",
-        expires: Date.now() + 7*24*60*60*1000, // 7 days
+        expires: Date.now() + 7*24*60*60*1000, // 7 days till expiry
       };
       const downloadURL = await storageRef.file("public/"+request.body.entity_id+".fit").getSignedUrl(urlOptions);
-      // generates a download url for the new fit file.
       let sanitisedActivity;
       try {
         sanitisedActivity = filters.polarSanatise(activity);
+        // add fit file URL to the sanitised activity
         sanitisedActivity["file"] = {"url": downloadURL[0]};
       } catch (error) {
         console.log(error.errorMessage);
