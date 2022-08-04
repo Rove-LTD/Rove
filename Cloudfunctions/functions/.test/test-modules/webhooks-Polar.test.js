@@ -32,10 +32,9 @@ myFunctions = require('../../index.js');
 // testing processes - these have to have the same constant
 // name as in the function we are testing
 const got = require('got');
-const stravaApi = require("strava-v3");
 const webhookInBox = require('../../webhookInBox');
 //-------------TEST --- webhooks-------
-describe("Testing that the strava Webhooks work: ", () => {
+describe("Testing that the Polar Webhooks work: ", () => {
     before ('set up the userIds in the test User doc', async () => {
       await admin.firestore()
       .collection("users")
@@ -43,10 +42,9 @@ describe("Testing that the strava Webhooks work: ", () => {
       .set({
           "devId": testDev,
           "userId": testUser,
-          "strava_id" : "test_strava_id",
-          "strava_access_token": "test_strava_access_token",
-          "strava_refresh_token": "test_strava_refresh_token",
-          "strava_token_expires_at": new Date().getTime()/1000 + 600,      }, {merge: true});
+          "polar_user_id" : "polar_test_user",
+          "polar_access_token": "test_polar_access_token",
+        }, {merge: true});
 
       activityDocs = await admin.firestore()
           .collection("users")
@@ -59,18 +57,18 @@ describe("Testing that the strava Webhooks work: ", () => {
       });
 
       successfulWebhookMessage = {
-            provider: "strava",
+            provider: "polar",
             method: "POST",
-            body: '{"updates":{},"object_type":"activity","object_id":7345142595,"owner_id":"test_strava_id","subscription_id":217520,"aspect_type":"create","event_time":1655824005}',
+            body: '{"event": "EXERCISE","user_id": "polar_test_user","entity_id": "aQlC83","timestamp": "2018-05-15T14:22:24Z","url": "https://www.polaraccesslink.com/v3/exercises/aQlC83"}',
             status: "added before the tests to be successful",
         }
 
-            unsuccessfulWebhookMessage = {
-                provider: "strava",
-                method: "POST",
-                body: '{"updates":{},"object_type":"activity","object_id":7345142595,"owner_id":"incorrect_strava_id","subscription_id":217520,"aspect_type":"create","event_time":1655824005}',
-                status: "added before the tests to be successful",
-            }
+        unsuccessfulWebhookMessage = {
+            provider: "polar",
+            method: "POST",
+            body: '{"event": "EXERCISE","user_id": "incorrect_test_user","entity_id": "aQlC83","timestamp": "2018-05-15T14:22:24Z","url": "https://www.polaraccesslink.com/v3/exercises/aQlC83"}',
+            status: "added before the tests to be successful",
+        }
 
     });
     after('clean-up the webhookInbox documents',async ()=>{
@@ -78,12 +76,18 @@ describe("Testing that the strava Webhooks work: ", () => {
     })
     it('Webhooks should log event and repond with status 200...', async () => {
       // set the request object with the correct provider, developerId and userId
-        const req = {
-            debug: true,
-            url: "https://us-central1-rovetest-beea7.cloudfunctions.net/stravaWebhook",
-            method: "POST",
-            body: {"updates":{},"object_type":"activity","object_id":7345142595,"owner_id":"test_strava_id","subscription_id":217520,"aspect_type":"create","event_time":1655824005}
-        };
+      const req = {
+        debug: true,
+        url: "https://us-central1-rovetest-beea7.cloudfunctions.net/polarWebhook",
+        method: "POST",
+        body: {
+            "event": "EXERCISE",
+            "user_id": "polar_test_user",
+            "entity_id": "aQlC83",
+            "timestamp": "2018-05-15T14:22:24Z",
+            "url": "https://www.polaraccesslink.com/v3/exercises/aQlC83"
+          }
+    };
         res = {
             sendStatus: (code)=>{assert.equal(code, 200);},
         }
@@ -93,20 +97,48 @@ describe("Testing that the strava Webhooks work: ", () => {
         const stubbedWebhookInBox = sinon.stub(webhookInBox, "push");
         stubbedWebhookInBox.onCall().returns("testDoc");
 
-        await myFunctions.stravaWebhook(req, res);
+        await myFunctions.polarWebhook(req, res);
 
         // check the webhookInBox was called correctly
-        assert(stubbedWebhookInBox.calledOnceWithExactly(req, "strava"),
+        assert(stubbedWebhookInBox.calledOnceWithExactly(req, "polar"),
                 "webhookInBox called with wrong args");
         sinon.restore();
 
     });
     it('read webhookInBox event and process it successfully...', async () => {
 
-        //set up the stubbed response to mimic Strava's response when called with the
-        const stravaExercisePayload = require('./strava.json');
-        stubbedStravaCall = sinon.stub(stravaApi.activities, "get");
-        stubbedStravaCall.onFirstCall().returns(stravaExercisePayload);
+        //set up the stubbed response to mimic Polar's response when called with the
+        const polarExercisePayload = {
+            json() { return {
+                    "id": 1937529874,
+                    "upload_time": "2008-10-13T10:40:02Z",
+                    "polar_user": "https://www.polaraccesslink/v3/users/1",
+                    "transaction_id": 179879,
+                    "device": "Polar M400",
+                    "device_id": "1111AAAA",
+                    "start_time": "2008-10-13T10:40:02Z",
+                    "start_time_utc_offset": 180,
+                    "duration": "PT2H44M",
+                    "calories": 530,
+                    "distance": 1600,
+                    "heart_rate": {
+                    "average": 129,
+                    "maximum": 147
+                    },
+                    "training_load": 143.22,
+                    "sport": "OTHER",
+                    "has_route": true,
+                    "club_id": 999,
+                    "club_name": "Polar Club",
+                    "detailed_sport_info": "WATERSPORTS_WATERSKI",
+                    "fat_percentage": 60,
+                    "carbohydrate_percentage": 38,
+                    "protein_percentage": 2
+                }
+            }
+        }
+        stubbedPolarCall = sinon.stub(got, "get");
+        stubbedPolarCall.onFirstCall().returns(polarExercisePayload);
         const stubbedWebhookInBox = sinon.stub(webhookInBox, "delete");
 
         const snapshot = test.firestore.makeDocumentSnapshot(successfulWebhookMessage, "webhookInBox/"+successfulWebhookMessageDoc);
@@ -119,41 +151,53 @@ describe("Testing that the strava Webhooks work: ", () => {
         // check the webhookInBox function was called with the correct args
         assert(stubbedWebhookInBox.calledOnceWith(snapshot.ref), "webhookInBox called incorrectly");
         //now check the database was updated correctly
-        const testUserDocs = await admin.firestore()
-            .collection("users")
-            .doc(testDev+testUser)
-            .collection("activities")
-            .where("raw.id", "==", 12345678987654321)
-            .get();
+     const testUserDocs = await admin.firestore()
+     .collection("users")
+     .doc(testDev+testUser)
+     .collection("activities")
+     .where("raw.id", "==", 1937529874)
+     .get();
 
-        const sanatisedActivity = testUserDocs.docs[0].data()["sanitised"];
-        const expectedResults = { // TODO:
-            userId: testUser,
-            activity_id: 12345678987654321,
-            activity_name: "Happy Friday",
-            activity_type: "Ride",
-            distance_in_meters: 28099, //float no trailing 0
-            average_pace_in_meters_per_second:"6.7", //float
-            active_calories: 781,
-            activity_duration_in_seconds: 4207,
-            start_time: '2018-02-16T06:52:54.000Z', //ISO 8601 UTC
-            average_heart_rate_bpm: null,
-            // max_heart_rate_bpm: null,
-            average_cadence: "78.5",
-            elevation_gain: "446.6",
-            elevation_loss:"17.2",
-            provider: "strava",
-        }
-        assert.deepEqual(sanatisedActivity, expectedResults);
-        sinon.restore();
+     const sanatisedActivity = testUserDocs.docs[0].data();
+     const expectedResults = { // TODO:
+          sanitised: {
+              userId: testUser,
+              activity_id: 1937529874,
+              activity_name: "WATERSPORTS_WATERSKI",
+              activity_type: "OTHER",
+              distance_in_meters: 1600, //float no trailing 0
+              average_pace_in_meters_per_second: null, //float
+              active_calories: 530,
+              activity_duration_in_seconds: 9840,
+              start_time: '2008-10-13T10:40:02.000Z', //ISO 8601 UTC
+              average_heart_rate_bpm: 129,
+              max_heart_rate_bpm: 147,
+              average_cadence: null,
+              elevation_gain: null,
+              elevation_loss: null,
+              provider: "polar",
+          },
+          raw: polarExercisePayload.json(),
+          "status": "sent",
+          "timestamp": "not tested",
+      }
+     sanatisedActivity.timestamp = "not tested";
+     assert.deepEqual(sanatisedActivity, expectedResults);
+     sinon.restore();
       });
     it('Webhooks should repond with status 401 if method incorrect...', async () => {
         // set the request object with the correct provider, developerId and userId
         const req = {
             debug: true,
-            url: "https://us-central1-rovetest-beea7.cloudfunctions.net/stravaWebhook",
-            method: "incorrect",
-            body: {"updates":{},"object_type":"activity","object_id":7345142595,"owner_id":"test_strava_id","subscription_id":217520,"aspect_type":"create","event_time":1655824005}
+            url: "https://us-central1-rovetest-beea7.cloudfunctions.net/polarWebhook",
+            method: "Incorrect",
+            body: {
+                "event": "EXERCISE",
+                "user_id": "polar_test_user",
+                "entity_id": "aQlC83",
+                "timestamp": "2018-05-15T14:22:24Z",
+                "url": "https://www.polaraccesslink.com/v3/exercises/aQlC83"
+              }
         };
         res = {
             sendStatus: (code)=>{assert.equal(code, 401);},
@@ -163,33 +207,12 @@ describe("Testing that the strava Webhooks work: ", () => {
         const stubbedWebhookInBox = sinon.stub(webhookInBox, "push");
         stubbedWebhookInBox.onCall().returns("testDoc");
 
-        await myFunctions.stravaWebhook(req, res);
+        await myFunctions.polarWebhook(req, res);
         // check the inBox was not written to
         assert.equal(stubbedWebhookInBox.notCalled, true);
         sinon.restore();
     });
-    it('Webhooks should repond with status 401 if webhook token is incorrect...', async () => {
-        // set the request object with the correct provider, developerId and userId
-        const req = {
-            debug: true,
-            url: "https://us-central1-rovetest-beea7.cloudfunctions.net/stravaWebhook",
-            method: "POST",
-            body: {"updates":{},"object_type":"activity","object_id":7345142595,"owner_id":"test_strava_id","subscription_id":"not correct","aspect_type":"create","event_time":1655824005}
-    };
-        res = {
-            send: (text)=>{assert.equal(text, "NOT AUTHORISED")},
-            status: (code)=>{assert.equal(code, 401);},
-        }
-        // set up stubs so that WebhookInBox is not written to
-        // this would trigger the function in the online environment
-        const stubbedWebhookInBox = sinon.stub(webhookInBox, "push");
-        stubbedWebhookInBox.onCall().returns("testDoc");
-        await myFunctions.stravaWebhook(req, res);
-        // check the inBox was not written to
-        assert.equal(stubbedWebhookInBox.notCalled, true);
-        sinon.restore();
-    });
-    it('read webhook inbox message and error if no users that match strava_id...', async () => {
+    it('read webhook inbox message and error if no users that match polar_id...', async () => {
 
     const data = unsuccessfulWebhookMessage;
 
@@ -201,7 +224,7 @@ describe("Testing that the strava Webhooks work: ", () => {
     args = stubbedWebhookInBox.getCall(0).args; //this first call
     // check webhookInBox called with the correct parameters
     assert(stubbedWebhookInBox.calledOnce, "webhookInBox called too many times");
-    assert.equal(args[1].message, "zero users registered to strava webhook owner_id incorrect_strava_id");
+    assert.equal(args[1].message, "zero users registered to polar webhook user_id incorrect_test_user");
     assert.equal(args[0], snapshot.ref);
     sinon.restore();
     });

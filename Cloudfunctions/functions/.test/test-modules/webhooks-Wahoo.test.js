@@ -32,6 +32,7 @@ myFunctions = require('../../index.js');
 // testing processes - these have to have the same constant
 // name as in the function we are testing
 const got = require('got');
+const webhookInBox = require('../../webhookInBox');
 //-------------TEST --- webhooks-------
 describe("Testing that the Wahoo Webhooks work: ", () => {
     before ('set up the userIds in the test User doc', async () => {
@@ -61,35 +62,16 @@ describe("Testing that the Wahoo Webhooks work: ", () => {
             status: "added before the tests to be successful",
         }
 
-        await admin.firestore()
-            .collection("webhookInBox")
-            .doc(successfulWebhookMessageDoc)
-            .set(successfulWebhookMessage);
-
             unsuccessfulWebhookMessage = {
                 provider: "wahoo",
                 body: '{"user":{"id":"wahoo_test_user"},"event_type":"incorrect","workout_summar_nothere":{"duration_active_accum":"9.0","workout":{"name":"Cycling","workout_token":"ELEMNT AE48:274","workout_type_id":"incorrect","id":147564736,"updated_at":"2022-06-13T16:39:08.000Z","plan_id":null,"minutes":0,"starts":"2022-06-13T16:38:51.000Z","created_at":"2022-06-13T16:39:08.000Z"},"speed_avg":"0.0","duration_total_accum":"9.0","cadence_avg":"0.0","id":140473420,"work_accum":"0.0","power_bike_tss_last":null,"ascent_accum":"0.0","power_bike_np_last":null,"duration_paused_accum":"0.0","created_at":"2022-06-13T16:39:09.000Z","updated_at":"2022-06-13T16:39:09.000Z","power_avg":"0.0","file":{"url":"https://cdn.wahooligan.com/wahoo-cloud/production/uploads/workout_file/file/WpHvKL3irWsv2vHzGzGF_Q/2022-06-13-163851-ELEMNT_AE48-274-0.fit"},"distance_accum":"0.0","heart_rate_avg":"0.0","calories_accum":"0.0"},"webhook_token":"348a6fe2-3719-4647-a233-933b8c404d6b"}',
                 method: "POST",
                 status: "added before the tests to be unsuccessful",
             }
-    
-            await admin.firestore()
-                .collection("webhookInBox")
-                .doc(unsuccessfulWebhookMessageDoc)
-                .set(unsuccessfulWebhookMessage);
 
     });
     after('clean-up the webhookInbox documents',async ()=>{
 
-        const testWebhookDocs = await admin.firestore()
-        .collection("webhookInBox")
-        .where("status", "==", "new")
-        .where("provider", "==", "wahoo")
-        .get();
-
-        testWebhookDocs.docs.forEach ((doc)=>{
-            doc.ref.delete();
-        })
     })
     it('Webhooks should log event and repond with status 200...', async () => {
       // set the request object with the correct provider, developerId and userId
@@ -102,35 +84,35 @@ describe("Testing that the Wahoo Webhooks work: ", () => {
     res = {
         sendStatus: (code)=>{assert.equal(code, 200);},
     }
+    // set up stubs so that WebhookInBox is not written to
+    // this would trigger the function in the online environment
+    const stubbedWebhookInBox = sinon.stub(webhookInBox, "push");
+    stubbedWebhookInBox.onCall().returns("testDoc");
 
     await myFunctions.wahooWebhook(req, res);
 
     const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
     await wait(1000);
-    //now check the database was updated correctly
-    const testWebhookDocs = await admin.firestore()
-        .collection("webhookInBox")
-        .where("status", "==", "new")
-        .where("provider", "==", "wahoo")
-        .get();
-    
-    const expectedResults = successfulWebhookMessage;
-    expectedResults.status = "new";
-
-    assert.equal(testWebhookDocs.docs.length, 1);
-    assert.deepEqual(testWebhookDocs.docs[0].data(), expectedResults)
-    await testWebhookDocs.docs[0].ref.delete();
+    // check the webhookInBox was called correctly
+    assert(stubbedWebhookInBox.calledOnceWithExactly(req, "wahoo"),
+            "webhookInBox called with wrong args");
 
     });
     it('read webhookInBox event and process it successfully...', async () => {
 
         const snapshot = test.firestore.makeDocumentSnapshot(successfulWebhookMessage, "webhookInBox/"+successfulWebhookMessageDoc);
 
+        // set up stubs so that WebhookInBox is not deleted as the record
+        // will not be there - it was not written
+        const stubbedWebhookInBox = sinon.stub(webhookInBox, "delete");
+
         wrapped = test.wrap(myFunctions.processWebhookInBox);
         await wrapped(snapshot);
 
         const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
         await wait(1000);
+        // check the webhookInBox function was called with the correct args
+        assert(stubbedWebhookInBox.calledOnceWith(snapshot.ref), "webhookInBox called incorrectly");
         //now check the database was updated correctly
        const testUserDocs = await admin.firestore()
        .collection("users")
@@ -174,6 +156,7 @@ describe("Testing that the Wahoo Webhooks work: ", () => {
        sanatisedActivity.timestamp = "not tested";
   
        assert.deepEqual(sanatisedActivity, expectedResults);
+       sinon.restore();
   
       });
     it('Webhooks should repond with status 401 if method incorrect...', async () => {
@@ -187,8 +170,14 @@ describe("Testing that the Wahoo Webhooks work: ", () => {
     res = {
         sendStatus: (code)=>{assert.equal(code, 401);},
     }
-
+    // set up stubs so that WebhookInBox is not written to
+    // this would trigger the function in the online environment
+    const stubbedWebhookInBox = sinon.stub(webhookInBox, "push");
+    stubbedWebhookInBox.onCall().returns("testDoc");
     await myFunctions.wahooWebhook(req, res);
+    // check the inBox was not written to
+    assert.equal(stubbedWebhookInBox.notCalled, true);
+    sinon.restore();
     });
     it('Webhooks should repond with status 401 if webhook token is incorrect...', async () => {
         // set the request object with the correct provider, developerId and userId
@@ -202,29 +191,30 @@ describe("Testing that the Wahoo Webhooks work: ", () => {
             send: (text)=>{assert.equal(text, "NOT AUTHORISED")},
             status: (code)=>{assert.equal(code, 401);},
         }
-
+        // set up stubs so that WebhookInBox is not written to
+        // this would trigger the function in the online environment
+        const stubbedWebhookInBox = sinon.stub(webhookInBox, "push");
+        stubbedWebhookInBox.onCall().returns("testDoc");
         await myFunctions.wahooWebhook(req, res);
+        // check the inBox was not written to
+        assert.equal(stubbedWebhookInBox.notCalled, true);
+        sinon.restore();
+
     });
     it('read webhook message and error if sanitise fails and repond with status 200...', async () => {
 
-    const data = unsuccessfulWebhookMessage;
+        const data = unsuccessfulWebhookMessage;
 
-    const snapshot = test.firestore.makeDocumentSnapshot(data, "webhookInBox/"+unsuccessfulWebhookMessageDoc);
-    wrapped = test.wrap(myFunctions.processWebhookInBox);
-    await wrapped(snapshot);
-
-    const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
-    await wait(1000);
-    //now check the database was updated correctly
-    const webhookDoc = await admin.firestore()
-        .collection("webhookInBox")
-        .doc(unsuccessfulWebhookMessageDoc)
-        .get();
-
-    const expectedResults = unsuccessfulWebhookMessage;
-    expectedResults.status = 
-            "error: don't recognise the wahoo event_type: incorrect";
-
-    assert.deepEqual(webhookDoc.data(), expectedResults);
+        const snapshot = test.firestore.makeDocumentSnapshot(data, "webhookInBox/"+unsuccessfulWebhookMessageDoc);
+        // set up stubs so that WebhookInBox is updated 
+        const stubbedWebhookInBox = sinon.stub(webhookInBox, "writeError");
+        wrapped = test.wrap(myFunctions.processWebhookInBox);
+        await wrapped(snapshot);
+        args = stubbedWebhookInBox.getCall(0).args; //this first call
+        // check webhookInBox called with the correct parameters
+        assert(stubbedWebhookInBox.calledOnce, "webhookInBox called too many times");
+        assert.equal(args[1].message, "don't recognise the wahoo event_type: incorrect");
+        assert.equal(args[0], snapshot.ref);
+        sinon.restore();
     });
 }); //End TEST
