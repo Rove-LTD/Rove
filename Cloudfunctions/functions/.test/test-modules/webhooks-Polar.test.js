@@ -23,7 +23,6 @@ let unsuccessfulWebhookMessage;
 const devTestData = testParameters.devTestData
 const devUserData = testParameters.devUserData
 const test = require('firebase-functions-test')(firebaseConfig, testParameters.testKeyFile);
-const admin = require("firebase-admin");
 myFunctions = require('../../index.js');
 // -----------END INITIALISE ROVE TEST PARAMETERS----------------------------//
 
@@ -32,6 +31,7 @@ myFunctions = require('../../index.js');
 // testing processes - these have to have the same constant
 // name as in the function we are testing
 const got = require('got');
+const admin = require('firebase-admin');
 const webhookInBox = require('../../webhookInBox');
 //-------------TEST --- webhooks-------
 describe("Testing that the Polar Webhooks work: ", () => {
@@ -137,10 +137,16 @@ describe("Testing that the Polar Webhooks work: ", () => {
                 }
             }
         }
+        const fitFilePayload = "longStringofFitFile";
         stubbedPolarCall = sinon.stub(got, "get");
         stubbedPolarCall.onFirstCall().returns(polarExercisePayload);
         const stubbedWebhookInBox = sinon.stub(webhookInBox, "delete");
-
+        stubbedPolarCall.onSecondCall().returns(fitFilePayload);
+        stubbedSaveFile = sinon.stub(admin.storage(), "bucket").returns({
+          file: sinon.stub().returnsThis(),
+          save: sinon.stub().returns("fileData"),
+          getSignedUrl: sinon.stub().returns(["someURL"])
+        });
         const snapshot = test.firestore.makeDocumentSnapshot(successfulWebhookMessage, "webhookInBox/"+successfulWebhookMessageDoc);
 
         wrapped = test.wrap(myFunctions.processWebhookInBox);
@@ -176,6 +182,7 @@ describe("Testing that the Polar Webhooks work: ", () => {
               elevation_gain: null,
               elevation_loss: null,
               provider: "polar",
+              file: {"url": "someURL"}
           },
           raw: polarExercisePayload.json(),
           "status": "sent",

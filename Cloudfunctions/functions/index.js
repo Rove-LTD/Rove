@@ -21,12 +21,14 @@ const contentsOfDotEnvFile = require("./config.json");
 const filters = require("./data-filter");
 const fs = require("fs");
 const notion = require("./notion");
-
 const configurations = contentsOfDotEnvFile["config"];
 // find a way to decrypt and encrypt this information
 
 admin.initializeApp();
 const db = admin.firestore();
+const storage = admin.storage();
+
+
 switch (process.env.GCLOUD_PROJECT) {
   case "rove-26":
     configurations.lookup = "roveLiveSecrets";
@@ -469,7 +471,6 @@ exports.disconnectService = functions.https.onRequest(async (req, res) => {
     let result;
     if (provider == "strava") {
       // deauth for Strava.
-      // TODO check user is already authorised
       if (userDocData["strava_connected"] == true) {
         result = await deleteStravaActivity(userDoc, false);
         // check success or fail. result 200 is success 400 is failure
@@ -784,18 +785,12 @@ async function sendToDeauthoriseWebhook(userDoc, provider, triesSoFar) {
   };
   const response = await got(options);
   if (response.statusCode == 200) {
-    // the developer accepted the information TODO
-    /*
-     userDoc.ref
-         .collection("activities")
-         .doc(activityDoc)
-         .set({status: "sent", timestamp: new Date()}, {merge: true}); */
     return 200;
   } else {
     // call the retry functionality and increment the retry counter
     if (triesSoFar <= MaxRetries) {
       console.log("retrying sending to developer");
-      wait(waitTime[triesSoFar]);
+      await wait(waitTime[triesSoFar]);
       sendToDeauthoriseWebhook(userDoc, provider, triesSoFar+1);
     } else {
       // max retries email developer
@@ -1555,7 +1550,6 @@ async function processPolarWebhook(webhookDoc) {
   });
   // request the exercise information from Polar - the access token is
   // needed for this
-  // TODO: if there are no users we have an issue
   const userToken = userQuery.docs[0].data()["polar_access_token"];
   if (webhookBody.event == "EXERCISE") {
     const headers = {
@@ -1567,13 +1561,28 @@ async function processPolarWebhook(webhookDoc) {
       headers: headers,
     };
     const activity = await got.get(options).json();
+    options.url = options.url + "/fit";
+    options.method = "GET";
+    const fitFile = await got.get(options);
+    const contents = fitFile.body;
+    // storing FIT file in bucket under activityId.fit
+    const storageRef = storage.bucket("gs://rovetest-beea7.appspot.com/");
+    await storageRef.file("public/"+webhookBody.entity_id+".fit").save(contents);
+    // create signed URL for developer to download file.
+    const urlOptions = {
+      version: "v4",
+      action: "read",
+      expires: Date.now() + 7*24*60*60*1000, // 7 days till expiry
+    };
+    const downloadURL = await storageRef.file("public/"+webhookBody.entity_id+".fit").getSignedUrl(urlOptions);
 
     const sanitisedActivity = filters.polarSanatise(activity);
-
+    sanitisedActivity["file"] = {"url": downloadURL[0]};
     // write sanitised information and raw information to each user and then
     // send to developer
     for (const userDoc of userDocsList) {
       sanitisedActivity["userId"] = userDoc.data()["userId"];
+      // add fit file URL to the sanitised activity
       // create a local copy of the activity to prevent the userId
       // being written incorrectly in this loop during async
       // firebase writes and developer sends.
@@ -1629,7 +1638,7 @@ async function sendToDeveloper(userDoc,
       };
       const response = await got.post(options);
       if (response.statusCode == 200) {
-      // the developer accepted the information TODO
+      // the developer accepted the information
         activityDoc
             .set({status: "sent", timestamp: new Date().toISOString()},
                 {merge: true});
