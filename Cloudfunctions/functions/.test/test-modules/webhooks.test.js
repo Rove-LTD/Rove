@@ -28,6 +28,7 @@ myFunctions = require('../../index.js');
 // testing processes - these have to have the same constant
 // name as in the function we are testing
 const got = require('got');
+const storage = require('firebase-admin');
 //const stravaApi = require("strava-v3");
 //-------------TEST --- webhooks-------
 describe("Testing that the Webhooks work: ", () => {
@@ -90,8 +91,15 @@ describe("Testing that the Webhooks work: ", () => {
               }
           }
       }
-      // stubbedPolarCall = sinon.stub(got, "get");
-      // stubbedPolarCall.onFirstCall().returns(polarExercisePayload);
+      const fitFilePayload = "longStringofFitFile";
+      stubbedPolarCall = sinon.stub(got, "get");
+      stubbedPolarCall.onFirstCall().returns(polarExercisePayload);
+      stubbedPolarCall.onSecondCall().returns(fitFilePayload);
+      stubbedSaveFile = sinon.stub(admin.storage(), "bucket").returns({
+        file: sinon.stub().returnsThis(),
+        save: sinon.stub().returns("fileData"),
+        getSignedUrl: sinon.stub().returns(["someURL"])
+      });
       // set the request object with the correct provider, developerId and userId
       const req = {
           debug: true,
@@ -100,7 +108,7 @@ describe("Testing that the Webhooks work: ", () => {
           body: {
               "event": "EXERCISE",
               "user_id": "45395466",
-              "entity_id": "ymeoBNZw",
+              "entity_id": 1937529874,
               "timestamp": "2018-05-15T14:22:24Z",
               "url": "https://www.polaraccesslink.com/v3/exercises/aQlC83"
             }
@@ -141,6 +149,7 @@ describe("Testing that the Webhooks work: ", () => {
               elevation_gain: null,
               elevation_loss: null,
               provider: "polar",
+              file: {url: "someURL"}
           },
           raw: polarExercisePayload.json(),
           "status": "sent",
