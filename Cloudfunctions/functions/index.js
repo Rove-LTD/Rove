@@ -1575,14 +1575,14 @@ async function processPolarWebhook(webhookDoc) {
     const contents = fitFile.body;
     // storing FIT file in bucket under activityId.fit
     const storageRef = storage.bucket("gs://rovetest-beea7.appspot.com/");
-    await storageRef.file("public/"+request.body.entity_id+".fit").save(contents);
+    await storageRef.file("public/"+webhookBody.entity_id+".fit").save(contents);
     // create signed URL for developer to download file.
     const urlOptions = {
       version: "v4",
       action: "read",
       expires: Date.now() + 7*24*60*60*1000, // 7 days till expiry
     };
-    const downloadURL = await storageRef.file("public/"+request.body.entity_id+".fit").getSignedUrl(urlOptions);
+    const downloadURL = await storageRef.file("public/"+webhookBody.entity_id+".fit").getSignedUrl(urlOptions);
 
     const sanitisedActivity = filters.polarSanatise(activity);
     sanitisedActivity["file"] = {"url": downloadURL[0]};
