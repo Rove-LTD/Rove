@@ -35,6 +35,7 @@ switch (process.env.GCLOUD_PROJECT) {
     configurations.lookup = "roveTestSecrets";
     break;
 }
+const webhookInBox = require("./webhookInBox");
 const oauthWahoo = new OauthWahoo(configurations, db);
 const callbackBaseUrl = "https://us-central1-"+process.env.GCLOUD_PROJECT+".cloudfunctions.net";
 
@@ -1431,10 +1432,10 @@ exports.processWebhookInBox = functions.firestore
             await processWahooWebhook(snap);
             break;
           case "polar":
-            await processPolarWebhook(snap);
+            // await processPolarWebhook(snap);
             break;
           case "garmin":
-            await processGarminWebhook(snap);
+            // await processGarminWebhook(snap);
             break;
         }
         webhookInBox.delete(snap.ref);
@@ -1842,24 +1843,4 @@ async function createTransactionWithParameters(parameters) {
 const waitTime = {0: 0, 1: 1, 2: 10, 3: 60}; // time in minutes
 const wait = (mins) => new Promise((resolve) => setTimeout(resolve, mins*60*1000));
 
-const webhookInBox = {
-  push: async function(request, provider) {
-    const webhookDoc = db.collection("webhookInBox").doc();
-    await webhookDoc
-        .set({
-          provider: provider,
-          status: "new",
-          method: request.method,
-          body: JSON.stringify(request.body),
-        });
-    return webhookDoc;
-  },
-  delete: async function(webhookDoc) {
-    await webhookDoc.delete();
-  },
-  writeError: async function(webhookDoc, error) {
-    console.log(error.message);
-    await webhookDoc.set({status: "error: "+error.message}, {merge: true});
-  },
-};
 
