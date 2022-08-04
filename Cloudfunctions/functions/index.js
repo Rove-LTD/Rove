@@ -471,7 +471,6 @@ exports.disconnectService = functions.https.onRequest(async (req, res) => {
     let result;
     if (provider == "strava") {
       // deauth for Strava.
-      // TODO check user is already authorised
       if (userDocData["strava_connected"] == true) {
         result = await deleteStravaActivity(userDoc, false);
         // check success or fail. result 200 is success 400 is failure
@@ -786,18 +785,12 @@ async function sendToDeauthoriseWebhook(userDoc, provider, triesSoFar) {
   };
   const response = await got(options);
   if (response.statusCode == 200) {
-    // the developer accepted the information TODO
-    /*
-     userDoc.ref
-         .collection("activities")
-         .doc(activityDoc)
-         .set({status: "sent", timestamp: new Date()}, {merge: true}); */
     return 200;
   } else {
     // call the retry functionality and increment the retry counter
     if (triesSoFar <= MaxRetries) {
       console.log("retrying sending to developer");
-      wait(waitTime[triesSoFar]);
+      await wait(waitTime[triesSoFar]);
       sendToDeauthoriseWebhook(userDoc, provider, triesSoFar+1);
     } else {
       // max retries email developer
@@ -1557,7 +1550,6 @@ async function processPolarWebhook(webhookDoc) {
   });
   // request the exercise information from Polar - the access token is
   // needed for this
-  // TODO: if there are no users we have an issue
   const userToken = userQuery.docs[0].data()["polar_access_token"];
   if (webhookBody.event == "EXERCISE") {
     const headers = {
@@ -1646,7 +1638,7 @@ async function sendToDeveloper(userDoc,
       };
       const response = await got.post(options);
       if (response.statusCode == 200) {
-      // the developer accepted the information TODO
+      // the developer accepted the information
         activityDoc
             .set({status: "sent", timestamp: new Date().toISOString()},
                 {merge: true});
