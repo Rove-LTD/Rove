@@ -42,7 +42,7 @@ describe("Testing that the Polar Webhooks work: ", () => {
       .set({
           "devId": testDev,
           "userId": testUser,
-          "polar_user_id" : "test_Polar_id",
+          "polar_user_id" : "polar_test_user",
           "polar_access_token": "test_polar_access_token",
         }, {merge: true});
 
@@ -207,33 +207,6 @@ describe("Testing that the Polar Webhooks work: ", () => {
         const stubbedWebhookInBox = sinon.stub(webhookInBox, "push");
         stubbedWebhookInBox.onCall().returns("testDoc");
 
-        await myFunctions.polarWebhook(req, res);
-        // check the inBox was not written to
-        assert.equal(stubbedWebhookInBox.notCalled, true);
-        sinon.restore();
-    });
-    it('Webhooks should repond with status 401 if webhook token is incorrect...', async () => {
-        // set the request object with the correct provider, developerId and userId
-        const req = {
-            debug: true,
-            url: "https://us-central1-rovetest-beea7.cloudfunctions.net/wahooWebhook",
-            method: "POST",
-            body: {
-                "event": "EXERCISE",
-                "user_id": "polar_test_user",
-                "entity_id": "aQlC83",
-                "timestamp": "2018-05-15T14:22:24Z",
-                "url": "https://www.polaraccesslink.com/v3/exercises/aQlC83"
-              }
-        };
-        res = {
-            send: (text)=>{assert.equal(text, "NOT AUTHORISED")},
-            status: (code)=>{assert.equal(code, 401);},
-        }
-        // set up stubs so that WebhookInBox is not written to
-        // this would trigger the function in the online environment
-        const stubbedWebhookInBox = sinon.stub(webhookInBox, "push");
-        stubbedWebhookInBox.onCall().returns("testDoc");
         await myFunctions.polarWebhook(req, res);
         // check the inBox was not written to
         assert.equal(stubbedWebhookInBox.notCalled, true);

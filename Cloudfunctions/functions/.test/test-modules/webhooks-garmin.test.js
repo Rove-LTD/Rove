@@ -238,7 +238,7 @@ describe("Testing that the garmin Webhooks work: ", () => {
         assert.equal(stubbedWebhookInBox.notCalled, true);
         sinon.restore();
     });
-    it.only('read webhook inbox message and error if no users that match garmin_id...', async () => {
+    it('read webhook inbox message and error if no users that match garmin_id...', async () => {
 
     const data = unsuccessfulWebhookMessage;
 
