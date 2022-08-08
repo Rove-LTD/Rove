@@ -237,9 +237,14 @@ exports.getActivityList = functions.https.onRequest(async (req, res) => {
   // make the request for the services which are authenticated by the user
   const payload = await requestForDateRange(providersConnected, userDoc, start, end);
   url = "all checks passing";
-  // console.log(payload);
   res.status(200);
-  res.send(payload);
+  let currentActivity = "";
+  // write the docs into the database now.
+  for (let i = 0; i< payload.length; i++) {
+    currentActivity = payload[i];
+    db.collection("users").doc(userDoc.id).collection("activities").doc(currentActivity["sanitised"]["activity_id"] + currentActivity["sanitised"]["provider"]).set(payload[i], {merge: true});
+  }
+  res.send("OK");
   // send to Dev first and then store all the activities.
 });
 

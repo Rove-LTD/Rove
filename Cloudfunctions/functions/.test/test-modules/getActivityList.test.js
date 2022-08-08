@@ -207,11 +207,21 @@ it.only('Check that activities are correctly sanitised and concatonated...', asy
     stubbedGot.withArgs(sinon.match({url: "https://api.wahooligan.com/v1/workouts"})).returns(wahooResponse);
     stubbedGot.withArgs(sinon.match({url: "https://www.polaraccesslink.com/v3/exercises"})).returns(polarResponse);
     res = {
-        send: (JSON)=> {assert.equal(JSON.length, expectedResult.length);},
+        send: (JSON)=> {assert.equal(JSON, "OK");},
         status: (code)=>{assert.equal(code, 200);},
     }
 
     await myFunctions.getActivityList(req, res);
+
+    //now check the database was updated correctly
+    testUserActivities = await admin.firestore()
+    .collection("users")
+    .doc(testDev+testUser)
+    .collection("activities")
+    .get();
+    // cant check called with the right arguments as signiture is always different
+    assert.deepEqual(testUserActivities, expectedTestUserDoc);
+    sinon.restore();
 })
 });
 const polarResponse = {body: '[{"id":"ymeoBNZw","upload_time":"2022-07-28T12:27:50Z","polar_user":"https://www.polaraccesslink.com/v3/users/45395466","device":"Polar Flow app","start_time":"2022-07-28T13:27:37","start_time_utc_offset":60,"duration":"PT6.705S","distance":10.0,"heart_rate":{},"sport":"RUNNING","has_route":true,"detailed_sport_info":"RUNNING"}]'};
