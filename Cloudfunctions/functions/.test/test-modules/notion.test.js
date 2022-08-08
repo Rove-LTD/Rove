@@ -56,7 +56,7 @@ const webhookInBox = require('../../webhookInBox');
         await doc.ref.delete();
     });
 });
-  it('Webhooked activities should be written to the notion endpoint...', async () => {
+  it.only('Webhooked activities should be written to the notion endpoint...', async () => {
     //set up the stubbed response to mimic strava's response when called
     const stravaExercisePayload = require('./strava.json');
     stubbedStravaCall = sinon.stub(stravaApi.activities, "get");
