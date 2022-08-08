@@ -1,3 +1,4 @@
+/* eslint-disable no-useless-catch */
 /* eslint-disable no-prototype-builtins */
 /* eslint-disable no-multi-str */
 /* eslint-disable no-unused-vars */
@@ -226,9 +227,15 @@ exports.getActivityList = functions.https.onRequest(async (req, res) => {
   }
   const start = new Date(parameters.start);
   const end = new Date(parameters.end);
-  if (start == "Invalid Date" || end == "Invalid Date") {
+  if (start == "Invalid Date" || end == "Invalid Date" || start.getTime() > end.getTime()) {
     url =
     "error: the start/end was badly formatted, or missing";
+    res.status(400);
+    res.send(url);
+    return;
+  }
+  if (end.getTime() - start.getTime() > (15*24*60*60*1000)) {
+    url = "error: the start and end time are too far apart";
     res.status(400);
     res.send(url);
     return;
@@ -240,68 +247,54 @@ exports.getActivityList = functions.https.onRequest(async (req, res) => {
   providersConnected["wahoo"] = userDoc.data().hasOwnProperty("wahoo_user_id");
   providersConnected["strava"] = userDoc.data().hasOwnProperty("strava_id");
   // make the request for the services which are authenticated by the user
-  const payload = await requestForDateRange(providersConnected, userDoc, start, end);
-  url = "all checks passing";
+  try {
+    const payload = await requestForDateRange(providersConnected, userDoc, start, end);
+    url = "all checks passing";
+    res.status(200);
+    let currentActivity = "";
+    // write the docs into the database now.
+    for (let i = 0; i < payload.length; i++) {
+      currentActivity = payload[i];
+      db.collection("users").doc(userDoc.id).collection("activities").doc(currentActivity["sanitised"]["activity_id"] + currentActivity["sanitised"]["provider"]).set(payload[i], {merge: true});
+    }
+    res.send("OK");
+  } catch (error) {
+    res.status(400);
+    res.send("There was an error: " + error);
+  }
   // send to Dev first and then store all the activities.
-  res.status(200);
-  res.send("OK");
 });
 
 async function requestForDateRange(providers, userDoc, start, end) {
   // we want to synchronously run these functions together
   // so I will create a .then for each to add to an integer.
   let numOfProviders = 0;
-  let i = 0;
+  const i = 0;
   let activtyList = [];
-  /*
   if (providers["strava"]) {
     numOfProviders ++;
-    getStravaActivityList(start, end, userDoc).then((stravaActivities)=>{
-      i++;
-      activtyList = activtyList.concat(stravaActivities);
-      if (i == numOfProviders) {
-        return activtyList;
-      }
-    });
-  }*/
+    activtyList = activtyList.concat(getStravaActivityList(start, end, userDoc));
+  }
   if (providers["garmin"]) {
     numOfProviders ++;
-    await getGarminActivityList(start, end, userDoc).then((garminActivities)=>{
-      i++;
-      activtyList = activtyList.concat(garminActivities);
-      if (i == numOfProviders) {
-        return activtyList;
-      }
-    });
-  } else {
-    i++;
+    activtyList = activtyList.concat(getGarminActivityList(start, end, userDoc));
   }
-  /*
   // sadly Polar is not available to list activities.
   if (providers["wahoo"]) {
     numOfProviders ++;
-    getWahooActivityList(start, end, userDoc).then((wahooActivities)=>{
-      i++;
-      activtyList = activtyList.concat(wahooActivities);
-      if (i == numOfProviders) {
-        return activtyList;
-      }
-    });
-  } else {
-    i++;
+    activtyList = activtyList.concat(getWahooActivityList(start, end, userDoc));
   }
   if (providers["polar"]) {
     numOfProviders ++;
-    getPolarActivityList(start, end, userDoc).then((polarActivities)=>{
-      i++;
-      activtyList = activtyList.concat(polarActivities);
-      if (i == numOfProviders) {
-        return activtyList;
-      }
-    });
-  } else {
-    i++;
-  }*/
+    activtyList = activtyList.concat(getPolarActivityList(start, end, userDoc));
+  }
+  try {
+    let returnList = await Promise.all(activtyList);
+    returnList = returnList.flat();
+    return returnList;
+  } catch (err) {
+    throw err;
+  }
 }
 async function getWahooActivityList(start, end, userDoc) {
   try {
@@ -314,7 +307,8 @@ async function getWahooActivityList(start, end, userDoc) {
         "Authorization": "Bearer " + accessToken,
       },
     };
-    const activityList = await got.get(options).json();
+    let activityList = await got.get(options);
+    activityList = JSON.parse(activityList.body);
     if (activityList.hasOwnProperty("workouts")) {
       // delivers a list of the last 30 workouts...
       // return a sanitised list
@@ -350,7 +344,8 @@ async function getPolarActivityList(start, end, userDoc) {
       method: "GET",
       headers: headers,
     };
-    const activityList = await got.get(options).json();
+    let activityList = await got.get(options);
+    activityList = JSON.parse(activityList.body);
     const sanitisedList = [];
     for (let i = 0; i<activityList.length; i++) {
       sanitisedList.push({"raw": activityList[i], "sanitised": filters.polarSanatise(activityList[i])});
@@ -371,7 +366,6 @@ async function getPolarActivityList(start, end, userDoc) {
   }
 }
 async function getGarminActivityList(start, end, userDoc) {
-  // include the garmin fetcher here.
   const url = "https://apis.garmin.com/wellness-api/rest/activities";
   const userDocData = await userDoc.data();
   const devId = userDocData["devId"];
@@ -379,9 +373,23 @@ async function getGarminActivityList(start, end, userDoc) {
   const lookup = await secretLookup.data()["secret_lookup"];
   const consumerSecret = configurations[lookup]["consumerSecret"];
   const oAuthConsumerSecret = configurations[lookup]["oauth_consumer_key"];
-  const options = await encodeparams.garminCallOptions(url, "GET", consumerSecret, oAuthConsumerSecret, userDocData["garmin_access_token"], userDocData["garmin_access_token_secret"], {from: start.getTime()/1000, to: end.getTime()/1000});
-  const activityList = await got.get(options);
-  return;
+  let activityList = [];
+  let requestEndTime;
+  // we have to run the API call for each day in the call.
+  while (start.getTime() < end.getTime()) {
+    requestEndTime = new Date(start.getTime() + (24*60*60*1000));
+    const options = await encodeparams.garminCallOptions(url, "GET", consumerSecret, oAuthConsumerSecret, userDocData["garmin_access_token"], userDocData["garmin_access_token_secret"], {from: start.getTime()/1000, to: requestEndTime.getTime()/1000});
+    let currentActivityList = await got.get(options);
+    currentActivityList = JSON.parse(currentActivityList.body);
+    activityList = activityList.concat(currentActivityList);
+    start = new Date(start.getTime() + (24*60*60*1000));
+  }
+  const listOfSanitisedActivities = filters.garminSanitise(activityList);
+  const listOfValidActivities = [];
+  for (let i=0; i< activityList.length; i++) {
+    listOfValidActivities.push({raw: activityList[i], sanitised: listOfSanitisedActivities[i]});
+  }
+  return listOfValidActivities;
 }
 async function getStravaActivityList(start, end, userDoc) {
   const userDocData = await userDoc.data();
