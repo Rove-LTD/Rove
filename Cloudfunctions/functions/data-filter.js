@@ -352,7 +352,7 @@ exports.wahooSanitise = function (activity) {
       "created_at": activity.workout_summary.created_at,
       "updated_at": activity.workout_summary.updated_at,
       "power_avg": activity.workout_summary.power_avg,
-      "file": activity.workout_summary.files.url ?? "",
+      "file": activity.workout_summary.files[0].url ?? "",
       };}
   } else {
     // we dont recognise this event type yet
