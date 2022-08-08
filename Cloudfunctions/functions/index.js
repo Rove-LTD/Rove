@@ -1,3 +1,4 @@
+/* eslint-disable no-useless-catch */
 /* eslint-disable no-prototype-builtins */
 /* eslint-disable no-multi-str */
 /* eslint-disable no-unused-vars */
@@ -246,16 +247,21 @@ exports.getActivityList = functions.https.onRequest(async (req, res) => {
   providersConnected["wahoo"] = userDoc.data().hasOwnProperty("wahoo_user_id");
   providersConnected["strava"] = userDoc.data().hasOwnProperty("strava_id");
   // make the request for the services which are authenticated by the user
-  const payload = await requestForDateRange(providersConnected, userDoc, start, end);
-  url = "all checks passing";
-  res.status(200);
-  let currentActivity = "";
-  // write the docs into the database now.
-  for (let i = 0; i < payload.length; i++) {
-    currentActivity = payload[i];
-    db.collection("users").doc(userDoc.id).collection("activities").doc(currentActivity["sanitised"]["activity_id"] + currentActivity["sanitised"]["provider"]).set(payload[i], {merge: true});
+  try {
+    const payload = await requestForDateRange(providersConnected, userDoc, start, end);
+    url = "all checks passing";
+    res.status(200);
+    let currentActivity = "";
+    // write the docs into the database now.
+    for (let i = 0; i < payload.length; i++) {
+      currentActivity = payload[i];
+      db.collection("users").doc(userDoc.id).collection("activities").doc(currentActivity["sanitised"]["activity_id"] + currentActivity["sanitised"]["provider"]).set(payload[i], {merge: true});
+    }
+    res.send("OK");
+  } catch (error) {
+    res.status(400);
+    res.send("There was an error: " + error);
   }
-  res.send("OK");
   // send to Dev first and then store all the activities.
 });
 
@@ -287,7 +293,7 @@ async function requestForDateRange(providers, userDoc, start, end) {
     returnList = returnList.flat();
     return returnList;
   } catch (err) {
-    return err;
+    throw err;
   }
 }
 async function getWahooActivityList(start, end, userDoc) {
