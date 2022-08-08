@@ -1,5 +1,5 @@
 { "testDev" :  "anotherTestDev",
-  "testUser": "anotherTestUser",
+  "testUser": "paulsTestUser",
   "testNotionDev" :  "9e796cc24091489d97865364dc726b7b",
   "testNotionUser": "notion",
   "firebaseConfig": {
@@ -27,9 +27,9 @@
     "secret_lookup": "roveLiveSecrets",
     "callbackURL": "https://notion.so",
     "deauthorize_endpoint": "",
-    "devKey": "secret_RxAF1yQYpr7swJkAGUxfFKh5EgXg03hFPDjVwJhrOFr",
+    "devKey": "secret_5XB9u3Q58hYDSo6Saj4mJztukVUSZJmpCjzmhJfYegZ",
     "email": "",
-    "endpoint": "9e796cc24091489d97865364dc726b7b"
+    "endpoint": "1e493a63e26f4658854b0f0836de0b28"
   },
   "devUserNotionData": {
     "userId": "notion"

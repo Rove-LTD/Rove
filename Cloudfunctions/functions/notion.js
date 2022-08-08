@@ -4,9 +4,9 @@ const {Client} = require("@notionhq/client");
 
 module.exports = {
   sendToNotionEndpoint: async function(endpoint, developerDoc, sanitisedActivity) {
-    const notion = new Client({auth: developerDoc.data()["devKey"]});
+    const devKey = developerDoc.data()["devKey"];
+    const notion = new Client({auth: devKey});
     const databaseId = endpoint;
-    // console.log(sanitisedActivity.activity_name);
     await formatDatabase();
     await addItem(sanitisedActivity);
     async function addItem(sanitisedActivity) {
@@ -63,7 +63,7 @@ module.exports = {
             "rich_text": [
               {
                 "text": {
-                  "content": sanitisedActivity.data_source,
+                  "content": sanitisedActivity.provider,
                 },
               },
             ],
@@ -78,40 +78,37 @@ module.exports = {
         "database_id": databaseId,
         "properties": {
           "Name": {
-            "title": [
-            ],
+            "title": {},
           },
           "Type": {
-            "rich_text": [
-            ],
+            "rich_text": {},
           },
           "Distance (km)": {
-            "number": [],
+            "number": {},
           },
           "Average Pace (m/s)": {
-            "number": [],
+            "number": {},
           },
           "Calories": {
-            "number": [],
+            "number": {},
           },
           "Duration (mins)": {
-            "number": [],
+            "number": {},
           },
           "Average HR": {
-            "number": [],
+            "number": {},
           },
           "Elevation Gain (m)": {
-            "number": [],
+            "number": {},
           },
           "Elevation Loss (m)": {
-            "number": [],
+            "number": {},
           },
           "Date": {
-            "date": [],
+            "date": {},
           },
           "Data Source": {
-            "rich_text": [
-            ],
+            "rich_text": {},
           },
         },
       },

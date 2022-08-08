@@ -8,15 +8,16 @@
       "polarSecret": "f797c0e1-a39d-4b48-a2d9-89c2baea9005",
       "whaooClientId": "iA2JRS_dBkikcb0uEnHPtb6IDt1vDYNbityEEhp801I",
       "wahooSecret": "w4FvDllcO0zYrnV1-VKR-T2gJ4mYUOiFJuwx-8C-C2I",
-      "wahooWebhookToken": "97661c16-6359-4854-9498-a49c07b6ec11"
+      "wahooWebhookToken": "97661c16-6359-4854-9498-a49c07b6ec11",
+      "stravaSubscriptionId": 217520
     },
     "roveTestSecrets": {
       "consumerSecret": "ffqgs2OxeJkFHUM0c3pGysdCp1Znt0tnc2s",
       "oauth_consumer_key": "eb0a9a22-db68-4188-a913-77ee997924a8",
       "whaooClientId": "IGQW1vInhei9CE_tEyoso2V4COhNOn53AfYGsTx96oA",
       "wahooSecret": "-TQHcASsAk-cTUN3485_oyY6lUqsKhFLLpoKoWrCnHs",
-      "wahooWebhookToken": "348a6fe2-3719-4647-a233-933b8c404d6b"
+      "wahooWebhookToken": "348a6fe2-3719-4647-a233-933b8c404d6b",
+      "stravaSubscriptionId": 217520
     }
   }
 }
-
