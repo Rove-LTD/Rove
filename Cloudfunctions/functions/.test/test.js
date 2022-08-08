@@ -25,6 +25,7 @@ const devTestNotionData = testParameters.devTestNotionData
 const devUserNotionData = testParameters.devUserNotionData
 const test = require('firebase-functions-test')(firebaseConfig, testParameters.testKeyFile);
 const admin = require("firebase-admin");
+const WahooService = require('../.utilities/wahooService');
 // -----------END INITIALISE ROVE TEST PARAMETERS----------------------------//
 
 describe('ROVE full integration test scripts', () => {
@@ -71,7 +72,10 @@ describe('ROVE full integration test scripts', () => {
     require ('./test-modules/polarCallback.test.js');
     require ('./test-modules/wahooCallback.test.js');
     require ('./test-modules/garminCallback.test.js');
-    require ('./test-modules/webhooks.test.js');
+    require ('./test-modules/webhooks-Wahoo.test.js');
+    require ('./test-modules/webhooks-Strava.test.js');
+    require ('./test-modules/webhooks-Garmin.test.js');
+    require ('./test-modules/webhooks-Polar.test.js');
     require ('./test-modules/utility.test.js');
     require ('./test-modules/disconnectServiceFailure.test.js');
     require ('./test-modules/wahooDisconnect.test.js');
@@ -79,7 +83,5 @@ describe('ROVE full integration test scripts', () => {
     require ('./test-modules/polarDisconnect.test.js');
     require ('./test-modules/garminDisconnect.test.js');
     require ('./test-modules/notion.test.js');
-    require ('./test-modules/getActivityList.test.js');
+    //require ('./test-modules/getActivityList.test.js');
 });
-// require ('./test-modules/index.test.js');
-// require ('./test-modules/utility.test.js');
