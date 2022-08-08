@@ -4,4 +4,4 @@ Cloudfunctions/functions/.test/keys/*
 .DS_Store
 Cloudfunctions/functions/.env.yml
 Cloudfunctions/functions/.test/testParameters.json
-Cloudfunctions/functions/.test/testParameters.json
+Cloudfunctions/.firebaserc

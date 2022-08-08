@@ -941,12 +941,13 @@ async function processGarminWebhook(webhookDoc) {
     const userQuery = await db.collection("users")
         .where("garmin_user_id", "==",
             webhookBody.activities[index].userId)
+        .where("garmin_access_token", "==",
+            webhookBody.activities[index].userAccessToken)
         .get();
 
     if (userQuery.docs.length == 0) {
       // there is an issue if there are no users with a userId in the DB.
-      console.log("error: zero users registered to garmin webhook: " + webhookBody.activities[index].userId);
-      throw Error("zero users registered to garmin webhook owner_id "+webhookBody.activities[index].userId);
+      throw Error("zero users registered to garmin webhook userId "+webhookBody.activities[index].userId);
     }
     userQuery.docs.forEach((doc)=> {
       userDocsList.push(doc);
@@ -1296,9 +1297,10 @@ exports.stravaWebhook = functions.https.onRequest(async (request, response) => {
       response.sendStatus(403);
     }
   } else if (request.method === "POST") {
+    const stravaWebhook =
+        configurations["stravaSubscriptions"][request.body.subscription_id];
     // check the webhook token is correct
-    if (request.body.subscription_id !=
-        configurations[configurations.lookup].stravaSubscriptionId) {
+    if (stravaWebhook == undefined) {
       console.log("Strava Webhook event recieved that did not have the correct subscription Id");
       response.status(401);
       response.send("NOT AUTHORISED");
@@ -1306,7 +1308,8 @@ exports.stravaWebhook = functions.https.onRequest(async (request, response) => {
     }
     // save the webhook message and asynchronously process
     try {
-      const webhookDoc = await webhookInBox.push(request, "strava");
+      const webhookDoc = await webhookInBox
+          .push(request, "strava", stravaWebhook["secret_lookup"]);
       response.sendStatus(200);
       // now we have saved the request and returned ok to the provider
       // the message will trigger an asynchronous process
@@ -1322,10 +1325,13 @@ exports.stravaWebhook = functions.https.onRequest(async (request, response) => {
 
 async function processStravaWebhook(webhookDoc) {
   const webhookBody = JSON.parse(webhookDoc.data()["body"]);
+  const lookup = webhookDoc.data()["secret_lookup"];
   const userDocsList = [];
+  const devDocsList = [];
+
   stravaApi.config({
-    "client_id": configurations[configurations.lookup]["stravaClientId"],
-    "client_secret": configurations[configurations.lookup]["stravaClientSecret"],
+    "client_id": configurations[lookup]["stravaClientId"],
+    "client_secret": configurations[lookup]["stravaClientSecret"],
     "redirect_uri": callbackBaseUrl+"/stravaCallback",
   });
   // get userbased on userid. (.where("id" == request.body.owner_id)).
@@ -1333,17 +1339,28 @@ async function processStravaWebhook(webhookDoc) {
   if (webhookBody.aspect_type == "delete") {
     return; // TODO: put in delete logic
   }
+  const devQuery = await db.collection("developers")
+      .where("secret_lookup", "==", lookup)
+      .get();
+  devQuery.docs.forEach((doc)=>{
+    devDocsList.push(doc.id);
+  });
 
   const userQuery = await db.collection("users")
       .where("strava_id", "==", webhookBody.owner_id)
       .get();
-  if (userQuery.docs.length == 0) {
+
+  userQuery.docs.forEach((doc)=>{
+  // exclude devs that are not managed by this webhook subscription
+    if (devDocsList.includes(doc.data()["devId"])) {
+      userDocsList.push(doc);
+    }
+  });
+
+  if (userDocsList.length == 0) {
     // there is an issue if there are no users with a userId in the DB.
     throw Error("zero users registered to strava webhook owner_id "+webhookBody.owner_id);
   }
-  userQuery.docs.forEach((doc)=>{
-    userDocsList.push(doc);
-  });
   // now we have a list of userDoc's that are interested in this
   //  data
   // 1) get data from Strava, 2) sanatise and 3) save and send
@@ -1383,7 +1400,7 @@ async function processStravaWebhook(webhookDoc) {
         .get({"access_token": stravaAccessToken, "id": webhookBody.object_id});
     sanitisedActivity = filters.stravaSanitise([activity]);
   }
-  userDocsList.forEach(async (userDoc)=>{
+  for (const userDoc of userDocsList) {
     sanitisedActivity[0]["userId"] = userDoc.data()["userId"];
     // TODO: this is a bit of a cludge to prevent the userId
     // being written incorrectly in this loop during async
@@ -1396,7 +1413,7 @@ async function processStravaWebhook(webhookDoc) {
       "raw": activity});
     const triesSoFar = 0; // this is our first try to write to developer
     sendToDeveloper(userDoc, localSanitisedActivity, activity, activityDoc, triesSoFar);
-  });
+  }
 }
 
 exports.wahooWebhook = functions.https.onRequest(async (request, response) => {
@@ -1409,8 +1426,9 @@ exports.wahooWebhook = functions.https.onRequest(async (request, response) => {
   // then process asynchronously
   if (request.method === "POST") {
     // check the webhook token is correct
-    if (request.body.webhook_token !=
-        configurations[configurations.lookup].wahooWebhookToken) {
+    const wahooWebhook =
+        configurations["wahooWebhookTokens"][request.body.webhook_token];
+    if (wahooWebhook == undefined) {
       console.log("Wahoo Webhook event recieved that did not have the correct webhook token");
       response.status(401);
       response.send("NOT AUTHORISED");
@@ -1418,7 +1436,8 @@ exports.wahooWebhook = functions.https.onRequest(async (request, response) => {
     }
     // save the webhook message and asynchronously process
     try {
-      const webhookDoc = await webhookInBox.push(request, "wahoo");
+      const webhookDoc = await webhookInBox
+          .push(request, "wahoo", wahooWebhook["secret_lookup"]);
       response.sendStatus(200);
       // now we have saved the request and returned ok to the provider
       // the message will trigger an asynchronous process
@@ -1464,18 +1483,34 @@ exports.processWebhookInBox = functions.firestore
 
 async function processWahooWebhook(webhookDoc) {
   const webhookBody = JSON.parse(webhookDoc.data()["body"]);
+  const lookup = webhookDoc.data()["secret_lookup"];
   const userDocsList = [];
+  const devDocsList = [];
+
+  const devQuery = await db.collection("developers")
+      .where("secret_lookup", "==", lookup)
+      .get();
+  devQuery.docs.forEach((doc)=>{
+    devDocsList.push(doc.id);
+  });
+
   const userQuery = await db.collection("users")
       .where("wahoo_user_id", "==", webhookBody.user.id)
       .get();
-  if (userQuery.docs.length == 0) {
+
+  userQuery.docs.forEach((doc)=>{
+    // exclude devs that are not managed by this webhook subscription
+    if (devDocsList.includes(doc.data()["devId"])) {
+      userDocsList.push(doc);
+    }
+  });
+
+  if (userDocsList.length == 0) {
     // there is an issue if there are no users with a userId in the DB.
     console.log("error: zero users registered to wahoo webhook: " + webhookBody.owner_id);
     throw Error("zero users registered to wahoo webhook owner_id "+webhookBody.user.id);
   }
-  userQuery.docs.forEach((doc)=>{
-    userDocsList.push(doc);
-  });
+
   // now we have a list of user Id's that are interested in this
   //  data
   // 1) sanatise and 2) send
