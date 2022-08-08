@@ -4,7 +4,8 @@ const {Client} = require("@notionhq/client");
 
 module.exports = {
   sendToNotionEndpoint: async function(endpoint, developerDoc, sanitisedActivity) {
-    const notion = new Client({auth: developerDoc.data()["devKey"]});
+    const devKey = developerDoc.data()["devKey"];
+    const notion = new Client({auth: devKey});
     const databaseId = endpoint;
     // console.log(sanitisedActivity.activity_name);
     await formatDatabase();
