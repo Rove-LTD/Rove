@@ -71,18 +71,6 @@ describe("Testing that the developer can call API to getActivityList() and recei
         activityDocs.forEach(async (doc)=>{
             await doc.ref.delete();
         });
-
-        await admin.firestore()
-            .collection("users")
-            .doc(testDev+testUser)
-            .collection("activities").doc().set({
-                raw: {},
-                sanitised: {
-                "start_time": startTime,
-                "userId": testUser,
-                "activity_name": "TestActivity"
-                }
-            })
     });
   it('should get error if the start/end is not correct...', async () => {
       // set the request object with the incorrect provider, correct developerId, devKey and userId
@@ -194,7 +182,7 @@ describe("Testing that the developer can call API to getActivityList() and recei
 it.only('Check that activities are correctly sanitised and concatonated...', async () => {
     // set the request object with the correct provider, developerId and userId
     const req = {
-        url: 'https://us-central1-rovetest-beea7.cloudfunctions.net/getActivityList?devId='+testDev+'&userId='+testUser+'&devKey=test-key&start=2022-07-27T09:15:33.000Z&end=2022-07-29T09:15:33.000Z',
+        url: 'https://us-central1-rovetest-beea7.cloudfunctions.net/getActivityList?devId='+testDev+'&userId='+testUser+'&devKey=test-key&start=2022-07-28T09:15:33.000Z&end=2022-07-29T09:15:33.000Z',
     };
     // let expectedResult = require("./expectedResult.json");
     // let expectedResult;
@@ -212,21 +200,25 @@ it.only('Check that activities are correctly sanitised and concatonated...', asy
     }
 
     await myFunctions.getActivityList(req, res);
+    const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+    await wait(1000);
 
     //now check the database was updated correctly
-    testUserActivities = await admin.firestore()
+    const testUserActivities = await admin.firestore()
     .collection("users")
     .doc(testDev+testUser)
     .collection("activities")
     .get();
+
+    const numOfDocs = testUserActivities.docs.length
     // cant check called with the right arguments as signiture is always different
-    assert.deepEqual(testUserActivities, expectedTestUserDoc);
+    assert.deepEqual(numOfDocs, expectedResult.length);
     sinon.restore();
 })
 });
 const polarResponse = {body: '[{"id":"ymeoBNZw","upload_time":"2022-07-28T12:27:50Z","polar_user":"https://www.polaraccesslink.com/v3/users/45395466","device":"Polar Flow app","start_time":"2022-07-28T13:27:37","start_time_utc_offset":60,"duration":"PT6.705S","distance":10.0,"heart_rate":{},"sport":"RUNNING","has_route":true,"detailed_sport_info":"RUNNING"}]'};
 
-const wahooResponse = {body: '{"workouts":[{"id":161442834,"starts":"2022-07-31T06:17:26.000Z","minutes":0,"name":"Cycling","plan_id":null,"workout_token":"ELEMNT AE48:289","workout_type_id":0,"workout_summary":{"id":153936466,"ascent_accum":"70.0","calories_accum":"540.0","cadence_avg":"87.38","distance_accum":"19636.47","duration_active_accum":"2057.0","duration_paused_accum":"29.0","duration_total_accum":"2086.0","heart_rate_avg":"0.0","power_avg":"263.0","power_bike_np_last":"281.0","power_bike_tss_last":"48.9","speed_avg":"5.15","files":[{"url":"https://cdn.wahooligan.com/wahoo-cloud/production/uploads/workout_file/file/7IrvLZe89WV4QuaEcaCaWA/2022-05-08-080131-ELEMNT_AE48-260-0.fit"}],"created_at":"2022-05-08T11:31:43.000Z","updated_at":"2022-05-11T18:43:01.000Z"},"created_at":"2022-05-08T11:31:43.000Z","updated_at":"2022-05-08T11:31:43.000Z"}],"total":286,"page":1,"per_page":30,"order":"descending","sort":"starts"}'
+const wahooResponse = {body: '{"workouts":[{"id":161442834,"starts":"2022-07-28T12:17:26.000Z","minutes":0,"name":"Cycling","plan_id":null,"workout_token":"ELEMNT AE48:289","workout_type_id":0,"workout_summary":{"id":153936466,"ascent_accum":"70.0","calories_accum":"540.0","cadence_avg":"87.38","distance_accum":"19636.47","duration_active_accum":"2057.0","duration_paused_accum":"29.0","duration_total_accum":"2086.0","heart_rate_avg":"0.0","power_avg":"263.0","power_bike_np_last":"281.0","power_bike_tss_last":"48.9","speed_avg":"5.15","files":[{"url":"https://cdn.wahooligan.com/wahoo-cloud/production/uploads/workout_file/file/7IrvLZe89WV4QuaEcaCaWA/2022-05-08-080131-ELEMNT_AE48-260-0.fit"}],"created_at":"2022-05-08T11:31:43.000Z","updated_at":"2022-05-11T18:43:01.000Z"},"created_at":"2022-05-08T11:31:43.000Z","updated_at":"2022-05-08T11:31:43.000Z"}],"total":286,"page":1,"per_page":30,"order":"descending","sort":"starts"}'
 };
 const garminResponse = {body: '[{"summaryId":"9291942331","activityId":9291942331,"activityName":"Bedford Running","durationInSeconds":1939,"startTimeInSeconds":1659017697,"startTimeOffsetInSeconds":3600,"activityType":"RUNNING","averageHeartRateInBeatsPerMinute":139,"averageRunCadenceInStepsPerMinute":161.01562,"averageSpeedInMetersPerSecond":3.237,"averagePaceInMinutesPerKilometer":5.1488004,"activeKilocalories":407,"deviceName":"forerunner735xt","distanceInMeters":6276.64,"maxHeartRateInBeatsPerMinute":162,"maxPaceInMinute":61.5,"averageSpeedInMetersPerSecond":3.257,"averagePaceInMinutesPerKilometer":5.1171837,"activeKilocalories":630,"deviceName":"forerunner735xt","distanceInMeters":9960.81,"maxHeartRateInBeatsPerMinute":156,"maxPaceInMinutesPerKilometer":4.432624,"maxRunCadenceInStepsPerMinute":172.0,"maxSpeedInMetersPerSecond":3.76,"startingLatitudeInDegree":52.1348465513438,"startingLongitudeInDegree":-0.45787931419909,"steps":8226,"totalElevationGainInMeters":29.151274,"totalElevationLossInMeters":25.90904}]'};
 

@@ -317,7 +317,6 @@ exports.wahooSanitise = function (activity) {
     "elevation_loss": null,
     "provider" : "wahoo",
     // --------TODO: Here is additional data we need to agree on -------
-    "work_accum": activity.workout_summary.work_accum,
     "power_bike_tss_last": activity.workout_summary.power_bike_tss_last,
     "ascent_accum": activity.workout_summary.ascent_accum,
     "power_bike_np_last": activity.workout_summary.power_bike_np_last,
@@ -344,9 +343,8 @@ exports.wahooSanitise = function (activity) {
       "average_cadence" : activity.workout_summary.cadence_avg,
       "elevation_gain" : activity.workout_summary.ascent_accum,
       "elevation_loss": null,
-      "data_source" : "wahoo",
+      "provider" : "wahoo",
       // --------TODO: Here is additional data we need to agree on -------
-      "work_accum": activity.workout_summary.work_accum,
       "power_bike_tss_last": activity.workout_summary.power_bike_tss_last,
       "ascent_accum": activity.workout_summary.ascent_accum,
       "power_bike_np_last": activity.workout_summary.power_bike_np_last,
@@ -354,7 +352,7 @@ exports.wahooSanitise = function (activity) {
       "created_at": activity.workout_summary.created_at,
       "updated_at": activity.workout_summary.updated_at,
       "power_avg": activity.workout_summary.power_avg,
-      "file": activity.workout_summary.file,
+      "file": activity.workout_summary.files.url ?? "",
       };}
   } else {
     // we dont recognise this event type yet

@@ -251,7 +251,7 @@ exports.getActivityList = functions.https.onRequest(async (req, res) => {
   res.status(200);
   let currentActivity = "";
   // write the docs into the database now.
-  for (let i = 0; i< payload.length; i++) {
+  for (let i = 0; i < payload.length; i++) {
     currentActivity = payload[i];
     db.collection("users").doc(userDoc.id).collection("activities").doc(currentActivity["sanitised"]["activity_id"] + currentActivity["sanitised"]["provider"]).set(payload[i], {merge: true});
   }
