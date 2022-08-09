@@ -64,7 +64,6 @@ class PolarService {
       return response;
     }
   }
-
 }
 
 module.exports = PolarService;
