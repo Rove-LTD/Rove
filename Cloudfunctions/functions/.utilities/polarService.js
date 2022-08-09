@@ -42,18 +42,52 @@ class PolarService {
     }
   }
 
-  async makeCall(service, callType) {
+  async createWebhook(url) {
+    this.error = false;
+    this.errorMessage = "";
+    const data = {
+      "events": [
+        "EXERCISE",
+        "SLEEP"
+      ],
+      "url": url
+    }
+    try {
+      const response = await this.makeCall("webhooks", "POST", data);
+      if (this.error) {
+        console.log("error creating webhooks: "+this.error.message);
+        return;
+      } else {
+        console.log("success - created Polar webhook");
+        return response.body;
+      }
+    } catch (error) {
+      this.error = true;
+      this.errorMessage = error;
+      return;
+    }
+  }
+
+  async makeCall(service, callType, data) {
     const options = {
       url: "https://www.polaraccesslink.com/v3/"+service,
       headers: {
         "Authorization": "Basic "+this.base64EncodedString,
+        'Content-Type':'application/json',
+        'Accept':'application/json'
       },
       method: callType,
     };
+    if (data != undefined) {
+      options.body = JSON.stringify(data);
+    }
     let response;
     switch (options.method) {
       case "GET":
         response = await got.get(options);
+        break;
+      case "POST":
+        response = await got.post(options);
         break;
     }
     if (response.statusCode == 200) {

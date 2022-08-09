@@ -13,7 +13,9 @@
       "consumerSecret": "ffqgs2OxeJkFHUM0c3pGysdCp1Znt0tnc2s",
       "oauth_consumer_key": "eb0a9a22-db68-4188-a913-77ee997924a8",
       "whaooClientId": "IGQW1vInhei9CE_tEyoso2V4COhNOn53AfYGsTx96oA",
-      "wahooSecret": "-TQHcASsAk-cTUN3485_oyY6lUqsKhFLLpoKoWrCnHs"
+      "wahooSecret": "-TQHcASsAk-cTUN3485_oyY6lUqsKhFLLpoKoWrCnHs",
+      "polarClientId": "0544732f-0024-4645-a844-6f46ba09fe8d",
+      "polarSecret": "42b1eed7-108c-4ab6-b090-b21e42f1dca1"
     },
     "stravaSubscriptions": {
       "217520": {
@@ -24,6 +26,10 @@
       "e14f5f33-0ffc-4f38-8f7e-8d243337f986": {
         "secret_lookup": "roveLiveSecrets",
         "webhook_id": "wPWwr1P7"
+      },
+      "f20098c4-eeac-4516-8ade-66b0581fadb8": {
+        "secret_lookup": "roveTestSecrets",
+        "webhook_id": "6y8wRGPQ"
       }
     },
     "wahooWebhookTokens": {
