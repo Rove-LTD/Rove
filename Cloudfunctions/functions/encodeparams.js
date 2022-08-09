@@ -102,4 +102,27 @@ module.exports = {
     };
     return options;
   },
+  /**
+   * creates a signature that should match the polar signature
+   * available in the polar webhook messages using the available keys,
+   * the matching key is used to return the secret_lookup for that key.
+   * If non match an string containing "error" is returned.
+   * @param {String} JSONBody
+   * @param {String} polarKeys
+   * @param {String} signature
+   * @return {String} secret_lookup as a string
+   */
+  getLookupFromPolarSignature: function(JSONBody, polarKeys, signature) {
+    let lookup = "error";
+    Object.keys(polarKeys).forEach(function(key) {
+      const calculatedSignature = crypto
+          .createHmac("sha256", key)
+          .update(JSON.stringify(JSONBody))
+          .digest().toString("hex");
+      if (calculatedSignature == signature) {
+        lookup = polarKeys[key]["secret_lookup"];
+      }
+    });
+    return lookup;
+  },
 };

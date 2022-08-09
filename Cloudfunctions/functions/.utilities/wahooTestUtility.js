@@ -1,4 +1,3 @@
-/* eslint-disable require-jsdoc */
 /* eslint-disable max-len */
 /**
  * Utilities.js contains the main functions and callbacks for triggering

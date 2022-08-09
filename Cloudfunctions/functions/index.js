@@ -29,15 +29,6 @@ admin.initializeApp();
 const db = admin.firestore();
 const storage = admin.storage();
 
-
-switch (process.env.GCLOUD_PROJECT) {
-  case "rove-26":
-    configurations.lookup = "roveLiveSecrets";
-    break;
-  case "rovetest-beea7":
-    configurations.lookup = "roveTestSecrets";
-    break;
-}
 const webhookInBox = require("./webhookInBox");
 const oauthWahoo = new OauthWahoo(configurations, db);
 const callbackBaseUrl = "https://us-central1-"+process.env.GCLOUD_PROJECT+".cloudfunctions.net";
@@ -1550,16 +1541,17 @@ exports.polarWebhook = functions.https.onRequest(async (request, response) => {
   }
   if (request.method === "POST") {
     // check the webhook token is correct
-    const valid = true;
-    if (!valid) { // TODO put in validation function
-      console.log("Polar Webhook event recieved that did not have the correct validation");
+    const signature = request.headers["Polar-Webhook-Signature"];
+    const lookup = encodeparams.getLookupFromPolarSignature(request.body, configurations.polarWebhookSecrets, signature);
+    if (lookup == "error") { // TODO put in validation function
+      console.log("Polar Webhook event recieved that did not have a valid signature");
       response.status(401);
       response.send("NOT AUTHORISED");
       return;
     }
     // save the webhook message and asynchronously process
     try {
-      const webhookDoc = await webhookInBox.push(request, "polar");
+      const webhookDoc = await webhookInBox.push(request, "polar", lookup);
       response.sendStatus(200);
       // now we have saved the request and returned ok to the provider
       // the message will trigger an asynchronous process
@@ -1579,18 +1571,34 @@ exports.polarWebhook = functions.https.onRequest(async (request, response) => {
 
 async function processPolarWebhook(webhookDoc) {
   const webhookBody = JSON.parse(webhookDoc.data()["body"]);
+  const lookup = webhookDoc.data()["secret_lookup"];
   const userDocsList = [];
+  const devDocsList = [];
+
+  const devQuery = await db.collection("developers")
+      .where("secret_lookup", "==", lookup)
+      .get();
+  devQuery.docs.forEach((doc)=>{
+    devDocsList.push(doc.id);
+  });
+
   const userQuery = await db.collection("users")
       .where("polar_user_id", "==", webhookBody.user_id)
       .get();
-  if (userQuery.docs.length == 0) {
+
+  userQuery.docs.forEach((doc)=>{
+    // exclude devs that are not managed by this webhook subscription
+    if (devDocsList.includes(doc.data()["devId"])) {
+      userDocsList.push(doc);
+    }
+  });
+
+  if (userDocsList.length == 0) {
     // there is an issue if there are no users with a userId in the DB.
     console.log("error: zero users registered to polar webhook: " + webhookBody.user_id);
     throw Error("zero users registered to polar webhook user_id "+webhookBody.user_id);
   }
-  userQuery.docs.forEach((doc)=>{
-    userDocsList.push(doc);
-  });
+
   // request the exercise information from Polar - the access token is
   // needed for this
   const userToken = userQuery.docs[0].data()["polar_access_token"];

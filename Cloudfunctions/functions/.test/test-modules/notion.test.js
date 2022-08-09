@@ -67,6 +67,7 @@ const webhookInBox = require('../../webhookInBox');
         provider: "strava",
             status: "new",
             method: "POST",
+            secret_lookup: "roveLiveSecrets",
             body: JSON.stringify({"updates":{},"object_type":"activity","object_id":7345142595,"owner_id":"notion_test_strava_id","subscription_id":217520,"aspect_type":"create","event_time":1655824005})
         };
     const snapshot = test.firestore.makeDocumentSnapshot(inboxData, "webhookInBox/testWebhookMessageDocId");

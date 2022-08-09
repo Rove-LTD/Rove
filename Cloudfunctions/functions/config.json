@@ -28,6 +28,9 @@
     },
     "wahooWebhookTokens": {
       "348a6fe2-3719-4647-a233-933b8c404d6b": {
+        "secret_lookup": "roveTestSecrets"
+      },
+      "97661c16-6359-4854-9498-a49c07b6ec11": {
         "secret_lookup": "roveLiveSecrets"
       }
     }
