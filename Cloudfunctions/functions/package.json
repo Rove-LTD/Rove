@@ -18,6 +18,7 @@
     "@notionhq/client": "^2.0.0",
     "firebase-admin": "^10.2.0",
     "firebase-functions": "^3.22.0",
+    "fit-decoder": "^1.0.5",
     "got": "^11.8.5",
     "request": "^2.88.2",
     "strava-v3": "^2.1.0",

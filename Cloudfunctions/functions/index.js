@@ -1385,24 +1385,9 @@ async function getPolarDetailedActivity(userDoc, activityDoc) {
     } else if (sessionsResponse.statusCode == 204) {
       const message = "No activities in the last 30 days";
       console.log(message);
-      const options = {
-        url: "https://www.polaraccesslink.com/v3/users/"+polarId+"/exercise-transactions/"+transactionId,
-        method: "PUT",
-        headers: headers,
-      };
-      const res = await got.put(options);
-      console.log("Comit transaction response: " + res.statusCode);
       return message;
     }
   } catch (error) {
-    // Comit transaction
-    const options = {
-      url: "https://www.polaraccesslink.com/v3/users/"+polarId+"/exercise-transactions/"+transactionId,
-      method: "PUT",
-      headers: headers,
-    };
-    const res = await got.put(options);
-    console.log("Comit transaction response: " + res.statusCode);
     console.log(error);
     return error;
   }
