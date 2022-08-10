@@ -22,6 +22,7 @@ const contentsOfDotEnvFile = require("./config.json");
 const filters = require("./data-filter");
 const fs = require("fs");
 const notion = require("./notion");
+const fitDecoder = require("fit-decoder");
 const configurations = contentsOfDotEnvFile["config"];
 // find a way to decrypt and encrypt this information
 
@@ -1698,6 +1699,363 @@ exports.polarWebhookSetup = functions.https.onRequest(async (req, res) => {
   return;
 });
 
+async function getStravaDetailedActivity(userDoc, activityDoc) {
+  const stravaActivityId = await activityDoc["raw"]["id"];
+  const devId = await userDoc["devId"];
+  const secretLookup = await db.collection("developers").doc(devId).get();
+  const lookup = await secretLookup.data()["secret_lookup"];
+  let streamResponse;
+  stravaApi.config({
+    "client_id": configurations[lookup]["stravaClientId"],
+    "client_secret": configurations[lookup]["stravaClientSecret"],
+    "redirect_uri": callbackBaseUrl+"/stravaCallback",
+  });
+  // delete activities
+  // check if this is the last user with this stravaId and this is not a call from the webhook
+  let accessToken = userDoc["strava_access_token"];
+  const userQueryList = await db.collection("users").
+      where("strava_id", "==", userDoc["strava_id"])
+      .get();
+  if ( userQueryList.docs.length == 1) {
+    if (await checkStravaTokens(userDoc["devId"]+userDoc["userId"], db) == true) {
+      // token out of date, make request for new ones.
+      const payload = await stravaApi.oauth.refreshToken(userDoc["strava_refresh_token"]);
+      await stravaTokenStorage(userDoc["devId"]+userDoc["userId"], payload, db);
+      accessToken = payload["access_token"];
+    }
+    streamResponse = await stravaApi.streams.activity({"access_token": accessToken, "id": stravaActivityId, "types": ["time", "distance", "latlng", "altitude", "velocity_smooth", "heartrate", "cadence", "watts", "temp", "moving", "grade_smooth"], "key_by_type": true});
+  }
+}
+
+async function getPolarDetailedActivity(userDoc, activityDoc) {
+  const polarId = userDoc["polar_user_id"];
+  const exerciseDate = activityDoc["raw"]["start_time"];
+  let exerciseId;
+  const accessToken = userDoc["polar_access_token"];
+  let transactionId;
+  const headers = {
+    "Accept": "application/json", "Authorization": "Bearer " + accessToken,
+  };
+
+  try {
+    // Create transaction
+    const transactionOptions = {
+      url: "https://www.polaraccesslink.com/v3/users/"+polarId+"/exercise-transactions",
+      method: "POST",
+      headers: headers,
+    };
+    const transactionResponse = await got.post(transactionOptions);
+    if (transactionResponse.statusCode == 201) {
+      const transactionResponseObject = JSON.parse(transactionResponse.body);
+      transactionId = String(transactionResponseObject["transaction-id"]);
+    } else if (transactionResponse.statusCode == 204) {
+      const message = "No activities in the last 30 days";
+      console.log(message);
+      const options = {
+        url: "https://www.polaraccesslink.com/v3/users/"+polarId+"/exercise-transactions/"+transactionId,
+        method: "PUT",
+        headers: headers,
+      };
+      const res = await got.put(options);
+      console.log("Comit transaction response: " + res.statusCode);
+      return message;
+    }
+
+    // Get available sessions
+    const sessionsOptions = {
+      url: "https://www.polaraccesslink.com/v3/users/"+polarId+"/exercise-transactions/" + transactionId,
+      method: "GET",
+      headers: headers,
+    };
+    const sessionsResponse = await got.get(sessionsOptions);
+    if (sessionsResponse.statusCode == 200) {
+      const sessionsResponseObject = JSON.parse(sessionsResponse.body);
+      const sessionURLs = sessionsResponseObject["exercises"];
+      // Get session summaries
+      for (let i=0; i<sessionURLs.length; i++) {
+        const options = {
+          url: sessionURLs[i],
+          method: "GET",
+          headers: headers,
+        };
+        const res = await got.get(options);
+        const session = JSON.parse(res.body);
+        if (session["start-time"] == exerciseDate) {
+          exerciseId = session["id"];
+          break;
+        }
+      }
+
+      // Get available samples
+      const fitOptions = {
+        url: "https://www.polaraccesslink.com/v3/users/"+polarId+"/exercise-transactions/"+transactionId+"/exercises/"+exerciseId+"/fit",
+        method: "GET",
+        headers: {
+          "Accept": "*/*", "Authorization": "Bearer " + accessToken,
+        },
+      };
+      const fitFile = await got.get(fitOptions);
+      if (fitFile.statusCode == 200) {
+        const buffer = fitFile.rawBody.buffer;
+        const jsonRaw = fitDecoder.fit2json(buffer);
+        const json = fitDecoder.parseRecords(jsonRaw);
+        const records = json.records;
+        const sanitised = jsonSanitise(records);
+        // Comit transaction
+        const options = {
+          url: "https://www.polaraccesslink.com/v3/users/"+polarId+"/exercise-transactions/"+transactionId,
+          method: "PUT",
+          headers: headers,
+        };
+        const res = await got.put(options);
+        return sanitised;
+      } else {
+        const message = "No activities in the last 30 days";
+        console.log(message);
+        const options = {
+          url: "https://www.polaraccesslink.com/v3/users/"+polarId+"/exercise-transactions/"+transactionId,
+          method: "PUT",
+          headers: headers,
+        };
+        const res = await got.put(options);
+        console.log("Comit transaction response: " + res.statusCode);
+        return message;
+      }
+    } else if (sessionsResponse.statusCode == 204) {
+      const message = "No activities in the last 30 days";
+      console.log(message);
+      return message;
+    }
+  } catch (error) {
+    console.log(error);
+    return error;
+  }
+}
+
+async function getWahooDetailedActivity(userDoc, activityDoc) {
+  try { // or 'https' for https:// URLs
+    const fileLocation = activityDoc["raw"]["file"]["url"];
+    const fitFile = await got.get(fileLocation);
+    const buffer = fitFile.rawBody.buffer;
+    const jsonRaw = fitDecoder.fit2json(buffer);
+    const json = fitDecoder.parseRecords(jsonRaw);
+    const records = json.records;
+    const sanitised = jsonSanitise(records);
+    return sanitised;
+  } catch (error) {
+    console.log(error);
+    return error;
+  }
+}
+
+function jsonSanitise(jsonRecords) {
+  const records = jsonRecords.filter((element) => element["type"] == "record");
+  let summary = jsonRecords.filter((element) => element["type"] == "session");
+  const events = jsonRecords.filter((element) => element["data"]["event"] == "timer");
+  summary = summary[0]["data"];
+  const timerSamples = [];
+  const timestampSamples = [];
+  const distanceSamples = [];
+  const powerSamples = [];
+  const heartRateSamples = [];
+  const speedSamples = [];
+  const altitudeSamples = [];
+  const positionSamples = [];
+  const gradientSamples = [];
+  const calorieSamples = [];
+  const cadenceSamples = [];
+  const acentSamples = [];
+  const decentSamples = [];
+  const sanitisedData = {
+    "summary": {
+      "start_time": null,
+      "total_elapsed_time": null,
+      "total_timer_time": null,
+      "avg_speed": null,
+      "max_speed": null,
+      "total_distance": null,
+      "min_heart_rate": null,
+      "avg_heart_rate": null,
+      "max_heart_rate": null,
+      "min_altitude": null,
+      "avg_altitude": null,
+      "max_altitude": null,
+      "max_neg_grade": null,
+      "avg_grade": null,
+      "max_pos_grade": null,
+      "total_calories": null,
+      "avg_temperature": null,
+      "max_temperature": null,
+      "total_ascent": null,
+      "total_descent": null,
+      "sport": null,
+      "num_laps": null,
+      "threshold_power": null,
+      "workout_type": null,
+    },
+  };
+  // assign arrays
+  records.forEach((_record) => {
+    const record = _record["data"];
+    timestampSamples.push(record["timestamp"]);
+    distanceSamples.push(record["distance"]);
+    powerSamples.push(record["power"]);
+    heartRateSamples.push(record["heart_rate"]);
+    speedSamples.push(record["speed"]);
+    altitudeSamples.push(record["altitude"]);
+    positionSamples.push([record["position_lat"], record["position_long"]]);
+    gradientSamples.push(record["grade"]);
+    calorieSamples.push(record["calories"]);
+    cadenceSamples.push(record["cadence"]);
+    acentSamples.push(record["acent"]);
+    decentSamples.push(record["decent"]);
+  });
+  // assign to samples
+  sanitisedData["samples"]= {
+    "timestampSamples": timestampSamples,
+    "distanceSamples": distanceSamples,
+    "powerSamples": powerSamples,
+    "heartRateSamples": heartRateSamples,
+    "speedSamples": speedSamples,
+    "altitudeSamples": altitudeSamples,
+    "positionSamples": positionSamples,
+    "gradientSamples": gradientSamples,
+    "calorieSamples": calorieSamples,
+    "cadenceSamples": cadenceSamples,
+    "acentSamples": acentSamples,
+    "decentSamples": decentSamples,
+  };
+  // remove undefined samples
+  for (const prop in sanitisedData["samples"]) {
+    if (Object.prototype.hasOwnProperty.call(sanitisedData["samples"], prop)) {
+      let initValue = sanitisedData["samples"][prop].find((element) => element != undefined);
+      if (initValue == undefined) {
+        initValue = null;
+      }
+      for (let i=0; i<sanitisedData["samples"][prop].length; i++) {
+        if (sanitisedData["samples"][prop][i] != undefined) {
+          break;
+        }
+        sanitisedData["samples"][prop][i] = initValue;
+      }
+    }
+  }
+  // add timer samples
+  for (let i=0; i < (events.length-1)/2; i++) {
+    const currEnd = events[2*i+1]["data"]["timestamp"];
+    const currStart = events[2*i]["data"]["timestamp"];
+    let index = timestampSamples.findIndex((element) => element >= currStart);
+    let start;
+    if (index == 0) {
+      start = 0;
+    } else {
+      start = timerSamples[index - 1];
+    }
+    timerSamples.push(start + 1 + (timestampSamples[index] - currStart)/1000);
+    index += 1;
+    while (timestampSamples[index] <= currEnd) {
+      const t0 = timestampSamples[index-1];
+      const t1 = timestampSamples[index];
+      const t = timerSamples[index-1] + (t1 - t0)/1000;
+      timerSamples.push(t);
+      index += 1;
+    }
+  }
+  sanitisedData["samples"]["timerSamples"] = timerSamples;
+  // assign summary data
+  for (const prop in sanitisedData["summary"]) {
+    if (Object.prototype.hasOwnProperty.call(sanitisedData["summary"], prop)) {
+      sanitisedData["summary"][prop] = summary[prop];
+    }
+  }
+  return sanitisedData;
+}
+
+exports.getDetailedActivity = functions.https.onRequest(async (req, res) => {
+  const devId = req.body["devId"];
+  const devKey = req.body["devKey"];
+  const userId = req.body["userId"];
+  const activityId = req.body["activityId"];
+  const userPath = db.collection("users").doc(userId);
+  let userDoc;
+  let activityDoc;
+  let sanitisedDetailedActivity;
+
+  // firt, checking the devId and devKey
+  if (devId != null) {
+    await db.collection("developers").doc(devId).get()
+        .then((docSnapshot) => {
+          if (docSnapshot.exists) {
+            if (docSnapshot.data().devKey != devKey || devKey == null) {
+              res.status(400);
+              res.send("error: the developerId was badly formatted, missing or not authorised");
+              return;
+            }
+          } else {
+            res.status(400);
+            res.send("error: the developerId was badly formatted, missing or not authorised");
+            return;
+          }
+        });
+  } else {
+    res.status(400);
+    res.send("error: the developerId parameter is missing");
+    return;
+  }
+
+  // checking the userId is valid and matches the devId
+  if (userId != null) {
+    await userPath.get()
+        .then((docSnapshot) => {
+          if (docSnapshot.exists) {
+            if (docSnapshot.data().devId != devId) {
+              res.status(400);
+              res.send("error: the userId was badly formatted, missing or nor authorised");
+              return;
+            }
+            userDoc = docSnapshot.data();
+          } else {
+            res.status(400);
+            res.send("error: the userId was badly formatted, missing or nor authorised");
+            return;
+          }
+        });
+  } else {
+    res.status(400);
+    res.send("error: the userId parameter is missing");
+    return;
+  }
+
+  // now check activity exist and get the detailed activity
+  if (activityId != null) {
+    await userPath.collection("activities").doc(activityId).get()
+        .then(async (docSnapshot) => {
+          if (docSnapshot.exists) {
+            activityDoc = docSnapshot.data();
+            const source = activityDoc["sanitised"]["provider"];
+            if (source == "strava") {
+              sanitisedDetailedActivity = await getStravaDetailedActivity(userDoc, activityDoc);
+            } else if (source == "polar") {
+              sanitisedDetailedActivity = await getPolarDetailedActivity(userDoc, activityDoc);
+            } else if (source == "wahoo") {
+              sanitisedDetailedActivity = await getWahooDetailedActivity(userDoc, activityDoc);
+            }
+            // based on source, get detailed activity
+          } else {
+            res.status(400);
+            res.send("error: the activity requested does not exist");
+          }
+        });
+  } else {
+    res.status(400);
+    res.send("error: the activityId parameter is missing");
+    return;
+  }
+  res.status(200);
+  res.send("Complete");
+  return sanitisedDetailedActivity;
+});
+
 exports.createNotionLink = functions.https.onRequest(async (req, res) => {
   const databaseId = (Url.parse(req.url, true).query)["databaseId"];
   const provider = (Url.parse(req.url, true).query)["provider"];
@@ -1895,7 +2253,6 @@ async function createTransactionWithParameters(parameters) {
       .set(parameters);
   return transactionRef.id;
 }
-
 
 // Utility Functions and Constants -----------------------------
 const waitTime = {0: 0, 1: 1, 2: 10, 3: 60}; // time in minutes
