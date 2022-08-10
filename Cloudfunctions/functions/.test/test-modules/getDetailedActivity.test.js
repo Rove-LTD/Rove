@@ -61,7 +61,7 @@ describe("Check the get detailed activity service works: ", () => {
         .collection("activities")
         .doc("stravaActivity")
         .set({
-            "sanitised": {"data_source": "strava"},
+            "sanitised": {"provider": "strava"},
             "raw": {"id": 7530448332}
         });
     await admin.firestore()
@@ -70,8 +70,8 @@ describe("Check the get detailed activity service works: ", () => {
         .collection("activities")
         .doc("polarActivity")
         .set({
-            "sanitised": {"data_source": "polar"},
-            "raw": {"start_time": "2022-08-10T09:50:50"}
+            "sanitised": {"provider": "polar"},
+            "raw": {"start_time": "2022-08-10T11:18:42"}
         });
     await admin.firestore()
         .collection("users")
@@ -81,7 +81,7 @@ describe("Check the get detailed activity service works: ", () => {
         .set({
             "sanitised": {
                 "id": "wahooActivityId",
-                "data_source": "wahoo"
+                "provider": "wahoo"
             },
             "raw": {"file": {"url": "https://cdn.wahooligan.com/wahoo-cloud/production/uploads/workout_file/file/0KNBLnbwOndDYh5MhonDZw/2022-07-07-071356-ELEMNT_AE48-282-0.fit"}}
         });
@@ -127,7 +127,7 @@ describe("Check the get detailed activity service works: ", () => {
         assert.deepEqual(sanitisedActivityJson, expectedResult);
         
     })
-    it("Check Get Polar Detailed Activity Works.", async () => {
+    it.only("Check Get Polar Detailed Activity Works.", async () => {
         req = {
             debug: true,
             url: "https://ourDomain.com",

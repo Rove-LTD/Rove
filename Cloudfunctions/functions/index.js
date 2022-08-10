@@ -1309,7 +1309,6 @@ async function getPolarDetailedActivity(userDoc, activityDoc) {
     if (transactionResponse.statusCode == 201) {
       const transactionResponseObject = JSON.parse(transactionResponse.body);
       transactionId = String(transactionResponseObject["transaction-id"]);
-      console.log(transactionId);
     } else if (transactionResponse.statusCode == 204) {
       const message = "No activities in the last 30 days";
       console.log(message);
@@ -1609,7 +1608,7 @@ exports.getDetailedActivity = functions.https.onRequest(async (req, res) => {
         .then(async (docSnapshot) => {
           if (docSnapshot.exists) {
             activityDoc = docSnapshot.data();
-            const source = activityDoc["sanitised"]["data_source"];
+            const source = activityDoc["sanitised"]["provider"];
             if (source == "strava") {
               sanitisedDetailedActivity = await getStravaDetailedActivity(userDoc, activityDoc);
             } else if (source == "polar") {
