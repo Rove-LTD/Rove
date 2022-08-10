@@ -28,9 +28,11 @@ myFunctions = require('../../index.js');
 // testing processes - these have to have the same constant
 // name as in the function we are testing
 const got = require('got');
+const stravaApi = require("strava-v3");
+const webhookInBox = require('../../webhookInBox');
 //-------------TEST 2--- Test Callbacks from Strava-------
  describe("Check the Strava Disconnect Service works: ", () => {
-  before(async () => {
+  beforeEach(async () => {
     nowInSeconds = new Date()/1000
     notExpiredDate = nowInSeconds+1000;
     await admin.firestore()
@@ -55,7 +57,7 @@ const got = require('got');
             sanitised: {data_source: "strava"}});
 
   });
-  it('Check Strava De-auth webhook works.', async () => {
+  it('Check Strava De-auth webhook saves to the InBox.', async () => {
     req = {
       debug: true,
       url: "https://ourDomain.com",
@@ -64,26 +66,53 @@ const got = require('got');
       body:{"owner_id":12972711,"object_type":"athlete","aspect_type":"update","subscription_id":217520,"object_id":12972711,"updates":{"authorized":"false"},"event_time":1656517720}
     };
     res = {
-      status: (code) => {
-        assert.equal(code, 200);
-      },
-      send: (message) => {
-        assert.equal(message,)
-      }
+      sendStatus: (code)=> {assert.equal(code, 200);},
     }
 
-    // set up stubbed functions
-    testResponse = {
-      json: ()=>{
-        return {"success":"Application has been revoked"};
-      }
-    }
+    // set up stubbed functions - we dont write to the inBox
 
-    const stubbedGot = sinon.stub(got, "delete");
-    stubbedGot.onFirstCall().returns(testResponse);
+    const stubbedWebhookInBox = sinon.stub(webhookInBox, "push");
+    stubbedWebhookInBox.returns("testDoc");
     
     await myFunctions.stravaWebhook(req, res);
+    const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+    await wait(1000);
     // check the got function was called with the correct options
+    // check the wahoo fields were deleted from the database
+    // check the wahoo activities were deleted from the database only for this user
+    assert(stubbedWebhookInBox.calledWithExactly(req, "strava"), "wrong arguments in call");
+
+    sinon.restore();
+  })
+  it('Check Strava De-auth webhook processes the InBox.', async () => {
+    
+    //TODO: turn inboxData to snapshot
+    // set up stubbed functions
+    testResponse = {
+      access_token: "4c68a65e19eb899b8f68aa21e760b074bf035a95"
+    }
+
+    // set up stubs.  dont delete the webhookInBox and don't really deauthorise
+    const stubbedGot = sinon.stub(stravaApi.oauth, "deauthorize");
+    const stubbedWebhookInBox = sinon.stub(webhookInBox, "delete");
+    stubbedGot.onFirstCall().returns(testResponse);
+    
+    //wrap function with snapshot input
+    inboxData = {
+      provider: "strava",
+          status: "new",
+          method: "POST",
+          body: JSON.stringify({"owner_id":12972711,"object_type":"athlete","aspect_type":"update","subscription_id":217520,"object_id":12972711,"updates":{"authorized":"false"},"event_time":1656517720})
+    };
+    const snapshot = test.firestore.makeDocumentSnapshot(inboxData, "webhookInBox/testWebhookMessageDocId");
+
+    wrapped = test.wrap(myFunctions.processWebhookInBox);
+    await wrapped(snapshot);
+
+    const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+    await wait(1000);
+    // check the webhookInBox function was called with the correct args
+    assert(stubbedWebhookInBox.calledOnceWith(snapshot.ref), "webhookInBox called incorrectly");
     // check the wahoo fields were deleted from the database
     // check the wahoo activities were deleted from the database only for this user
     const userDoc = await admin.firestore()
@@ -125,15 +154,15 @@ const got = require('got');
 
     // set up stubbed functions
     testResponse = {
-      json: ()=>{
-        return {"success":"Application has been revoked"};
-      }
-    }
+      access_token: "4c68a65e19eb899b8f68aa21e760b074bf035a95"
+    };
 
-   //const stubbedGot = sinon.stub(got, "delete");
-   //stubbedGot.onFirstCall().returns(testResponse);
+    const stubbedGot = sinon.stub(stravaApi.oauth, "deauthorize");
+    stubbedGot.onFirstCall().returns(testResponse);
     
     await myFunctions.disconnectService(req, res);
+    const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+    await wait(1000);
     // check the got function was called with the correct options
     // check the wahoo fields were deleted from the database
     // check the wahoo activities were deleted from the database only for this user

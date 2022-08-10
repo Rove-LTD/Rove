@@ -60,7 +60,7 @@ describe("Testing that the Garmin callbacks work: ", () => {
       };
       const responseObject2 = {
           statusCode: 200,
-          body: {"userId": "d3315b1072421d0dd7c8f6b8e1de4df8"},
+          body: '{"userId": "test-garmin-user-id"}',
       };
 
       const expectedTestUserDoc = {
@@ -69,6 +69,8 @@ describe("Testing that the Garmin callbacks work: ", () => {
           email: devUserData.email,
           garmin_access_token: "garmin-access-token",
           garmin_access_token_secret: "garmin-test-secret",
+          garmin_user_id: "test-garmin-user-id",
+          garmin_connected: true,
       }
 
       const stubbedcall = sinon.stub(got, "post");

@@ -22,16 +22,14 @@ const test = require('firebase-functions-test')(firebaseConfig, testParameters.t
 const admin = require("firebase-admin");
 myFunctions = require('../../index.js');
 // -----------END INITIALISE ROVE TEST PARAMETERS----------------------------//
-const got = require('got');
-const stravaApi = require("strava-v3");
 
 // ---------REQUIRE FUNCTONS TO BE STUBBED----------------------//
 // include the functions that we are going to be stub in the
 // testing processes - these have to have the same constant
 // name as in the function we are testing
-const request = require('request');
-const strava = require("strava-v3");
+const stravaApi = require("strava-v3");
 const notion = require('../../notion');
+const webhookInBox = require('../../webhookInBox');
 //-------------TEST 2--- Test Callbacks from Strava-------
  describe("Check the notion functions are writing activites to the notion endpoint.", () => {
   before ('set up the userIds in the test User doc', async () => {
@@ -59,27 +57,27 @@ const notion = require('../../notion');
     });
 });
   it('Webhooked activities should be written to the notion endpoint...', async () => {
-    //set up the stubbed response to mimic polar's response when called with the
+    //set up the stubbed response to mimic strava's response when called
     const stravaExercisePayload = require('./strava.json');
     stubbedStravaCall = sinon.stub(stravaApi.activities, "get");
     stubbedStravaCall.onFirstCall().returns(stravaExercisePayload);
-    // set the request object with the correct provider, developerId and userId
-    const req = {
-        debug: true,
-        url: "https://us-central1-rove-26.cloudfunctions.net/stravaWebhook",
-        method: "POST",
-        "body":{"updates":{},"object_type":"activity","object_id":7345142595,"owner_id":"notion_test_strava_id","subscription_id":217520,"aspect_type":"create","event_time":1655824005}
-    };
-    res = {
-        send: (text)=> {assert.equal(text, "OK!");},
-        status: (code)=>{assert.equal(code, 200);},
-    }
+    const stubbedWebhookInBox = sinon.stub(webhookInBox, "delete");
+    //wrap function with snapshot input
+    inboxData = {
+        provider: "strava",
+            status: "new",
+            method: "POST",
+            body: JSON.stringify({"updates":{},"object_type":"activity","object_id":7345142595,"owner_id":"notion_test_strava_id","subscription_id":217520,"aspect_type":"create","event_time":1655824005})
+        };
+    const snapshot = test.firestore.makeDocumentSnapshot(inboxData, "webhookInBox/testWebhookMessageDocId");
 
-    await myFunctions.stravaWebhook(req, res);
-    // check polar was called with the right arguments
-    // assert(stubbedPolarCall.calledWith(), "polar arguments");
+    wrapped = test.wrap(myFunctions.processWebhookInBox);
+    await wrapped(snapshot);
+
     const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
     await wait(1000);
+    // check the webhookInBox function was called with the correct args
+    stubbedWebhookInBox.calledOnceWith(snapshot.ref);
     //now check the database was updated correctly
    const testUserDocs = await admin.firestore()
         .collection("users")
@@ -104,7 +102,7 @@ const notion = require('../../notion');
         average_cadence: "78.5",
         elevation_gain: "446.6",
         elevation_loss:"17.2",
-        data_source: "strava",
+        provider: "strava",
     }
    assert.deepEqual(sanatisedActivity, expectedResults);
    sinon.restore();
