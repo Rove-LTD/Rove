@@ -953,17 +953,9 @@ async function processGarminWebhook(webhookDoc) {
     });
     // save raw and sanitised activites as a backup for each user
     for (const userDoc of userDocsList) {
-      sanitisedActivity["userId"] = userDoc.data()["userId"];
-      // create a local copy of the activity to prevent the userId
-      // being written incorrectly in this loop during async
-      // firebase writes and developer sends.
-      const localSanitisedActivity = JSON.parse(JSON.stringify(sanitisedActivity));
-      const activityDoc = userDoc.ref
-          .collection("activities")
-          .doc();
-      activityDoc.set({"sanitised": localSanitisedActivity, "raw": webhookBody.activities[index]});
-      const triesSoFar = 0; // this is our first try to write to developer
-      sendToDeveloper(userDoc, localSanitisedActivity, webhookBody.activities[index], activityDoc, triesSoFar);
+      saveAndSendActivity(userDoc,
+          sanitisedActivity,
+          webhookBody.activities[index]);
     }
     index=index+1;
   }
@@ -1400,18 +1392,9 @@ async function processStravaWebhook(webhookDoc) {
     sanitisedActivity = filters.stravaSanitise([activity]);
   }
   for (const userDoc of userDocsList) {
-    sanitisedActivity[0]["userId"] = userDoc.data()["userId"];
-    // TODO: this is a bit of a cludge to prevent the userId
-    // being written incorrectly in this loop during async
-    // firebase writes.
-    const localSanitisedActivity = JSON.parse(JSON.stringify(sanitisedActivity[0]));
-    const activityDoc = userDoc.ref
-        .collection("activities")
-        .doc();
-    await activityDoc.set({"sanitised": localSanitisedActivity,
-      "raw": activity});
-    const triesSoFar = 0; // this is our first try to write to developer
-    sendToDeveloper(userDoc, localSanitisedActivity, activity, activityDoc, triesSoFar);
+    saveAndSendActivity(userDoc,
+        sanitisedActivity[0],
+        activity);
   }
 }
 
@@ -1517,18 +1500,9 @@ async function processWahooWebhook(webhookDoc) {
 
   // save raw and sanitised activites as a backup for each user
   for (const userDoc of userDocsList) {
-    sanitisedActivity["userId"] = userDoc.data()["userId"];
-    // create a local copy of the activity to prevent the userId
-    // being written incorrectly in this loop during async
-    // firebase writes and developer sends.
-    const localSanitisedActivity = JSON.parse(JSON.stringify(sanitisedActivity));
-    const activityDoc = userDoc.ref
-        .collection("activities")
-        .doc();
-    activityDoc.set({"sanitised": localSanitisedActivity,
-      "raw": webhookBody});
-    const triesSoFar = 0; // this is our first try to write to developer
-    sendToDeveloper(userDoc, localSanitisedActivity, webhookBody, activityDoc, triesSoFar);
+    saveAndSendActivity(userDoc,
+        sanitisedActivity,
+        webhookBody);
   }
   return;
 }
@@ -1536,13 +1510,18 @@ async function processWahooWebhook(webhookDoc) {
 exports.polarWebhook = functions.https.onRequest(async (request, response) => {
   if (!request.debug) {
     functions.logger.info("----> polar "+request.method+" webhook event received!", {
+      headers: request.headers,
       body: request.body,
     });
   }
   if (request.method === "POST") {
     // check the webhook token is correct
-    const signature = request.headers["Polar-Webhook-Signature"];
-    const lookup = encodeparams.getLookupFromPolarSignature(request.body, configurations.polarWebhookSecrets, signature);
+    const signature = request.headers["polar-webhook-signature"];
+    const lookup = encodeparams
+        .getLookupFromPolarSignature(
+            request.body,
+            configurations.polarWebhookSecrets,
+            signature);
     if (lookup == "error") { // TODO put in validation function
       console.log("Polar Webhook event recieved that did not have a valid signature");
       response.status(401);
@@ -1572,6 +1551,10 @@ exports.polarWebhook = functions.https.onRequest(async (request, response) => {
 async function processPolarWebhook(webhookDoc) {
   const webhookBody = JSON.parse(webhookDoc.data()["body"]);
   const lookup = webhookDoc.data()["secret_lookup"];
+  if (webhookBody.event === "PING") {
+    console.log("polar webhook message event = PING, do nothing");
+    return;
+  }
   const userDocsList = [];
   const devDocsList = [];
 
@@ -1618,6 +1601,8 @@ async function processPolarWebhook(webhookDoc) {
     const contents = fitFile.body;
     // storing FIT file in bucket under activityId.fit
     const storageRef = storage.bucket("gs://rovetest-beea7.appspot.com/");
+    // TODO: shouldn't this be the default bucket without an argument?
+    // then live will use live storage and test will use test storage?
     await storageRef.file("public/"+webhookBody.entity_id+".fit").save(contents);
     // create signed URL for developer to download file.
     const urlOptions = {
@@ -1628,25 +1613,48 @@ async function processPolarWebhook(webhookDoc) {
     const downloadURL = await storageRef.file("public/"+webhookBody.entity_id+".fit").getSignedUrl(urlOptions);
 
     const sanitisedActivity = filters.polarSanatise(activity);
+    // add fit file URL to the sanitised activity
     sanitisedActivity["file"] = {"url": downloadURL[0]};
     // write sanitised information and raw information to each user and then
     // send to developer
     for (const userDoc of userDocsList) {
       sanitisedActivity["userId"] = userDoc.data()["userId"];
-      // add fit file URL to the sanitised activity
-      // create a local copy of the activity to prevent the userId
-      // being written incorrectly in this loop during async
-      // firebase writes and developer sends.
-      const localSanitisedActivity = JSON.parse(JSON.stringify(sanitisedActivity));
-      const activityDoc = userDoc.ref
-          .collection("activities")
-          .doc();
-      activityDoc.set({"sanitised": localSanitisedActivity, "raw": activity});
-      const triesSoFar = 0; // this is our first try to write to developer
-      sendToDeveloper(userDoc, localSanitisedActivity, activity, activityDoc, triesSoFar);
+      saveAndSendActivity(userDoc, sanitisedActivity, activity);
     }
   } else {
-    throw Error("Polar activity type "+webhookBody.event+" not recognised");
+    throw Error("Polar activity type "+webhookBody.event+" not supported");
+  }
+}
+/**
+ * checks if a duplicate and if not then
+ * saves the activity to the user collection
+ * then sends to the developer.
+ * @param {FirebaseFirestore} userDoc
+ * @param {Map} sanitisedActivity
+ * @param {Map} activity
+ */
+async function saveAndSendActivity(userDoc,
+    sanitisedActivity,
+    activity) {
+  // tag the sanitised activty with the userId
+  sanitisedActivity["userId"] = userDoc.data()["userId"];
+  // create a local copy of the activity to prevent the userId
+  // being written incorrectly in this loop during async
+  // firebase writes and developer sends.
+  const localSanitisedActivity =
+      JSON.parse(JSON.stringify(sanitisedActivity));
+  const activityDoc = userDoc.ref
+      .collection("activities")
+      .doc(sanitisedActivity.activity_id+sanitisedActivity.provider);
+
+  const doc = await activityDoc.get();
+
+  if (!doc.exists) {
+    activityDoc.set({"sanitised": localSanitisedActivity, "raw": activity});
+    const triesSoFar = 0; // this is our first try to write to developer
+    sendToDeveloper(userDoc, localSanitisedActivity, activity, activityDoc, triesSoFar);
+  } else {
+    console.log("duplicate activity - not written or sent");
   }
 }
 

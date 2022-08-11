@@ -9,8 +9,14 @@
  const configurations = contentsOfDotEnvFile["config"];
  // find a way to decrypt and encrypt this information
 
- const args = process.argv
-const polarService = new PolarService(configurations, "roveTestSecrets");
+const args = process.argv
+let lookup;
+if (args[3] == "live") {
+  lookup = "roveLiveSecrets";
+} else {
+  lookup = "roveTestSecrets";
+}
+const polarService = new PolarService(configurations, lookup);
 
 if (args.length > 2){
   switch (args[2]) {
@@ -22,7 +28,7 @@ if (args.length > 2){
       break;
   }
 } else {
-  console.log("commands are: getWebhooks, createWebhooks");
+  console.log("usage: \ngetWebhooks <live/test> - get webhooks for the test or live environment \ncreateWebhooks - create webhook for the test environment");
 }
 
 async function getWebhooks() {

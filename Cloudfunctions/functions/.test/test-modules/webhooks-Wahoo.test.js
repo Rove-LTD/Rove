@@ -97,8 +97,8 @@ describe("Testing that the Wahoo Webhooks work: ", () => {
     await wait(1000);
     // check the webhookInBox was called correctly
     args = stubbedWebhookInBox.getCall(0).args; //this first call
-    assert(stubbedWebhookInBox.calledOnceWithExactly(req, "wahoo", "roveLiveSecrets"),
-            "webhookInBox called with wrong args");
+    assert(stubbedWebhookInBox.calledOnceWithExactly(req, "wahoo", "roveTestSecrets"),
+            "webhookInBox called with wrong args: "+args);
 
     });
     it('read webhookInBox event and process it successfully...', async () => {
