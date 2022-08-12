@@ -16,14 +16,12 @@
       "**/.*",
       "**/node_modules/**"
     ],
-    "hosting": {
-      "rewrites": [ {
-        "source": "/createNotionLink",
-        "function": "createNotionLink"
-      },
-      {
-        "source": "/connectService",
-        "function": "connectService"
-      }]
-  }
+    "rewrites": [ {
+      "source": "/createNotionLink",
+      "function": "createNotionLink"
+    },
+    {
+      "source": "/connectService",
+      "function": "connectService"
+    }]
 }}
