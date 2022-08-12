@@ -61,6 +61,7 @@ describe("Testing that the strava Webhooks work: ", () => {
       successfulWebhookMessage = {
             provider: "strava",
             method: "POST",
+            secret_lookup: "roveLiveSecrets",
             body: '{"updates":{},"object_type":"activity","object_id":7345142595,"owner_id":"test_strava_id","subscription_id":217520,"aspect_type":"create","event_time":1655824005}',
             status: "added before the tests to be successful",
         }
@@ -68,6 +69,7 @@ describe("Testing that the strava Webhooks work: ", () => {
             unsuccessfulWebhookMessage = {
                 provider: "strava",
                 method: "POST",
+                secret_lookup: "roveLiveSecrets",
                 body: '{"updates":{},"object_type":"activity","object_id":7345142595,"owner_id":"incorrect_strava_id","subscription_id":217520,"aspect_type":"create","event_time":1655824005}',
                 status: "added before the tests to be successful",
             }
@@ -96,7 +98,7 @@ describe("Testing that the strava Webhooks work: ", () => {
         await myFunctions.stravaWebhook(req, res);
 
         // check the webhookInBox was called correctly
-        assert(stubbedWebhookInBox.calledOnceWithExactly(req, "strava"),
+        assert(stubbedWebhookInBox.calledOnceWithExactly(req, "strava", "roveLiveSecrets"),
                 "webhookInBox called with wrong args");
         sinon.restore();
 
