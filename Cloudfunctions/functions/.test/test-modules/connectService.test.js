@@ -184,7 +184,7 @@ describe("Testing that the developer can call API to connectService() and receiv
       // set the assertions for the expected response object
       const res = {
         redirect: (url) => {
-              assert.include(url,"https://us-central1-rovetest-beea7.cloudfunctions.net/redirectPage?transactionId=");
+              assert.include(url,"https://rovetest-beea7.web.app?transactionId=");
               assert.include(url, "&provider=wahoo");
               assert.include(url, "&devId="+testDev);
               assert.include(url, "?transactionId=");
@@ -196,33 +196,12 @@ describe("Testing that the developer can call API to connectService() and receiv
   })
   it('the redirect function should send the HTML page needed', async () => {
     let count = 0;
-    const htmlPage = await fs.promises.readFile("redirectPage.html");
+    const htmlPage = await fs.promises.readFile("/Users/Alex/Desktop/FlutterDev/RoveAPI/Cloudfunctions/redirectPage/index.html");
 
     // set the request object with the correct provider, developerId and userId
-    const req = {url: 'https://us-central1-rovetest-beea7.cloudfunctions.net/redirectPage?transactionId=testTransactionId&devId='+testDev+'&devKey=test-key&provider=wahoo'};
+    const req = {url: 'https://rovetest-beea7.web.app?transactionId=testTransactionId&devId='+testDev+'&devKey=test-key&provider=wahoo'};
     // set the assertions for the expected response object
-    const res = {
-      writeHead: (code, content)=>{
-        // could put assert here
-        assert.equal(code, 200);
-        assert.deepEqual(content, {"Content-Type": "text/html"} );
-      },
-      write: (html) => {
-        if (count == 0) { // first time write is called
-          assert.deepEqual(html, htmlPage);
-        } else if (count == 1) { // second time write is called
-          assert.equal(html, "<h2 style='text-align: center;font-family:DM Sans'>Data integrations provider for "+testDev+"</h2>\
-  <h2 style='text-align: center;font-family:DM Sans'>To authenticate wahoo click <a href=/connectService?transactionId=testTransactionId&isRedirect=true>here</a></h2>");
-        } else {
-          assert.equal(count, 1, "write should only be called twice");
-        }
-        count = count+1;
-      },
-      end: ()=>{
-        //could put an assert here
-      }
-    }
-
-    await myFunctions.redirectPage(req, res);
+    const response = await got(req);
+    assert.equal(response.body, htmlPage);
   });
 });
