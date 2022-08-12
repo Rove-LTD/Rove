@@ -138,7 +138,7 @@ exports.connectService = functions.https.onRequest(async (req, res) => {
   // redirect to splash page if isRedirect is not set
   if (isRedirect == undefined || isRedirect == false) {
     // call redirect with the transaction id
-    res.redirect("rovetest-beea7.web.app?transactionId="+transactionId+"&provider="+parameters.provider+"&devId="+parameters.devId+"&userId="+parameters.userId);
+    res.redirect("https://rovetest-beea7.web.app?transactionId="+transactionId+"&provider="+parameters.provider+"&devId="+parameters.devId+"&userId="+parameters.userId);
     return;
   }
 
