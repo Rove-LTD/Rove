@@ -587,6 +587,9 @@ async function deleteGarminActivity(userDoc, webhookCall) {
         where("garmin_access_token",
             "==",
             userDoc.data()["garmin_access_token"])
+        .where("garmin_user_id",
+            "==",
+            userDoc.data()["garmin_user_id"])
         .get();
     if (userQueryList.docs.length == 1) {
     // send post to garmin to de-auth.
@@ -612,8 +615,7 @@ async function deleteGarminActivity(userDoc, webhookCall) {
     activities.forEach(async (doc)=>{
       await doc.ref.delete();
     });
-    await sendToDeauthoriseWebhook(userDoc);
-    return 200; // 200 success, 400 failure
+    return await sendToDeauthoriseWebhook(userDoc, "garmin", 0);
   } catch (error) {
     return 400;
   }
@@ -764,7 +766,7 @@ async function sendToDeauthoriseWebhook(userDoc, provider, triesSoFar) {
   if (endpoint == undefined || endpoint == null) {
     // cannot send to developer as endpoint does not exist
     console.log("Cannot send deauthorise payload to "+devId+" endpoint not provided");
-    return;
+    return 400;
   }
   const options = {
     method: "POST",
@@ -783,10 +785,11 @@ async function sendToDeauthoriseWebhook(userDoc, provider, triesSoFar) {
     if (triesSoFar <= MaxRetries) {
       console.log("retrying sending to developer");
       await wait(waitTime[triesSoFar]);
-      sendToDeauthoriseWebhook(userDoc, provider, triesSoFar+1);
+      return await sendToDeauthoriseWebhook(userDoc, provider, triesSoFar+1);
     } else {
       // max retries email developer
       console.log("max retries on sending deauthorisation to developer reached - fail");
+      return 400;
     }
   }
 }
@@ -878,13 +881,31 @@ async function successDevCallback(transactionData) {
 }
 exports.garminDeregistrations = functions.https.onRequest(async (req, res) => {
   // here we are handed a list of de-registrations with userIds and userAccessTokens.
-  const deRegistrations = req.body["deregistrations"];
-  for (let i=0; i<deRegistrations.length; i++) {
-    const userQuery = await db.collection("users").where("garmin_access_token", "==", deRegistrations[i]["userAccessToken"]).get();
-    userQuery.docs.forEach(async (doc) =>{
-      const response = await deleteGarminActivity(doc, true);
-      res.send(response);
+  if (!req.debug) {
+    functions.logger.info("----> garmin "+req.method+" deregistration webhook event received!", {
+      body: req.body,
     });
+  }
+  const deRegistrations = req.body["deregistrations"];
+  const responses = [];
+  for (let i=0; i<deRegistrations.length; i++) {
+    const userQuery = await db.collection("users")
+        .where("garmin_access_token",
+            "==",
+            deRegistrations[i]["userAccessToken"])
+        .where("garmin_user_id",
+            "==",
+            deRegistrations[i]["userId"])
+        .get();
+    for (const doc of userQuery.docs) {
+      const response = await deleteGarminActivity(doc, true);
+      responses.push(response);
+    }
+  }
+  if (responses.every((value) => value == 200)) {
+    res.sendStatus(200);
+  } else {
+    res.sendStatus(400);
   }
 });
 
