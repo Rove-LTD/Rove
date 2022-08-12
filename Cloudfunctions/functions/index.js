@@ -30,7 +30,6 @@ admin.initializeApp();
 const db = admin.firestore();
 const storage = admin.storage();
 
-
 switch (process.env.GCLOUD_PROJECT) {
   case "rove-26":
     configurations.lookup = "roveLiveSecrets";
@@ -48,7 +47,7 @@ const callbackBaseUrl = "https://us-central1-"+process.env.GCLOUD_PROJECT+".clou
 // we recieve auth token from strava to stravaCallBack.
 // tokens stored under userId
 
-exports.redirectPage = functions.https.onRequest( async (req, res) => {
+/* exports.redirectPage = functions.https.onRequest( async (req, res) => {
   const transactionId = (Url.parse(req.url, true).query)["transactionId"];
   const provider = (Url.parse(req.url, true).query)["provider"];
   let devId = (Url.parse(req.url, true).query)["devId"];
@@ -57,13 +56,16 @@ exports.redirectPage = functions.https.onRequest( async (req, res) => {
     devId = "Notion Templates";
   }
   const params = "?transactionId="+transactionId+"&isRedirect=true";
-  const html = await fs.promises.readFile("redirectPage.html");
+  const html = fs.readFileSync("redirectPage/index.html");
+  // html.replace("***", devId);
+  // html.replace("https://domain.ext/path", "/connectService"+params);
+  // res.write(html);
+  // res.write("<h2 style='text-align: center;font-family:DM Sans'>Data integrations provider for "+devId+"</h2>\
+  // <h2 style='text-align: center;font-family:DM Sans'>To authenticate "+provider+" click <a href=/connectService"+params+">here</a></h2>");
   res.writeHead(200, {"Content-Type": "text/html"});
-  res.write(html);
-  res.write("<h2 style='text-align: center;font-family:DM Sans'>Data integrations provider for "+devId+"</h2>\
-  <h2 style='text-align: center;font-family:DM Sans'>To authenticate "+provider+" click <a href=/connectService"+params+">here</a></h2>");
+  res.sendFile(html);
   res.end();
-});
+}); */
 
 exports.connectService = functions.https.onRequest(async (req, res) => {
   // Dev calls this service with parameters: user-id, dev-id, service to
@@ -136,7 +138,7 @@ exports.connectService = functions.https.onRequest(async (req, res) => {
   // redirect to splash page if isRedirect is not set
   if (isRedirect == undefined || isRedirect == false) {
     // call redirect with the transaction id
-    res.redirect(callbackBaseUrl+"/redirectPage?transactionId="+transactionId+"&provider="+parameters.provider+"&devId="+parameters.devId+"&userId="+parameters.userId);
+    res.redirect("rovetest-beea7.web.app?transactionId="+transactionId+"&provider="+parameters.provider+"&devId="+parameters.devId+"&userId="+parameters.userId);
     return;
   }
 
