@@ -28,7 +28,7 @@ myFunctions = require('../../index.js');
 // testing processes - these have to have the same constant
 // name as in the function we are testing
 const stravaApi = require("strava-v3");
-const notion = require('../../notion');
+const notion = require('../../notion.js');
 const webhookInBox = require('../../webhookInBox');
 //-------------TEST 2--- Test Callbacks from Strava-------
  describe("Check the notion functions are writing activites to the notion endpoint.", () => {
@@ -62,6 +62,8 @@ const webhookInBox = require('../../webhookInBox');
     stubbedStravaCall = sinon.stub(stravaApi.activities, "get");
     stubbedStravaCall.onFirstCall().returns(stravaExercisePayload);
     const stubbedWebhookInBox = sinon.stub(webhookInBox, "delete");
+    const stubbedNotion = sinon.stub(notion, "sendToNotionEndpoint");
+    stubbedNotion.onCall().returns("successful value");
     //wrap function with snapshot input
     inboxData = {
         provider: "strava",
