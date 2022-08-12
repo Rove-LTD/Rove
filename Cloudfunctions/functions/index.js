@@ -30,15 +30,6 @@ admin.initializeApp();
 const db = admin.firestore();
 const storage = admin.storage();
 
-
-switch (process.env.GCLOUD_PROJECT) {
-  case "rove-26":
-    configurations.lookup = "roveLiveSecrets";
-    break;
-  case "rovetest-beea7":
-    configurations.lookup = "roveTestSecrets";
-    break;
-}
 const webhookInBox = require("./webhookInBox");
 const oauthWahoo = new OauthWahoo(configurations, db);
 const callbackBaseUrl = "https://us-central1-"+process.env.GCLOUD_PROJECT+".cloudfunctions.net";
@@ -950,29 +941,22 @@ async function processGarminWebhook(webhookDoc) {
     const userQuery = await db.collection("users")
         .where("garmin_user_id", "==",
             webhookBody.activities[index].userId)
+        .where("garmin_access_token", "==",
+            webhookBody.activities[index].userAccessToken)
         .get();
 
     if (userQuery.docs.length == 0) {
       // there is an issue if there are no users with a userId in the DB.
-      console.log("error: zero users registered to garmin webhook: " + webhookBody.activities[index].userId);
-      throw Error("zero users registered to garmin webhook owner_id "+webhookBody.activities[index].userId);
+      throw Error("zero users registered to garmin webhook userId "+webhookBody.activities[index].userId);
     }
     userQuery.docs.forEach((doc)=> {
       userDocsList.push(doc);
     });
     // save raw and sanitised activites as a backup for each user
     for (const userDoc of userDocsList) {
-      sanitisedActivity["userId"] = userDoc.data()["userId"];
-      // create a local copy of the activity to prevent the userId
-      // being written incorrectly in this loop during async
-      // firebase writes and developer sends.
-      const localSanitisedActivity = JSON.parse(JSON.stringify(sanitisedActivity));
-      const activityDoc = userDoc.ref
-          .collection("activities")
-          .doc();
-      activityDoc.set({"sanitised": localSanitisedActivity, "raw": webhookBody.activities[index]});
-      const triesSoFar = 0; // this is our first try to write to developer
-      sendToDeveloper(userDoc, localSanitisedActivity, webhookBody.activities[index], activityDoc, triesSoFar);
+      saveAndSendActivity(userDoc,
+          sanitisedActivity,
+          webhookBody.activities[index]);
     }
     index=index+1;
   }
@@ -1305,9 +1289,10 @@ exports.stravaWebhook = functions.https.onRequest(async (request, response) => {
       response.sendStatus(403);
     }
   } else if (request.method === "POST") {
+    const stravaWebhook =
+        configurations["stravaSubscriptions"][request.body.subscription_id];
     // check the webhook token is correct
-    if (request.body.subscription_id !=
-        configurations[configurations.lookup].stravaSubscriptionId) {
+    if (stravaWebhook == undefined) {
       console.log("Strava Webhook event recieved that did not have the correct subscription Id");
       response.status(401);
       response.send("NOT AUTHORISED");
@@ -1315,7 +1300,8 @@ exports.stravaWebhook = functions.https.onRequest(async (request, response) => {
     }
     // save the webhook message and asynchronously process
     try {
-      const webhookDoc = await webhookInBox.push(request, "strava");
+      const webhookDoc = await webhookInBox
+          .push(request, "strava", stravaWebhook["secret_lookup"]);
       response.sendStatus(200);
       // now we have saved the request and returned ok to the provider
       // the message will trigger an asynchronous process
@@ -1331,10 +1317,13 @@ exports.stravaWebhook = functions.https.onRequest(async (request, response) => {
 
 async function processStravaWebhook(webhookDoc) {
   const webhookBody = JSON.parse(webhookDoc.data()["body"]);
+  const lookup = webhookDoc.data()["secret_lookup"];
   const userDocsList = [];
+  const devDocsList = [];
+
   stravaApi.config({
-    "client_id": configurations[configurations.lookup]["stravaClientId"],
-    "client_secret": configurations[configurations.lookup]["stravaClientSecret"],
+    "client_id": configurations[lookup]["stravaClientId"],
+    "client_secret": configurations[lookup]["stravaClientSecret"],
     "redirect_uri": callbackBaseUrl+"/stravaCallback",
   });
   // get userbased on userid. (.where("id" == request.body.owner_id)).
@@ -1342,17 +1331,28 @@ async function processStravaWebhook(webhookDoc) {
   if (webhookBody.aspect_type == "delete") {
     return; // TODO: put in delete logic
   }
+  const devQuery = await db.collection("developers")
+      .where("secret_lookup", "==", lookup)
+      .get();
+  devQuery.docs.forEach((doc)=>{
+    devDocsList.push(doc.id);
+  });
 
   const userQuery = await db.collection("users")
       .where("strava_id", "==", webhookBody.owner_id)
       .get();
-  if (userQuery.docs.length == 0) {
+
+  userQuery.docs.forEach((doc)=>{
+  // exclude devs that are not managed by this webhook subscription
+    if (devDocsList.includes(doc.data()["devId"])) {
+      userDocsList.push(doc);
+    }
+  });
+
+  if (userDocsList.length == 0) {
     // there is an issue if there are no users with a userId in the DB.
     throw Error("zero users registered to strava webhook owner_id "+webhookBody.owner_id);
   }
-  userQuery.docs.forEach((doc)=>{
-    userDocsList.push(doc);
-  });
   // now we have a list of userDoc's that are interested in this
   //  data
   // 1) get data from Strava, 2) sanatise and 3) save and send
@@ -1392,20 +1392,11 @@ async function processStravaWebhook(webhookDoc) {
         .get({"access_token": stravaAccessToken, "id": webhookBody.object_id});
     sanitisedActivity = filters.stravaSanitise([activity]);
   }
-  userDocsList.forEach(async (userDoc)=>{
-    sanitisedActivity[0]["userId"] = userDoc.data()["userId"];
-    // TODO: this is a bit of a cludge to prevent the userId
-    // being written incorrectly in this loop during async
-    // firebase writes.
-    const localSanitisedActivity = JSON.parse(JSON.stringify(sanitisedActivity[0]));
-    const activityDoc = userDoc.ref
-        .collection("activities")
-        .doc();
-    await activityDoc.set({"sanitised": localSanitisedActivity,
-      "raw": activity});
-    const triesSoFar = 0; // this is our first try to write to developer
-    sendToDeveloper(userDoc, localSanitisedActivity, activity, activityDoc, triesSoFar);
-  });
+  for (const userDoc of userDocsList) {
+    saveAndSendActivity(userDoc,
+        sanitisedActivity[0],
+        activity);
+  }
 }
 
 exports.wahooWebhook = functions.https.onRequest(async (request, response) => {
@@ -1418,8 +1409,9 @@ exports.wahooWebhook = functions.https.onRequest(async (request, response) => {
   // then process asynchronously
   if (request.method === "POST") {
     // check the webhook token is correct
-    if (request.body.webhook_token !=
-        configurations[configurations.lookup].wahooWebhookToken) {
+    const wahooWebhook =
+        configurations["wahooWebhookTokens"][request.body.webhook_token];
+    if (wahooWebhook == undefined) {
       console.log("Wahoo Webhook event recieved that did not have the correct webhook token");
       response.status(401);
       response.send("NOT AUTHORISED");
@@ -1427,7 +1419,8 @@ exports.wahooWebhook = functions.https.onRequest(async (request, response) => {
     }
     // save the webhook message and asynchronously process
     try {
-      const webhookDoc = await webhookInBox.push(request, "wahoo");
+      const webhookDoc = await webhookInBox
+          .push(request, "wahoo", wahooWebhook["secret_lookup"]);
       response.sendStatus(200);
       // now we have saved the request and returned ok to the provider
       // the message will trigger an asynchronous process
@@ -1473,18 +1466,34 @@ exports.processWebhookInBox = functions.firestore
 
 async function processWahooWebhook(webhookDoc) {
   const webhookBody = JSON.parse(webhookDoc.data()["body"]);
+  const lookup = webhookDoc.data()["secret_lookup"];
   const userDocsList = [];
+  const devDocsList = [];
+
+  const devQuery = await db.collection("developers")
+      .where("secret_lookup", "==", lookup)
+      .get();
+  devQuery.docs.forEach((doc)=>{
+    devDocsList.push(doc.id);
+  });
+
   const userQuery = await db.collection("users")
       .where("wahoo_user_id", "==", webhookBody.user.id)
       .get();
-  if (userQuery.docs.length == 0) {
+
+  userQuery.docs.forEach((doc)=>{
+    // exclude devs that are not managed by this webhook subscription
+    if (devDocsList.includes(doc.data()["devId"])) {
+      userDocsList.push(doc);
+    }
+  });
+
+  if (userDocsList.length == 0) {
     // there is an issue if there are no users with a userId in the DB.
     console.log("error: zero users registered to wahoo webhook: " + webhookBody.owner_id);
     throw Error("zero users registered to wahoo webhook owner_id "+webhookBody.user.id);
   }
-  userQuery.docs.forEach((doc)=>{
-    userDocsList.push(doc);
-  });
+
   // now we have a list of user Id's that are interested in this
   //  data
   // 1) sanatise and 2) send
@@ -1492,18 +1501,9 @@ async function processWahooWebhook(webhookDoc) {
 
   // save raw and sanitised activites as a backup for each user
   for (const userDoc of userDocsList) {
-    sanitisedActivity["userId"] = userDoc.data()["userId"];
-    // create a local copy of the activity to prevent the userId
-    // being written incorrectly in this loop during async
-    // firebase writes and developer sends.
-    const localSanitisedActivity = JSON.parse(JSON.stringify(sanitisedActivity));
-    const activityDoc = userDoc.ref
-        .collection("activities")
-        .doc();
-    activityDoc.set({"sanitised": localSanitisedActivity,
-      "raw": webhookBody});
-    const triesSoFar = 0; // this is our first try to write to developer
-    sendToDeveloper(userDoc, localSanitisedActivity, webhookBody, activityDoc, triesSoFar);
+    saveAndSendActivity(userDoc,
+        sanitisedActivity,
+        webhookBody);
   }
   return;
 }
@@ -1511,21 +1511,27 @@ async function processWahooWebhook(webhookDoc) {
 exports.polarWebhook = functions.https.onRequest(async (request, response) => {
   if (!request.debug) {
     functions.logger.info("----> polar "+request.method+" webhook event received!", {
+      headers: request.headers,
       body: request.body,
     });
   }
   if (request.method === "POST") {
     // check the webhook token is correct
-    const valid = true;
-    if (!valid) { // TODO put in validation function
-      console.log("Polar Webhook event recieved that did not have the correct validation");
+    const signature = request.headers["polar-webhook-signature"];
+    const lookup = encodeparams
+        .getLookupFromPolarSignature(
+            request.body,
+            configurations.polarWebhookSecrets,
+            signature);
+    if (lookup == "error") { // TODO put in validation function
+      console.log("Polar Webhook event recieved that did not have a valid signature");
       response.status(401);
       response.send("NOT AUTHORISED");
       return;
     }
     // save the webhook message and asynchronously process
     try {
-      const webhookDoc = await webhookInBox.push(request, "polar");
+      const webhookDoc = await webhookInBox.push(request, "polar", lookup);
       response.sendStatus(200);
       // now we have saved the request and returned ok to the provider
       // the message will trigger an asynchronous process
@@ -1545,18 +1551,38 @@ exports.polarWebhook = functions.https.onRequest(async (request, response) => {
 
 async function processPolarWebhook(webhookDoc) {
   const webhookBody = JSON.parse(webhookDoc.data()["body"]);
+  const lookup = webhookDoc.data()["secret_lookup"];
+  if (webhookBody.event === "PING") {
+    console.log("polar webhook message event = PING, do nothing");
+    return;
+  }
   const userDocsList = [];
+  const devDocsList = [];
+
+  const devQuery = await db.collection("developers")
+      .where("secret_lookup", "==", lookup)
+      .get();
+  devQuery.docs.forEach((doc)=>{
+    devDocsList.push(doc.id);
+  });
+
   const userQuery = await db.collection("users")
       .where("polar_user_id", "==", webhookBody.user_id)
       .get();
-  if (userQuery.docs.length == 0) {
+
+  userQuery.docs.forEach((doc)=>{
+    // exclude devs that are not managed by this webhook subscription
+    if (devDocsList.includes(doc.data()["devId"])) {
+      userDocsList.push(doc);
+    }
+  });
+
+  if (userDocsList.length == 0) {
     // there is an issue if there are no users with a userId in the DB.
     console.log("error: zero users registered to polar webhook: " + webhookBody.user_id);
     throw Error("zero users registered to polar webhook user_id "+webhookBody.user_id);
   }
-  userQuery.docs.forEach((doc)=>{
-    userDocsList.push(doc);
-  });
+
   // request the exercise information from Polar - the access token is
   // needed for this
   const userToken = userQuery.docs[0].data()["polar_access_token"];
@@ -1576,6 +1602,8 @@ async function processPolarWebhook(webhookDoc) {
     const contents = fitFile.body;
     // storing FIT file in bucket under activityId.fit
     const storageRef = storage.bucket("gs://rovetest-beea7.appspot.com/");
+    // TODO: shouldn't this be the default bucket without an argument?
+    // then live will use live storage and test will use test storage?
     await storageRef.file("public/"+webhookBody.entity_id+".fit").save(contents);
     // create signed URL for developer to download file.
     const urlOptions = {
@@ -1586,25 +1614,48 @@ async function processPolarWebhook(webhookDoc) {
     const downloadURL = await storageRef.file("public/"+webhookBody.entity_id+".fit").getSignedUrl(urlOptions);
 
     const sanitisedActivity = filters.polarSanatise(activity);
+    // add fit file URL to the sanitised activity
     sanitisedActivity["file"] = {"url": downloadURL[0]};
     // write sanitised information and raw information to each user and then
     // send to developer
     for (const userDoc of userDocsList) {
       sanitisedActivity["userId"] = userDoc.data()["userId"];
-      // add fit file URL to the sanitised activity
-      // create a local copy of the activity to prevent the userId
-      // being written incorrectly in this loop during async
-      // firebase writes and developer sends.
-      const localSanitisedActivity = JSON.parse(JSON.stringify(sanitisedActivity));
-      const activityDoc = userDoc.ref
-          .collection("activities")
-          .doc();
-      activityDoc.set({"sanitised": localSanitisedActivity, "raw": activity});
-      const triesSoFar = 0; // this is our first try to write to developer
-      sendToDeveloper(userDoc, localSanitisedActivity, activity, activityDoc, triesSoFar);
+      saveAndSendActivity(userDoc, sanitisedActivity, activity);
     }
   } else {
-    throw Error("Polar activity type "+webhookBody.event+" not recognised");
+    throw Error("Polar activity type "+webhookBody.event+" not supported");
+  }
+}
+/**
+ * checks if a duplicate and if not then
+ * saves the activity to the user collection
+ * then sends to the developer.
+ * @param {FirebaseFirestore} userDoc
+ * @param {Map} sanitisedActivity
+ * @param {Map} activity
+ */
+async function saveAndSendActivity(userDoc,
+    sanitisedActivity,
+    activity) {
+  // tag the sanitised activty with the userId
+  sanitisedActivity["userId"] = userDoc.data()["userId"];
+  // create a local copy of the activity to prevent the userId
+  // being written incorrectly in this loop during async
+  // firebase writes and developer sends.
+  const localSanitisedActivity =
+      JSON.parse(JSON.stringify(sanitisedActivity));
+  const activityDoc = userDoc.ref
+      .collection("activities")
+      .doc(sanitisedActivity.activity_id+sanitisedActivity.provider);
+
+  const doc = await activityDoc.get();
+
+  if (!doc.exists) {
+    activityDoc.set({"sanitised": localSanitisedActivity, "raw": activity});
+    const triesSoFar = 0; // this is our first try to write to developer
+    sendToDeveloper(userDoc, localSanitisedActivity, activity, activityDoc, triesSoFar);
+  } else {
+    console.log("duplicate activity - not written or sent");
   }
 }
 

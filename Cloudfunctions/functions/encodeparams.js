@@ -102,4 +102,47 @@ module.exports = {
     };
     return options;
   },
+  /**
+   * creates a signature that should match the polar signature
+   * available in the polar webhook messages using the available keys,
+   * the matching key is used to return the secret_lookup for that key.
+   * If non match an string containing "error" is returned.
+   * @param {String} JSONBody
+   * @param {String} polarKeys
+   * @param {String} signature
+   * @return {String} secret_lookup as a string
+   */
+  getLookupFromPolarSignature: function(JSONBody, polarKeys, signature) {
+    // eslint-disable-next-line require-jsdoc
+    const baseString = JSON.stringify(JSONBody);
+    const data = Buffer.from(baseString, "utf8");
+    let lookup = "";
+    Object.keys(polarKeys).forEach(function(key) {
+      const calculatedSignature = crypto
+          .createHmac("sha256", key)
+          .update(data)
+          .digest("hex");
+      if (calculatedSignature == signature) {
+        lookup = polarKeys[key]["secret_lookup"];
+      }
+    });
+    if (lookup == "") {
+      // default depending on the google project if
+      // test use the test keys if live use the live keys
+      // this is a temporary fix while we wait for Polar to explain exactly
+      // how the signature should be calculated
+      switch (process.env.GCLOUD_PROJECT) {
+        case "rovetest-beea7":
+          lookup = "roveTestSecrets";
+          break;
+        case "rove-26":
+          lookup = "roveLivesecrets";
+          break;
+        default:
+          lookup = "error";
+          break;
+      }
+    }
+    return lookup;
+  },
 };
