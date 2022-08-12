@@ -30,31 +30,23 @@ admin.initializeApp();
 const db = admin.firestore();
 const storage = admin.storage();
 
+switch (process.env.GCLOUD_PROJECT) {
+  case "rove-26":
+    configurations.lookup = "roveLiveSecrets";
+    break;
+  case "rovetest-beea7":
+    configurations.lookup = "roveTestSecrets";
+    break;
+}
 const webhookInBox = require("./webhookInBox");
 const oauthWahoo = new OauthWahoo(configurations, db);
 const callbackBaseUrl = "https://us-central1-"+process.env.GCLOUD_PROJECT+".cloudfunctions.net";
+const redirectPageUrl = "https://"+process.env.GCLOUD_PROJECT+".web.app";
 
 // INTEGRATION FOR APP:
 // get url response and go through onboarding flow.
 // we recieve auth token from strava to stravaCallBack.
 // tokens stored under userId
-
-exports.redirectPage = functions.https.onRequest( async (req, res) => {
-  const transactionId = (Url.parse(req.url, true).query)["transactionId"];
-  const provider = (Url.parse(req.url, true).query)["provider"];
-  let devId = (Url.parse(req.url, true).query)["devId"];
-  const userId = (Url.parse(req.url, true).query)["userId"];
-  if (userId == "notion") {
-    devId = "Notion Templates";
-  }
-  const params = "?transactionId="+transactionId+"&isRedirect=true";
-  const html = await fs.promises.readFile("redirectPage.html");
-  res.writeHead(200, {"Content-Type": "text/html"});
-  res.write(html);
-  res.write("<h2 style='text-align: center;font-family:DM Sans'>Data integrations provider for "+devId+"</h2>\
-  <h2 style='text-align: center;font-family:DM Sans'>To authenticate "+provider+" click <a href=/connectService"+params+">here</a></h2>");
-  res.end();
-});
 
 exports.connectService = functions.https.onRequest(async (req, res) => {
   // Dev calls this service with parameters: user-id, dev-id, service to
@@ -126,8 +118,8 @@ exports.connectService = functions.https.onRequest(async (req, res) => {
   }
   // redirect to splash page if isRedirect is not set
   if (isRedirect == undefined || isRedirect == false) {
-    // call redirect with the transaction id
-    res.redirect(callbackBaseUrl+"/redirectPage?transactionId="+transactionId+"&provider="+parameters.provider+"&devId="+parameters.devId+"&userId="+parameters.userId);
+    // go to redirect with the transaction id
+    res.redirect(redirectPageUrl+"?transactionId="+transactionId+"&provider="+parameters.provider+"&devId="+parameters.devId+"&userId="+parameters.userId);
     return;
   }
 
