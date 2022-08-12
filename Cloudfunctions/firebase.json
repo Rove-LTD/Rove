@@ -10,17 +10,20 @@
     "source": "functions"
   },
   "hosting": {
-    "public": "functions/redirectPage",
+    "public": "redirectPage",
     "ignore": [
       "firebase.json",
       "**/.*",
       "**/node_modules/**"
     ],
-    "rewrites": [
+    "hosting": {
+      "rewrites": [ {
+        "source": "/createNotionLink",
+        "function": "createNotionLink"
+      },
       {
-        "source": "**",
-        "destination": "/index.html"
-      }
-    ]
+        "source": "/connectService",
+        "function": "connectService"
+      }]
   }
-}
+}}
