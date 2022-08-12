@@ -151,7 +151,7 @@ describe("Testing that the garmin Webhooks work: ", () => {
         await wrapped(snapshot);
 
         const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
-        await wait(1000);
+        await wait(1500);
         // check the webhookInBox function was called with the correct args
         assert(stubbedWebhookInBox.calledOnceWith(snapshot.ref), "webhookInBox called incorrectly");
          //now check the database was updated correctly
