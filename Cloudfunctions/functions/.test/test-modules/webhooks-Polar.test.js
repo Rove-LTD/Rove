@@ -93,15 +93,15 @@ describe("Testing that the Polar Webhooks work: ", () => {
         url: "https://us-central1-rovetest-beea7.cloudfunctions.net/polarWebhook",
         method: "POST",
         headers: {
-            "Polar-Webhook-Signature": "ef8381ea1709c8097cb3e203eae2b6caacb699580fe9636763fac7ef742d5413",
+            "polar-webhook-signature": "cebdf4cbe1317a77e2ca3bdcb741314b0b26c903583a06dddd4b6909d01a6a6f",
         },
-        body: {
+        rawBody: new Buffer.from(JSON.stringify({
             "event": "EXERCISE",
             "user_id": "polar_test_user",
             "entity_id": "aQlC83",
             "timestamp": "2018-05-15T14:22:24Z",
             "url": "https://www.polaraccesslink.com/v3/exercises/aQlC83"
-          }
+          })) //in the real message the rawBody is a buffer with the payload
     };
         res = {
             sendStatus: (code)=>{assert.equal(code, 200);},
@@ -255,8 +255,9 @@ describe("Testing that the Polar Webhooks work: ", () => {
             debug: true,
             url: "https://us-central1-rovetest-beea7.cloudfunctions.net/polarWebhook",
             method: "POST",
-            headers: {"x-datadog-sampling-priority":"-1","x-cloud-trace-context":"fb19a10dd0e1ccd345f14ae444b5f1b4/1357503526931563120;o=1","function-execution-id":"zzgtxg83i83m","host":"us-central1-rovetest-beea7.cloudfunctions.net","x-appengine-https":"on","transfer-encoding":"chunked","x-appengine-request-log-id":"62f3c7be00ff0b7a77344d3bc80001737e7834363763316439303439373637396336702d7470000130663130326533633638383535646137313763626631643837616465623433353a3334000100","x-appengine-timeout-ms":"599999","content-type":"application/json","x-appengine-region":"d","x-appengine-default-version-hostname":"x467c1d90497679c6p-tp.appspot.com","polar-webhook-event":"EXERCISE","connection":"close","x-forwarded-for":"52.212.18.54","forwarded":"for=\"52.212.18.54\";proto=https","x-datadog-parent-id":"2594929423869901867","x-forwarded-proto":"https","x-appengine-user-ip":"52.212.18.54","x-appengine-appversionid":"s~x467c1d90497679c6p-tp/0f102e3c68855da717cbf1d87adeb435:34.445641353158191059","x-datadog-trace-id":"2258606105194993868","polar-webhook-signature":"4e9d196f83f0f163cd12917d09725904e1183f5fc7950a38d9c5659976fc430d","x-appengine-citylatlong":"53.349805,-6.260310","x-appengine-country":"IE","traceparent":"00-fb19a10dd0e1ccd345f14ae444b5f1b4-12d6d243f0188270-01","user-agent":"Apache-HttpClient/4.5.13 (Java/1.8.0_312)","x-appengine-city":"dublin","accept-encoding":"gzip,deflate"},
-            body:{"event":"EXERCISE","entity_id":"PnKxMgEl","url":"https://polaraccesslink.com/v3/exercises/PnKxMgEl","timestamp":"2022-08-10T14:59:10.463Z","user_id":58633784}
+            headers: {"polar-webhook-event":"EXERCISE","polar-webhook-signature":"929160c429a65f5f8cb762e3708430a8adee7ce5783a5ab1229c18e23be6cbab"},
+            body: {"entity_id":"5AvdOL3n","user_id":58633784,"event":"EXERCISE","timestamp":"2022-08-12T15:27:40.1Z","url":"https://polaraccesslink.com/v3/exercises/5AvdOL3n"},
+            rawBody: '{"entity_id":"5AvdOL3n","user_id":58633784,"event":"EXERCISE","timestamp":"2022-08-12T15:27:40.1Z","url":"https://polaraccesslink.com/v3/exercises/5AvdOL3n"}'
         };
         res = {
             sendStatus: (code)=>{assert.equal(code, 200);},
@@ -287,4 +288,19 @@ describe("Testing that the Polar Webhooks work: ", () => {
     assert.equal(args[0], snapshot.ref);
     sinon.restore();
     });
+    it.skip('NO STUBBS so SKIPPED - read a specific webhookInBox event and process it without stubbing...', async () => {
+        const testDocId = "OWdxJh4Fa5nZDiGsyaEX";
+        webhookDoc = await admin.firestore()
+            .collection("webhookInBox")
+            .doc(testDocId)
+            .get();
+        
+        webhookDocData = webhookDoc.data();
+        
+        const snapshot = test.firestore.makeDocumentSnapshot(webhookDocData, "webhookInBox/"+webhookDocData.id);
+
+        wrapped = test.wrap(myFunctions.processWebhookInBox);
+        await wrapped(snapshot);
+        sinon.restore();
+      });
 }); //End TEST
