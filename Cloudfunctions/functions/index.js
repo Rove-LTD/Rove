@@ -23,6 +23,7 @@ const filters = require("./data-filter");
 const fs = require("fs");
 const notion = require("./notion");
 const fitDecoder = require("fit-decoder");
+const FitParser = require("fit-file-parser").default;
 const configurations = contentsOfDotEnvFile["config"];
 // find a way to decrypt and encrypt this information
 
@@ -1839,10 +1840,13 @@ async function getPolarDetailedActivity(userDoc, activityDoc) {
         };
         const res = await got.get(options);
         const session = JSON.parse(res.body);
+        exerciseId = session["id"];
         if (session["start-time"] == exerciseDate) {
           exerciseId = session["id"];
           break;
         }
+        // for testing only if exerciseId is not found and remain undefined
+        // just take the last one
       }
 
       // Get available samples
@@ -1855,8 +1859,19 @@ async function getPolarDetailedActivity(userDoc, activityDoc) {
       };
       const fitFile = await got.get(fitOptions);
       if (fitFile.statusCode == 200) {
-        const buffer = fitFile.rawBody.buffer;
-        const jsonRaw = fitDecoder.fit2json(buffer);
+        const fitParser = new FitParser();
+        let jsonRaw;
+        fitParser.parse(fitFile.rawBody, (error, jsonRaw)=>{
+          // Handle result of parse method
+          if (error) {
+            console.log(error);
+          } else {
+            console.log(JSON.stringify(jsonRaw));
+          }
+        }); // the file is parsing but the code below will not work
+        // with the JSON that is created by fitParser
+        // as fitParser and fitDecoder will not
+        // operate together.  So we need to rewire this bit now.
         const json = fitDecoder.parseRecords(jsonRaw);
         const records = json.records;
         const sanitised = jsonSanitise(records);

@@ -48,12 +48,12 @@ describe("Check the get detailed activity service works: ", () => {
             "strava_refresh_token": "922dd204d91e03515b003fe8f5516d99563d9f0c",
             "strava_token_expires_at": nowInSeconds,
             "strava_id": 7995810,
-            "polar_access_token" : "04c9315a4da52c91cc43aace5630e65b",
+            "polar_access_token" : "2c55261b0b5babe5c986b845f3f532d5",
             "polar_connected": true,
             "polar_token_expires_at": 2120725270,
             "polar_token_expires_in": 461375999,
             "polar_token_type": "bearer",
-            "polar_user_id": 26925145,
+            "polar_user_id": 58633784,
         });
     await admin.firestore()
         .collection("users")
@@ -127,7 +127,7 @@ describe("Check the get detailed activity service works: ", () => {
         assert.deepEqual(sanitisedActivityJson, expectedResult);
         
     })
-    it("Check Get Polar Detailed Activity Works.", async () => {
+    it.only("Check Get Polar Detailed Activity Works.", async () => {
         req = {
             debug: true,
             url: "https://ourDomain.com",
