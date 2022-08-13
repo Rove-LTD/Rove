@@ -1800,7 +1800,7 @@ async function getPolarDetailedActivity(userDoc, activityDoc) {
         const jsonRaw = fitDecoder.fit2json(buffer);
         const json = fitDecoder.parseRecords(jsonRaw);
         const records = json.records;
-        const sanitised = jsonFitSanitise(records);
+        const sanitised = jsonSanitise(records);
         // Comit transaction
         const options = {
           url: "https://www.polaraccesslink.com/v3/users/"+polarId+"/exercise-transactions/"+transactionId,
@@ -1840,7 +1840,7 @@ async function getWahooDetailedActivity(userDoc, activityDoc) {
     const jsonRaw = fitDecoder.fit2json(buffer);
     const json = fitDecoder.parseRecords(jsonRaw);
     const records = json.records;
-    const sanitised = jsonFitSanitise(records);
+    const sanitised = jsonSanitise(records);
     return sanitised;
   } catch (error) {
     console.log(error);
@@ -1848,136 +1848,7 @@ async function getWahooDetailedActivity(userDoc, activityDoc) {
   }
 }
 
-async function getGarminDetailedActivity(userDoc, activityDoc) {
-  try {
-    const url = "https://apis.garmin.com/wellness-api/rest/activityDetails";
-    const devId = userDoc["devId"];
-    const secretLookup = await db.collection("developers").doc(devId).get();
-    const lookup = await secretLookup.data()["secret_lookup"];
-    const consumerSecret = configurations[lookup]["consumerSecret"];
-    const oAuthConsumerSecret = configurations[lookup]["oauth_consumer_key"];
-    let startTime = activityDoc["raw"]["startTimeInSeconds"];
-    const activityId = activityDoc["raw"]["activityId"];
-    startTime += activityDoc["raw"]["durationInSeconds"];
-    let activity;
-    while (activity == undefined) {
-      const options = await encodeparams.garminCallOptions(url, "GET", consumerSecret, oAuthConsumerSecret, userDoc["garmin_access_token"], userDoc["garmin_access_token_secret"], {from: startTime, to: startTime+24*60*60});
-      const response = await got.get(options);
-      const activityList = JSON.parse(response.body);
-      for (const _activity in activityList) {
-        if (activityList[_activity]["activityId"] == activityId) {
-          activity = garminDetailedSanitise(activityList[_activity]);
-          return activity;
-        }
-      }
-      startTime += 24*60*60;
-    }
-    // let currentActivityList = await got.get(options);
-  } catch (error) {
-    console.log(error);
-    return error;
-  }
-}
-
-function garminDetailedSanitise(activity) {
-  const type = activity["summary"]["activityType"];
-  let cadence;
-  if (type == "RUNNING") {
-    cadence = "stepsPerMinute";
-  } else if (type == "CYCLING") {
-    cadence = "bikeCadenceInRPM";
-  }
-  const timerSamples = [];
-  const timestampSamples = [];
-  const temperatureSamples = [];
-  const distanceSamples = [];
-  const powerSamples = [];
-  const heartRateSamples = [];
-  const speedSamples = [];
-  const altitudeSamples = [];
-  const positionSamples = [];
-  const gradientSamples = [];
-  const calorieSamples = [];
-  const cadenceSamples = [];
-  const acentSamples = [];
-  const decentSamples = [];
-  activity["samples"].forEach((sample) => {
-    timestampSamples.push(new Date(sample["startTimeInSeconds"]*1000));
-    timerSamples.push(sample["timerDurationInSeconds"]);
-    temperatureSamples.push(sample["airTemperatureCelcius"]);
-    distanceSamples.push(sample["totalDistanceInMeters"]);
-    powerSamples.push(sample["powerInWatts"]);
-    heartRateSamples.push(sample["heartRate"]);
-    speedSamples.push(sample["speedMetersPerSecond"]);
-    altitudeSamples.push(sample["elevationInMeters"]);
-    positionSamples.push([sample["latitudeInDegree"], sample["longitudeInDegree"]]);
-    gradientSamples.push(sample["grade"]);
-    calorieSamples.push(sample["calories"]);
-    cadenceSamples.push(sample[cadence]);
-    acentSamples.push(sample["acent"]);
-    decentSamples.push(sample["decent"]);
-  });
-  const sanitisedData = {
-    "summary": {
-      "start_time": null,
-      "total_elapsed_time": null,
-      "total_timer_time": null,
-      "avg_speed": null,
-      "max_speed": null,
-      "total_distance": null,
-      "min_heart_rate": null,
-      "avg_heart_rate": null,
-      "max_heart_rate": null,
-      "min_altitude": null,
-      "avg_altitude": null,
-      "max_altitude": null,
-      "max_neg_grade": null,
-      "avg_grade": null,
-      "max_pos_grade": null,
-      "total_calories": null,
-      "avg_temperature": null,
-      "max_temperature": null,
-      "total_ascent": null,
-      "total_descent": null,
-      "sport": null,
-      "num_laps": null,
-      "threshold_power": null,
-      "workout_type": null,
-    },
-  };
-  sanitisedData["samples"]= {
-    "timestampSamples": timestampSamples,
-    "distanceSamples": distanceSamples,
-    "powerSamples": powerSamples,
-    "heartRateSamples": heartRateSamples,
-    "speedSamples": speedSamples,
-    "altitudeSamples": altitudeSamples,
-    "positionSamples": positionSamples,
-    "gradientSamples": gradientSamples,
-    "calorieSamples": calorieSamples,
-    "cadenceSamples": cadenceSamples,
-    "acentSamples": acentSamples,
-    "decentSamples": decentSamples,
-    "timerSamples": timerSamples,
-  };
-  for (const prop in sanitisedData["samples"]) {
-    if (Object.prototype.hasOwnProperty.call(sanitisedData["samples"], prop)) {
-      let initValue = sanitisedData["samples"][prop].find((element) => element != undefined && element != [undefined, undefined]);
-      if (initValue == undefined) {
-        initValue = null;
-      }
-      for (let i=0; i<sanitisedData["samples"][prop].length; i++) {
-        if (sanitisedData["samples"][prop][i] != undefined) {
-          break;
-        }
-        sanitisedData["samples"][prop][i] = initValue;
-      }
-    }
-  }
-  return sanitisedData;
-}
-
-function jsonFitSanitise(jsonRecords) {
+function jsonSanitise(jsonRecords) {
   const records = jsonRecords.filter((element) => element["type"] == "record");
   let summary = jsonRecords.filter((element) => element["type"] == "session");
   const events = jsonRecords.filter((element) => element["data"]["event"] == "timer");
@@ -2168,8 +2039,6 @@ exports.getDetailedActivity = functions.https.onRequest(async (req, res) => {
               sanitisedDetailedActivity = await getPolarDetailedActivity(userDoc, activityDoc);
             } else if (source == "wahoo") {
               sanitisedDetailedActivity = await getWahooDetailedActivity(userDoc, activityDoc);
-            } else if (source == "garmin") {
-              sanitisedDetailedActivity = await getGarminDetailedActivity(userDoc, activityDoc);
             }
             // based on source, get detailed activity
           } else {
