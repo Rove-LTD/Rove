@@ -70,7 +70,7 @@ describe("Testing that the garmin Webhooks work: ", () => {
                 "startTimeInSeconds": 1634907261,
                 "startTimeOffsetInSeconds": 3600,
                 "summaryId": "7698241609",
-                "userAccessToken": "garmin-test-access-token",
+                "userAccessToken": "test_garmin_access_token",
                 "userId": "eb24e8e5-110d-4a87-b976-444f40ca27d4"
               }],}),
             status: "added before the tests to be successful",
@@ -91,7 +91,7 @@ describe("Testing that the garmin Webhooks work: ", () => {
                 "startTimeInSeconds": 1634907261,
                 "startTimeOffsetInSeconds": 3600,
                 "summaryId": "7698241609",
-                "userAccessToken": "garmin-test-access-token",
+                "userAccessToken": "test_garmin_access_token",
                 "userId": "incorrect_garmin_user",
               }],}),
             status: "added before the tests to be successful",
@@ -119,7 +119,7 @@ describe("Testing that the garmin Webhooks work: ", () => {
             "startTimeInSeconds": 1634907261,
             "startTimeOffsetInSeconds": 3600,
             "summaryId": "7698241609",
-            "userAccessToken": "garmin-test-access-token",
+            "userAccessToken": "test_garmin_access_token",
             "userId": "eb24e8e5-110d-4a87-b976-444f40ca27d4"
           }],}
         };
@@ -151,7 +151,7 @@ describe("Testing that the garmin Webhooks work: ", () => {
         await wrapped(snapshot);
 
         const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
-        await wait(1000);
+        await wait(1500);
         // check the webhookInBox function was called with the correct args
         assert(stubbedWebhookInBox.calledOnceWith(snapshot.ref), "webhookInBox called incorrectly");
          //now check the database was updated correctly
@@ -193,7 +193,7 @@ describe("Testing that the garmin Webhooks work: ", () => {
                 "startTimeInSeconds": 1634907261,
                 "startTimeOffsetInSeconds": 3600,
                 "summaryId": "7698241609",
-                "userAccessToken": "garmin-test-access-token",
+                "userAccessToken": "test_garmin_access_token",
                 "userId": "eb24e8e5-110d-4a87-b976-444f40ca27d4"
                 },
             "status": "sent",
@@ -221,7 +221,7 @@ describe("Testing that the garmin Webhooks work: ", () => {
                 "startTimeInSeconds": 1634907261,
                 "startTimeOffsetInSeconds": 3600,
                 "summaryId": "7698241609",
-                "userAccessToken": "garmin-test-access-token",
+                "userAccessToken": "test_garmin_access_token",
                 "userId": "eb24e8e5-110d-4a87-b976-444f40ca27d4"
               }],}
         };
@@ -250,7 +250,7 @@ describe("Testing that the garmin Webhooks work: ", () => {
     args = stubbedWebhookInBox.getCall(0).args; //this first call
     // check webhookInBox called with the correct parameters
     assert(stubbedWebhookInBox.calledOnce, "webhookInBox called too many times");
-    assert.equal(args[1].message, "zero users registered to garmin webhook owner_id incorrect_garmin_user");
+    assert.equal(args[1].message, "zero users registered to garmin webhook userId incorrect_garmin_user");
     assert.equal(args[0], snapshot.ref);
     sinon.restore();
     });

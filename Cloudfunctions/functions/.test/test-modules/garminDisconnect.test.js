@@ -43,6 +43,7 @@ describe("Check the garmin Disconnect Service works: ", () => {
             "email": "paul.userTest@gmail.com",
             "garmin_connected": true,
             "garmin_access_token": "test_access_token",
+            "garmin_user_id": "test_user_id",
             "garmin_access_token_secret": "test_access_token_secret",
         });
 
@@ -55,6 +56,7 @@ describe("Check the garmin Disconnect Service works: ", () => {
           "email": "paul.userTest@gmail.com",
           "garmin_connected": true,
           "garmin_access_token": "test_access_token",
+          "garmin_user_id": "test_user_id",
           "garmin_access_token_secret": "test_access_token_secret"
         });
 
@@ -183,6 +185,7 @@ describe("Check the garmin Disconnect Service works: ", () => {
       "email": "paul.userTest@gmail.com",
       "garmin_connected": true,
       "garmin_access_token": "test_access_token",
+      "garmin_user_id": "test_user_id",
       "garmin_access_token_secret": "test_access_token_secret",
     };
     
@@ -272,6 +275,63 @@ describe("Check the garmin Disconnect Service works: ", () => {
    stubbedGot.onFirstCall().returns(testResponse);
     
     await myFunctions.disconnectService(req, res);
+    // check the got function was called with the correct options
+    // check the garmin fields were deleted from the database
+    // check the garmin activities were deleted from the database only for this user
+    const userDoc = await admin.firestore()
+        .collection("users")
+        .doc(testDev+testUser)
+        .get();
+      
+    const activities = await admin.firestore()
+        .collection("users")
+        .doc(testDev+testUser)
+        .collection("activities")
+        .where("sanitised.data_source","==","garmin")
+        .get();
+    
+    const expectedUserResults = {
+      "devId": testDev,
+      "userId": testUser,
+      "email": "paul.userTest@gmail.com",
+    };
+    
+    assert.deepEqual(userDoc.data(), expectedUserResults);
+    assert.equal(activities.docs.length, 0);
+
+    sinon.restore();
+  })
+  it('Check that the deregistration webhook works', async () => {
+    // get rid of the second to last user
+    await admin.firestore()
+      .collection("users")
+      .doc(testDev+"secondTestUser")
+      .delete();
+
+    req = {
+      debug: true,
+      url: "https://us-central1-rovetest-beea7.cloudfunctions.net/garminDeregistrations",
+      body: {"deregistrations": [{"userAccessToken": "test_access_token", "userId":"test_user_id"}]},
+    };
+    res = {
+
+      sendStatus: (code) => {
+        assert.equal(code, 200);
+      }
+    }
+
+    // set up stubbed functions
+    testResponse = {
+      body: ()=>{
+        return {"success":"Application has been revoked"};
+      },
+      statusCode: 204,
+    }
+
+   const stubbedGot = sinon.stub(got, "delete");
+   stubbedGot.onFirstCall().returns(testResponse);
+    
+    await myFunctions.garminDeregistrations(req, res);
     // check the got function was called with the correct options
     // check the garmin fields were deleted from the database
     // check the garmin activities were deleted from the database only for this user

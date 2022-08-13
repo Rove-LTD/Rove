@@ -18,7 +18,9 @@ const testUser = testParameters.testUser
 const testDev = testParameters.testDev
 const unsuccessfulWebhookMessageDoc = "unsuccessfulTestWebhookMessageDoc";
 const successfulWebhookMessageDoc = "successfulTestWebhookMessageDoc";
+const successfulPINGMessageDoc = "successfulTestPINGMessageDoc";
 let successfulWebhookMessage;
+let successfulPINGMessage;
 let unsuccessfulWebhookMessage;
 const devTestData = testParameters.devTestData
 const devUserData = testParameters.devUserData
@@ -57,15 +59,25 @@ describe("Testing that the Polar Webhooks work: ", () => {
       });
 
       successfulWebhookMessage = {
-            provider: "polar",
-            method: "POST",
-            body: '{"event": "EXERCISE","user_id": "polar_test_user","entity_id": "aQlC83","timestamp": "2018-05-15T14:22:24Z","url": "https://www.polaraccesslink.com/v3/exercises/aQlC83"}',
-            status: "added before the tests to be successful",
-        }
+        provider: "polar",
+        method: "POST",
+        secret_lookup: "roveLiveSecrets",
+        body: '{"event": "EXERCISE","user_id": "polar_test_user","entity_id": "aQlC83","timestamp": "2018-05-15T14:22:24Z","url": "https://www.polaraccesslink.com/v3/exercises/aQlC83"}',
+        status: "added before the tests to be successful",
+      }
+
+      successfulPINGMessage = {
+          provider: "polar",
+          method: "POST",
+          secret_lookup: "roveLiveSecrets",
+          body: '{"timestamp":"2022-08-09T17:18:32.696Z","event":"PING"}',
+          status: "added before the tests to be successful",
+      }
 
         unsuccessfulWebhookMessage = {
             provider: "polar",
             method: "POST",
+            secret_lookup: "roveLiveSecrets",
             body: '{"event": "EXERCISE","user_id": "incorrect_test_user","entity_id": "aQlC83","timestamp": "2018-05-15T14:22:24Z","url": "https://www.polaraccesslink.com/v3/exercises/aQlC83"}',
             status: "added before the tests to be successful",
         }
@@ -80,13 +92,16 @@ describe("Testing that the Polar Webhooks work: ", () => {
         debug: true,
         url: "https://us-central1-rovetest-beea7.cloudfunctions.net/polarWebhook",
         method: "POST",
-        body: {
+        headers: {
+            "polar-webhook-signature": "cebdf4cbe1317a77e2ca3bdcb741314b0b26c903583a06dddd4b6909d01a6a6f",
+        },
+        rawBody: new Buffer.from(JSON.stringify({
             "event": "EXERCISE",
             "user_id": "polar_test_user",
             "entity_id": "aQlC83",
             "timestamp": "2018-05-15T14:22:24Z",
             "url": "https://www.polaraccesslink.com/v3/exercises/aQlC83"
-          }
+          })) //in the real message the rawBody is a buffer with the payload
     };
         res = {
             sendStatus: (code)=>{assert.equal(code, 200);},
@@ -100,8 +115,9 @@ describe("Testing that the Polar Webhooks work: ", () => {
         await myFunctions.polarWebhook(req, res);
 
         // check the webhookInBox was called correctly
-        assert(stubbedWebhookInBox.calledOnceWithExactly(req, "polar"),
-                "webhookInBox called with wrong args");
+        args = stubbedWebhookInBox.getCall(0).args;
+        assert(stubbedWebhookInBox.calledOnceWithExactly(req, "polar", "roveTestSecrets"),
+                "webhookInBox called with wrong args: "+args);
         sinon.restore();
 
     });
@@ -192,12 +208,26 @@ describe("Testing that the Polar Webhooks work: ", () => {
      assert.deepEqual(sanatisedActivity, expectedResults);
      sinon.restore();
       });
+    it('read webhookInBox PING event and process it successfully...', async () => {
+
+        const spyConsoleLog = sinon.spy(console, "log");
+        const snapshot = test.firestore.makeDocumentSnapshot(successfulPINGMessage, "webhookInBox/"+successfulPINGMessageDoc);
+
+        wrapped = test.wrap(myFunctions.processWebhookInBox);
+        await wrapped(snapshot);
+        calledArgs = spyConsoleLog.getCall(1).args;
+        assert.equal(calledArgs[0],"polar webhook message event = PING, do nothing");
+        sinon.restore();
+    });
     it('Webhooks should repond with status 401 if method incorrect...', async () => {
         // set the request object with the correct provider, developerId and userId
         const req = {
             debug: true,
             url: "https://us-central1-rovetest-beea7.cloudfunctions.net/polarWebhook",
             method: "Incorrect",
+            headers: {
+                "Polar-Webhook-Signature": "ef8381ea1709c8097cb3e203eae2b6caacb699580fe9636763fac7ef742d5413",
+            },
             body: {
                 "event": "EXERCISE",
                 "user_id": "polar_test_user",
@@ -219,6 +249,29 @@ describe("Testing that the Polar Webhooks work: ", () => {
         assert.equal(stubbedWebhookInBox.notCalled, true);
         sinon.restore();
     });
+    it('Webhooks should repond with status 200 if signature correct...', async () => {
+        // set the request object with the correct provider, developerId and userId
+        const req = {
+            debug: true,
+            url: "https://us-central1-rovetest-beea7.cloudfunctions.net/polarWebhook",
+            method: "POST",
+            headers: {"polar-webhook-event":"EXERCISE","polar-webhook-signature":"929160c429a65f5f8cb762e3708430a8adee7ce5783a5ab1229c18e23be6cbab"},
+            body: {"entity_id":"5AvdOL3n","user_id":58633784,"event":"EXERCISE","timestamp":"2022-08-12T15:27:40.1Z","url":"https://polaraccesslink.com/v3/exercises/5AvdOL3n"},
+            rawBody: '{"entity_id":"5AvdOL3n","user_id":58633784,"event":"EXERCISE","timestamp":"2022-08-12T15:27:40.1Z","url":"https://polaraccesslink.com/v3/exercises/5AvdOL3n"}'
+        };
+        res = {
+            sendStatus: (code)=>{assert.equal(code, 200);},
+        }
+        // set up stubs so that WebhookInBox is not written to
+        // this would trigger the function in the online environment
+        const stubbedWebhookInBox = sinon.stub(webhookInBox, "push");
+        stubbedWebhookInBox.onCall().returns("testDoc");
+
+        await myFunctions.polarWebhook(req, res);
+        // check the inBox was written to
+        assert(stubbedWebhookInBox.calledOnceWithExactly(req, "polar", "roveTestSecrets"),
+                "webhookInBox called with wrong args");        sinon.restore();
+    });
     it('read webhook inbox message and error if no users that match polar_id...', async () => {
 
     const data = unsuccessfulWebhookMessage;
@@ -235,4 +288,19 @@ describe("Testing that the Polar Webhooks work: ", () => {
     assert.equal(args[0], snapshot.ref);
     sinon.restore();
     });
+    it.skip('NO STUBBS so SKIPPED - read a specific webhookInBox event and process it without stubbing...', async () => {
+        const testDocId = "OWdxJh4Fa5nZDiGsyaEX";
+        webhookDoc = await admin.firestore()
+            .collection("webhookInBox")
+            .doc(testDocId)
+            .get();
+        
+        webhookDocData = webhookDoc.data();
+        
+        const snapshot = test.firestore.makeDocumentSnapshot(webhookDocData, "webhookInBox/"+webhookDocData.id);
+
+        wrapped = test.wrap(myFunctions.processWebhookInBox);
+        await wrapped(snapshot);
+        sinon.restore();
+      });
 }); //End TEST
