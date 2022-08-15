@@ -28,7 +28,7 @@ myFunctions = require('../../index.js');
 // testing processes - these have to have the same constant
 // name as in the function we are testing
 const stravaApi = require("strava-v3");
-const notion = require('../../notion');
+const notion = require('../../notion.js');
 const webhookInBox = require('../../webhookInBox');
 //-------------TEST 2--- Test Callbacks from Strava-------
  describe("Check the notion functions are writing activites to the notion endpoint.", () => {
@@ -62,11 +62,14 @@ const webhookInBox = require('../../webhookInBox');
     stubbedStravaCall = sinon.stub(stravaApi.activities, "get");
     stubbedStravaCall.onFirstCall().returns(stravaExercisePayload);
     const stubbedWebhookInBox = sinon.stub(webhookInBox, "delete");
+    const stubbedNotion = sinon.stub(notion, "sendToNotionEndpoint");
+    stubbedNotion.onCall().returns("successful value");
     //wrap function with snapshot input
     inboxData = {
         provider: "strava",
             status: "new",
             method: "POST",
+            secret_lookup: "roveLiveSecrets",
             body: JSON.stringify({"updates":{},"object_type":"activity","object_id":7345142595,"owner_id":"notion_test_strava_id","subscription_id":217520,"aspect_type":"create","event_time":1655824005})
         };
     const snapshot = test.firestore.makeDocumentSnapshot(inboxData, "webhookInBox/testWebhookMessageDocId");

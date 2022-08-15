@@ -22,7 +22,6 @@ const test = require('firebase-functions-test')(firebaseConfig, testParameters.t
 const admin = require("firebase-admin");
 const fs = require("fs");
 const wahooActivity = require("./wahooDetailed.json")
-const garminActivity = require("./garminDetailed.json")
 
 myFunctions = require('../../index.js');
 // -----------END INITIALISE ROVE TEST PARAMETERS----------------------------//
@@ -44,20 +43,17 @@ describe("Check the get detailed activity service works: ", () => {
             "devId": testDev,
             "userId": testUser,
             "email": "will.userTest@gmail.com",
-            "garmin_access_token": "32ada6ab-e5fe-46a7-bd82-5bad6158d6eb",
-            "garmin_access_token_secret": "boxYMolukwHGCyk9kTBIBCmvL8Wm3y2rFq4",
-            "garmin_user_id": "eb24e8e5-110d-4a87-b976-444f40ca27d4",
             "strava_connected": true,
             "strava_access_token": "3f1f6d3da1057cf458ffffde0ee70eccb610c468",
             "strava_refresh_token": "922dd204d91e03515b003fe8f5516d99563d9f0c",
             "strava_token_expires_at": nowInSeconds,
             "strava_id": 7995810,
-            "polar_access_token" : "04c9315a4da52c91cc43aace5630e65b",
+            "polar_access_token" : "2c55261b0b5babe5c986b845f3f532d5",
             "polar_connected": true,
             "polar_token_expires_at": 2120725270,
             "polar_token_expires_in": 461375999,
             "polar_token_type": "bearer",
-            "polar_user_id": 26925145,
+            "polar_user_id": 58633784,
         });
     await admin.firestore()
         .collection("users")
@@ -89,21 +85,6 @@ describe("Check the get detailed activity service works: ", () => {
             },
             "raw": {"file": {"url": "https://cdn.wahooligan.com/wahoo-cloud/production/uploads/workout_file/file/0KNBLnbwOndDYh5MhonDZw/2022-07-07-071356-ELEMNT_AE48-282-0.fit"}}
         });
-    await admin.firestore()
-        .collection("users")
-        .doc(testDev+testUser)
-        .collection("activities")
-        .doc("garminActivity")
-        .set({
-            "sanitised": {
-                "provider": "garmin",
-            },
-            "raw": {
-                "activityId": 9377961249,
-                "startTimeInSeconds": 1660111129,
-                "durationInSeconds": 3923,
-            }
-        })
     });
     it("Check Get Detailed Strava Activity Works.", async () => {
         req = {
@@ -124,7 +105,7 @@ describe("Check the get detailed activity service works: ", () => {
 
         await myFunctions.getDetailedActivity(req, res);
     })
-    it.only("Check Get Wahoo Detailed Activity Works.", async () => {
+    it("Check Get Wahoo Detailed Activity Works.", async () => {
         req = {
             debug: true,
             url: "https://ourDomain.com",
@@ -146,7 +127,7 @@ describe("Check the get detailed activity service works: ", () => {
         assert.deepEqual(sanitisedActivityJson, expectedResult);
         
     })
-    it("Check Get Polar Detailed Activity Works.", async () => {
+    it.only("Check Get Polar Detailed Activity Works.", async () => {
         req = {
             debug: true,
             url: "https://ourDomain.com",
@@ -165,26 +146,5 @@ describe("Check the get detailed activity service works: ", () => {
 
         const activity = await myFunctions.getDetailedActivity(req, res);
         console.log(activity);
-    })
-    it.only("Check Get Garmin detailed Activity Works.", async () => {
-        req = {
-            debug: true,
-            url: "https://ourDomain.com",
-            method: "POST",
-            query:{},
-            body:{"devId": testDev, "devKey": "test-key", "userId": testDev+testUser, "activityId": "garminActivity"},
-        }
-        res = {
-            status: (code) => {
-                assert.equal(code, 200);
-            },
-            send: (message) => {
-                assert.equal(message, "Complete")
-            }
-        }
-
-        const sanitisedActivityJson = JSON.stringify(await myFunctions.getDetailedActivity(req, res));
-        const expectedResult = JSON.stringify(garminActivity)
-        assert.deepEqual(sanitisedActivityJson, expectedResult);
     })
 })
