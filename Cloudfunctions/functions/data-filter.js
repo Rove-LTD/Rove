@@ -52,7 +52,8 @@ class standard_format {
       "active_calories": activity["calories"],
       "start_time": new Date(activity["start_time"]).toISOString(),
       "provider": "polar",
-      "average_pace_in_meters_per_second": null
+      "average_pace_in_meters_per_second": null,
+      "version": "1.0",
     }
     const duration = td.parse(activity["duration"]);
     let durationInSeconds = 0;
@@ -177,6 +178,7 @@ exports.garminSanitise = function(activities) {
             "elevation_gain": parseFloat(activities[i]["totalElevationGainInMeters"]).toFixed(1),
             "elevation_loss" : parseFloat(activities[i]["totalElevationLossInMeters"]).toFixed(1),
             "provider" : "garmin",
+            "version": "1.0",
             };
         }
         else if (activities[i]["activityType"] == "CYCLING") {
@@ -194,6 +196,7 @@ exports.garminSanitise = function(activities) {
                 "elevation_gain": parseFloat(activities[i]["totalElevationGainInMeters"]).toFixed(1),
                 "elevation_loss" : parseFloat(activities[i]["totalElevationLossInMeters"]).toFixed(1),
                 "provider" : "garmin",
+                "version": "1.0",
                 };
         }
         else if (activities[i]["activityType"] == "LAP_SWIMMING") {
@@ -211,6 +214,7 @@ exports.garminSanitise = function(activities) {
                 "elevation_gain": null,
                 "elevation_loss" : null,
                 "provider" : "garmin",
+                "version": "1.0",
                 };
         } else {
             summaryActivity = {
@@ -228,6 +232,7 @@ exports.garminSanitise = function(activities) {
                 "elevation_gain": null,
                 "elevation_loss" : null,
                 "provider" : "garmin",
+                "version": "1.0",
                 };
         }
         for (const property in summaryActivity) {
@@ -325,6 +330,7 @@ exports.wahooSanitise = function (activity) {
     "updated_at": activity.workout_summary.updated_at,
     "power_avg": activity.workout_summary.power_avg,
     "file": activity.workout_summary.file,
+    "version": "1.0",
     };
   } else if (activity.hasOwnProperty("workout_summary")) {
     if (activity.workout_summary == null) {
@@ -353,6 +359,7 @@ exports.wahooSanitise = function (activity) {
       "updated_at": activity.workout_summary.updated_at,
       "power_avg": activity.workout_summary.power_avg,
       "file": activity.workout_summary.files[0].url ?? "",
+      "version": "1.0",
       };}
   } else {
     // we dont recognise this event type yet
