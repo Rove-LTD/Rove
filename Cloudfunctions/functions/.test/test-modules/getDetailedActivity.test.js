@@ -99,7 +99,7 @@ describe("Check the get detailed activity service works: ", () => {
                 assert.equal(code, 200);
             },
             send: (message) => {
-                assert.equal(message,)
+                assert.equal(message,"Complete")
             }
         }
 
@@ -127,7 +127,7 @@ describe("Check the get detailed activity service works: ", () => {
         assert.deepEqual(sanitisedActivityJson, expectedResult);
         
     })
-    it.only("Check Get Polar Detailed Activity Works.", async () => {
+    it.skip("Check Get Polar Detailed Activity Works.", async () => {
         req = {
             debug: true,
             url: "https://ourDomain.com",
@@ -140,7 +140,7 @@ describe("Check the get detailed activity service works: ", () => {
                 assert.equal(code, 200);
             },
             send: (message) => {
-                assert.equal(message,)
+                assert.equal(message, 'complete')
             }
         }
 
