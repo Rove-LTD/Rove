@@ -84,5 +84,6 @@ describe('ROVE full integration test scripts', () => {
     require ('./test-modules/garminDisconnect.test.js');
     require ('./test-modules/notion.test.js');
     require ('./test-modules/getActivityList.test.js');
-    require ('./test-modules/getDetailedActivity.test.js')
+    require ('./test-modules/getDetailedActivity.test.js');
+    require ('./test-modules/corosCallback.test');
 });

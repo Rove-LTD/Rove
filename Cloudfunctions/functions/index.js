@@ -815,8 +815,16 @@ exports.corosCallback = functions.https.onRequest(async (req, res) => {
     "client_secret": configurations[lookup]["corosSecret"],
     "grant_type": "authorization_code"};
   const accessTokens = await got.post("https://open.coros.com/oauth2/accesstoken?", options);
+  console.log(accessTokens);
   if (accessTokens.statusCode == 200) {
-    await db.collection("users").doc(transactionData.userId).set(JSON.parse(accessTokens));
+    const jsonTokens = JSON.parse(accessTokens.body);
+    await db.collection("users").doc(transactionData.userId).set({"coros_access_token": jsonTokens["access_token"],
+      "coros_id": jsonTokens["openId"],
+      "coros_refresh_token": jsonTokens["refresh_token"],
+      "coros_expires_in": jsonTokens["refresh_token"],
+      "coros_expires_at": Date.now() + jsonTokens["refresh_token"],
+    },
+    {merge: true});
   }
   res.status(200);
   res.send();
