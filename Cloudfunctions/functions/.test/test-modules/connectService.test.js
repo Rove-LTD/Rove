@@ -196,7 +196,7 @@ describe("Testing that the developer can call API to connectService() and receiv
   })
   it('the redirect function should send the HTML page needed', async () => {
     let count = 0;
-    const htmlPage = await fs.promises.readFile("/Users/Alex/Desktop/FlutterDev/RoveAPI/Cloudfunctions/redirectPage/index.html");
+    const htmlPage = await fs.promises.readFile("../redirectPage/index.html");
 
     // set the request object with the correct provider, developerId and userId
     const req = {url: 'https://rovetest-beea7.web.app?transactionId=testTransactionId&devId='+testDev+'&devKey=test-key&provider=wahoo'};

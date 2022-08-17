@@ -30,14 +30,6 @@ admin.initializeApp();
 const db = admin.firestore();
 const storage = admin.storage();
 
-switch (process.env.GCLOUD_PROJECT) {
-  case "rove-26":
-    configurations.lookup = "roveLiveSecrets";
-    break;
-  case "rovetest-beea7":
-    configurations.lookup = "roveTestSecrets";
-    break;
-}
 const webhookInBox = require("./webhookInBox");
 const oauthWahoo = new OauthWahoo(configurations, db);
 const callbackBaseUrl = "https://us-central1-"+process.env.GCLOUD_PROJECT+".cloudfunctions.net";
@@ -1533,7 +1525,7 @@ exports.polarWebhook = functions.https.onRequest(async (request, response) => {
     const signature = request.headers["polar-webhook-signature"];
     const lookup = encodeparams
         .getLookupFromPolarSignature(
-            request.body,
+            request.rawBody,
             configurations.polarWebhookSecrets,
             signature);
     if (lookup == "error") { // TODO put in validation function
@@ -1600,21 +1592,24 @@ async function processPolarWebhook(webhookDoc) {
   // needed for this
   const userToken = userQuery.docs[0].data()["polar_access_token"];
   if (webhookBody.event == "EXERCISE") {
-    const headers = {
+    const headers1 = {
       "Accept": "application/json", "Authorization": "Bearer " + userToken,
+    };
+    const headers2 = {
+      "Accept": "*/*", "Authorization": "Bearer " + userToken,
     };
     const options = {
       url: "https://www.polaraccesslink.com/v3/exercises/" + webhookBody.entity_id,
-      method: "POST",
-      headers: headers,
+      method: "GET",
+      headers: headers1,
     };
     const activity = await got.get(options).json();
     options.url = options.url + "/fit";
-    options.method = "GET";
+    options.headers = headers2;
     const fitFile = await got.get(options);
-    const contents = fitFile.body;
+    const contents = fitFile.rawBody;
     // storing FIT file in bucket under activityId.fit
-    const storageRef = storage.bucket("gs://rovetest-beea7.appspot.com/");
+    const storageRef = storage.bucket();
     // TODO: shouldn't this be the default bucket without an argument?
     // then live will use live storage and test will use test storage?
     await storageRef.file("public/"+webhookBody.entity_id+".fit").save(contents);
@@ -1622,7 +1617,7 @@ async function processPolarWebhook(webhookDoc) {
     const urlOptions = {
       version: "v4",
       action: "read",
-      expires: Date.now() + 7*24*60*60*1000, // 7 days till expiry
+      expires: Date.now() + (7*24*60*60*1000)-1000, // 7 days in milleseconds till expiry
     };
     const downloadURL = await storageRef.file("public/"+webhookBody.entity_id+".fit").getSignedUrl(urlOptions);
 
