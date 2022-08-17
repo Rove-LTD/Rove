@@ -96,7 +96,7 @@ exports.connectService = functions.https.onRequest(async (req, res) => {
     res.send(url);
     return;
   }
-  const providers = ["strava", "garmin", "polar", "wahoo"];
+  const providers = ["strava", "garmin", "polar", "wahoo", "coros"];
   if (providers.includes(parameters.provider) == false) {
     url = "error: the provider was badly formatted, missing or not supported";
     res.status(400);
@@ -124,6 +124,8 @@ exports.connectService = functions.https.onRequest(async (req, res) => {
     url = await polarOauth(parameters, transactionId);
   } else if (parameters.provider == "wahoo") {
     url = await wahooOauth(parameters, transactionId);
+  } else if (parameters.provider == "coros") {
+    url = await corosOauth(parameters, transactionId);
   } else {
     // the request was badly formatted with incorrect provider parameter
     url = "error: the provider was badly formatted, missing or not supported";
@@ -798,6 +800,28 @@ exports.oauthCallbackHandlerGarmin = functions.https
       res.redirect(urlString);
     }),
 
+exports.corosCallback = functions.https.onRequest(async (req, res) => {
+  // https://us-central1-rove-26.cloudfunctions.net/corosCallback?code=rg2-59ad524187fc0c2972ef853832ac37fc&state=cyWUxCs9rItddD7OiawF
+  const oAuthCallback = Url.parse(req.url, true).query;
+  const code = oAuthCallback["code"];
+  const transactionId = oAuthCallback["state"];
+  const transactionData =
+          await getParametersFromTransactionId(transactionId);
+  const secretLookup = await db.collection("developers").doc(transactionData.devId).get();
+  const lookup = await secretLookup.data()["secret_lookup"];
+  const options = {"client_id": configurations[lookup]["corosClientId"],
+    "redirect_uri": transactionData.redirectUrl,
+    "code": code,
+    "client_secret": configurations[lookup]["corosSecret"],
+    "grant_type": "authorization_code"};
+  const accessTokens = await got.post("https://open.coros.com/oauth2/accesstoken?", options);
+  if (accessTokens.statusCode == 200) {
+    await db.collection("users").doc(transactionData.userId).set(JSON.parse(accessTokens));
+  }
+  res.status(200);
+  res.send();
+}),
+
 // callback from strava with token in
 exports.stravaCallback = functions.https.onRequest(async (req, res) => {
   // this comes from strava
@@ -1097,6 +1121,37 @@ async function garminOauth(transactionData, transactionId) {
       "&"+
       callbackURL;
   return _url;
+}
+
+async function corosOauth(transactionData, transactionId) {
+  const userId = transactionData.userId;
+  const devId =transactionData.devId;
+  const secretLookup = await db.collection("developers").doc(devId).get();
+  const lookup = await secretLookup.data()["secret_lookup"];
+  // add parameters from user onto the callback redirect.
+  const parameters = {
+    client_id: configurations[lookup]["corosClientId"],
+    response_type: "code",
+    redirect_uri: callbackBaseUrl+"/corosCallback",
+    state: transactionId,
+  };
+  //  https://open.coros.com/oauth2/authorize?
+
+  let encodedParameters = "";
+  let k = 0;
+  for (k in parameters) {
+    if (parameters[k] != null) {
+      const encodedValue = parameters[k];
+      const encodedKey = k;
+      if (encodedParameters === "") {
+        encodedParameters += `${encodedKey}=${encodedValue}`;
+      } else {
+        encodedParameters += `&${encodedKey}=${encodedValue}`;
+      }
+    }
+  }
+  const baseUrl = "https://open.coros.com/oauth2/authorize?";
+  return (baseUrl + encodedParameters);
 }
 
 async function polarOauth(transactionData, transactionId) {

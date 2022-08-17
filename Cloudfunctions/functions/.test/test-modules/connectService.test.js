@@ -162,6 +162,20 @@ describe("Testing that the developer can call API to connectService() and receiv
       await myFunctions.connectService(req, res);
 
   })
+  it.only('should get a properly formatted Coros redirect url...', async () => {
+    // set the request object with the correct provider, developerId and userId
+    const req = {url: 'https://us-central1-rovetest-beea7.cloudfunctions.net/connectService?devId='+testDev+'&userId='+testUser+'&devKey=test-key&provider=coros&isRedirect=true'};
+    // set the assertions for the expected response object
+    const res = {
+      redirect: (url) => {
+            assert.include(url, "https://open.coros.com/oauth2/authorize?client_id=e8925760066a490b9d26187f731020f8&response_type=code&redirect_uri=https://us-central1-rovetest-beea7.cloudfunctions.net/corosCallback&state=");
+            recievedPolarUrl = url;
+        },
+    }
+
+    await myFunctions.connectService(req, res);
+
+})
 
   it('should get a properly formatted wahoo redirect url...', async () => {
       // set the request object with the correct provider, developerId and userId

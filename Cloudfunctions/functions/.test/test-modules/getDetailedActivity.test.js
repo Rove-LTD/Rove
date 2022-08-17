@@ -127,7 +127,7 @@ describe("Check the get detailed activity service works: ", () => {
         assert.deepEqual(sanitisedActivityJson, expectedResult);
         
     })
-    it.only("Check Get Polar Detailed Activity Works.", async () => {
+    it("Check Get Polar Detailed Activity Works.", async () => {
         req = {
             debug: true,
             url: "https://ourDomain.com",
