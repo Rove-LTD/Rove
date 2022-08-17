@@ -73,6 +73,9 @@ const userId = urlVars["userId"];
 if (userId == "notion") {
 devId = "Notion Templates";
 }
+if (devId == "AiEndurance") {
+	devId = "AI Endurance"
+}
 const params = "?transactionId="+transactionId+"&isRedirect=true";
 var textBlock = document.getElementById("devName")
 textBlock.innerHTML = devId;
