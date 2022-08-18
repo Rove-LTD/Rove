@@ -29,7 +29,7 @@ myFunctions = require('../../index.js');
 // name as in the function we are testing
 const got = require('got');
 //-------------TEST --- Test Callbacks from Garmin-------
-describe("Testing that the Garmin callbacks work: ", () => {
+describe("Testing that the Coros callbacks work: ", () => {
   before(async () => {
     // reset the user doc before testing polar
     await admin.firestore()
@@ -44,59 +44,68 @@ describe("Testing that the Garmin callbacks work: ", () => {
       "provider": "coros",
       "userId": testUser,
       "devId": testDev,
-      "redirectUrl": "https://us-central1-rove-26.cloudfunctions.net/",
+      "redirectUrl": "https://bbc.co.uk",
     });
   });
   it.only('Coros callback should request and store tokens for connected user...', async () => {
-      //set up the stubbed response to mimic polar's response when called with the
+      //set up the stubbed response to mimic Coros' response when called with the
       //code to get the token
+      /* {
+    "access_token": "rg2-6ee918c0c7d3347aeaa1eae04a78d926",
+    "refresh_token": "rg2-b725c123e2494d58e8576642fdef6833",
+    "openId": "4211cf484d264f75935047b0d709d76c",
+    "expires_in": 2592000
+      } */
       const responseObject1 = {
           statusCode: 200,
           headers: {
             'content-type': 'application/json'
           },
-          body: "token=garmin-access-token&secret=garmin-test-secret",
-          expires_in: 21600,
+          body: JSON.stringify({
+            "access_token": "rg2-6ee918c0c7d3347aeaa1eae04a78d926",
+            "refresh_token": "rg2-b725c123e2494d58e8576642fdef6833",
+            "openId": "4211cf484d264f75935047b0d709d76c",
+            "expires_in": 2592000
+            }),
       };
-      const responseObject2 = {
-          statusCode: 200,
-          body: '{"userId": "test-garmin-user-id"}',
-      };
-
+      const testDate = Date.now();
       const expectedTestUserDoc = {
           devId: testDev,
           userId: testUser,
           email: devUserData.email,
-          garmin_access_token: "garmin-access-token",
-          garmin_access_token_secret: "garmin-test-secret",
-          garmin_user_id: "test-garmin-user-id",
-          garmin_connected: true,
+          "coros_access_token": "rg2-6ee918c0c7d3347aeaa1eae04a78d926",
+          "coros_id": "4211cf484d264f75935047b0d709d76c",
+          "coros_refresh_token": "rg2-b725c123e2494d58e8576642fdef6833",
+          "coros_expires_in": 2592000,
+          "coros_expires_at": testDate/1000 + 2592000,
+          "coros_connected": true,
       }
 
-      // const stubbedcall = sinon.stub(got, "post");
-      // stubbedcall.onFirstCall().returns(responseObject1);
-      // sinon.stub(got, "get").returns(responseObject2);
+      const stubbedcall = sinon.stub(got, "post");
+      stubbedcall.onFirstCall().returns(responseObject1);
 
       // set the request object with the correct provider, developerId and userId
-      const req = {url: 'https://us-central1-rove-26.cloudfunctions.net/corosCallback?code=rg2-b76a78166f35a903c5d8180a1404ee8a&state=corosTestTransaction',
+      const req = {url: 'https://us-central1-rove-26.cloudfunctions.net/corosCallback?code=rg2-106ffa603f751dc87dfdae8e1f7de41d&state=corosTestTransaction',
           debug: true
       };
 
       const res = {
-          send: (text) => {
-              assert.equal(text, "THANKS, YOU CAN NOW CLOSE THIS WINDOW")
-          },
+          send: (text) => {},
+          status: (code) => {assert.equal(code, 200)},
           redirect: (url) => {
-            assert.equal(url, "https://bbc.co.uk?userId="+testUser+"&provider=garmin");
+            assert.equal(url, "https://bbc.co.uk?userId="+testUser+"&provider=coros");
           },
       }
       await myFunctions.corosCallback(req, res);
+      const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+      await wait(1000);
 
       //now check the database was updated correctly
       testUserDoc = await admin.firestore()
       .collection("users")
       .doc(testDev+testUser)
       .get();
+      expectedTestUserDoc.coros_expires_at = testUserDoc.data()["coros_expires_at"];
       // cant check called with the right arguments as signiture is always different
 
       assert.deepEqual(testUserDoc.data(), expectedTestUserDoc);

@@ -801,7 +801,6 @@ exports.oauthCallbackHandlerGarmin = functions.https
     }),
 
 exports.corosCallback = functions.https.onRequest(async (req, res) => {
-  // https://us-central1-rove-26.cloudfunctions.net/corosCallback?code=rg2-59ad524187fc0c2972ef853832ac37fc&state=cyWUxCs9rItddD7OiawF
   const oAuthCallback = Url.parse(req.url, true).query;
   const code = oAuthCallback["code"];
   const transactionId = oAuthCallback["state"];
@@ -809,24 +808,32 @@ exports.corosCallback = functions.https.onRequest(async (req, res) => {
           await getParametersFromTransactionId(transactionId);
   const secretLookup = await db.collection("developers").doc(transactionData.devId).get();
   const lookup = await secretLookup.data()["secret_lookup"];
-  const options = {"client_id": configurations[lookup]["corosClientId"],
-    "redirect_uri": transactionData.redirectUrl,
-    "code": code,
-    "client_secret": configurations[lookup]["corosSecret"],
-    "grant_type": "authorization_code"};
+  const options = {
+    "headers": {"Content-Type": "application/x-www-form-urlencoded"},
+    "form": {
+      "client_id": configurations[lookup]["corosClientId"],
+      "redirect_uri": callbackBaseUrl+"/corosCallback",
+      "code": code,
+      "client_secret": configurations[lookup]["corosSecret"],
+      "grant_type": "authorization_code"}};
   const accessTokens = await got.post("https://open.coros.com/oauth2/accesstoken?", options);
-  console.log(accessTokens);
   if (accessTokens.statusCode == 200) {
     const jsonTokens = JSON.parse(accessTokens.body);
-    await db.collection("users").doc(transactionData.userId).set({"coros_access_token": jsonTokens["access_token"],
+    await db.collection("users").doc(transactionData.devId + transactionData.userId).set({
+      "devId": transactionData.devId,
+      "userId": transactionData.userId,
+      "coros_access_token": jsonTokens["access_token"],
       "coros_id": jsonTokens["openId"],
       "coros_refresh_token": jsonTokens["refresh_token"],
-      "coros_expires_in": jsonTokens["refresh_token"],
-      "coros_expires_at": Date.now() + jsonTokens["refresh_token"],
+      "coros_expires_in": jsonTokens["expires_in"],
+      "coros_connected": true,
+      "coros_expires_at": (Date.now()/1000) + jsonTokens["expires_in"],
     },
     {merge: true});
   }
   res.status(200);
+  const urlString = await successDevCallback(transactionData);
+  res.redirect(urlString);
   res.send();
 }),
 
