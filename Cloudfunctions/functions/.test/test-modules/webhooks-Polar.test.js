@@ -289,7 +289,7 @@ describe("Testing that the Polar Webhooks work: ", () => {
     sinon.restore();
     });
     it.skip('NO STUBBS so SKIPPED - read a specific webhookInBox event and process it without stubbing...', async () => {
-        const testDocId = "OWdxJh4Fa5nZDiGsyaEX";
+        const testDocId = "JtDTxPWIFBj55FcTQEEX";
         webhookDoc = await admin.firestore()
             .collection("webhookInBox")
             .doc(testDocId)
@@ -297,7 +297,7 @@ describe("Testing that the Polar Webhooks work: ", () => {
         
         webhookDocData = webhookDoc.data();
         
-        const snapshot = test.firestore.makeDocumentSnapshot(webhookDocData, "webhookInBox/"+webhookDocData.id);
+        const snapshot = test.firestore.makeDocumentSnapshot(webhookDocData, "webhookInBox/"+webhookDoc.id);
 
         wrapped = test.wrap(myFunctions.processWebhookInBox);
         await wrapped(snapshot);
