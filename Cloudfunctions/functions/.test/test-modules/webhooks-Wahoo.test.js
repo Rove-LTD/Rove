@@ -114,7 +114,7 @@ describe("Testing that the Wahoo Webhooks work: ", () => {
             "webhookInBox called with wrong args: "+args);
 
     });
-    it('read webhookInBox event and process it successfully...', async () => {
+    it.only('read webhookInBox event and process it successfully...', async () => {
 
         const snapshot = test.firestore.makeDocumentSnapshot(successfulWebhookMessage1, "webhookInBox/"+successfulWebhookMessageDoc1);
 
@@ -165,15 +165,63 @@ describe("Testing that the Wahoo Webhooks work: ", () => {
                 },
             },
             raw: JSON.parse(successfulWebhookMessage1.body),
-            "status": "sent",
+            "status": "not tested",
             "timestamp": "not tested",
         }
-       sanatisedActivity.timestamp = "not tested";
+        sanatisedActivity.timestamp = "not tested";
+        sanatisedActivity.status = "not tested";
   
        assert.deepEqual(sanatisedActivity, expectedResults);
        sinon.restore();
   
       });
+    it.only('Check sending webhook message to developers works...', async ()=>{
+        activityDoc = {
+            sanitised: {
+                userId: testUser,
+                activity_id: 140473420,
+                activity_name: "Cycling",
+                activity_type: "BIKING",
+                distance_in_meters: "0.0",
+                average_pace_in_meters_per_second: "0.0",
+                active_calories: "0.0",
+                activity_duration_in_seconds: "9.0",
+                start_time: '2022-06-13T16:38:51.000Z',
+                average_heart_rate_bpm: "0.0",
+                average_cadence: "0.0",
+                elevation_gain: "0.0",
+                elevation_loss: null,
+                provider: "wahoo",
+                power_bike_tss_last: null,
+                power_bike_np_last: null,
+                ascent_accum: "0.0",
+                duration_paused_accum: "0.0",
+                created_at: "2022-06-13T16:39:09.000Z",
+                updated_at: "2022-06-13T16:39:09.000Z",
+                power_avg: "0.0",
+                file: {
+                    "url":"https://cdn.wahooligan.com/wahoo-cloud/production/uploads/workout_file/file/WpHvKL3irWsv2vHzGzGF_Q/2022-06-13-163851-ELEMNT_AE48-274-0.fit"
+                },
+            },
+            raw: JSON.parse(successfulWebhookMessage1.body),
+            "status": "not tested",
+            "timestamp": "not tested",
+        }
+
+        const snapshot = test.firestore.makeDocumentSnapshot(activityDoc, "users/"+testDev+testUser+"/activities/"+activityDoc.sanitised.activity_id+"wahoo");
+        wrapped = test.wrap(myFunctions.sendToDeveloper);
+        await wrapped(snapshot, {params: {userDocId: testDev+testUser}});
+        //now check the database was updated correctly
+       const testUserDocs = await admin.firestore()
+       .collection("users")
+       .doc(testDev+testUser)
+       .collection("activities")
+       .get();
+  
+       const sanatisedActivity = testUserDocs.docs[0].data();
+       assert.deepEqual(sanatisedActivity, activityDoc);
+       sinon.restore();
+    })
     it('Webhooks should repond with status 401 if method incorrect...', async () => {
     // set the request object with the correct provider, developerId and userId
     const req = {
