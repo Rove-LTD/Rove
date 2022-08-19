@@ -1341,6 +1341,18 @@ exports.wahooCallback = functions.https.onRequest(async (req, res) => {
   }
 });
 
+exports.corosWebhook = functions.https.onRequest(async (request, response) => {
+  const webhookDoc = await webhookInBox.push(request, "wahoo", "roveLiveSecrets");
+  response.status(200);
+  response.send();
+});
+
+exports.corosStatus = functions.https.onRequest(async (request, response) => {
+  // a service status request, which at the moment is always ok.
+  response.status(200);
+  response.send();
+});
+
 exports.stravaWebhook = functions.https.onRequest(async (request, response) => {
   if (!request.debug) {
     functions.logger.info("---> Strava "+request.method+" webhook event received!", {
@@ -1531,6 +1543,8 @@ exports.processWebhookInBox = functions.firestore
           case "garmin":
             await processGarminWebhook(snap);
             break;
+          case "coros":
+            await processCorosWebhook(snap);
         }
         webhookInBox.delete(snap.ref);
       } catch (error) {
@@ -1578,6 +1592,50 @@ async function processWahooWebhook(webhookDoc) {
   for (const userDoc of userDocsList) {
     saveAndSendActivity(userDoc,
         sanitisedActivity,
+        webhookBody);
+  }
+  return;
+}
+
+async function processCorosWebhook(webhookDoc) {
+  const webhookBody = JSON.parse(webhookDoc.data()["body"]);
+  const lookup = webhookDoc.data()["secret_lookup"];
+  const userDocsList = [];
+  const devDocsList = [];
+
+  const devQuery = await db.collection("developers")
+      .where("secret_lookup", "==", lookup)
+      .get();
+  devQuery.docs.forEach((doc)=>{
+    devDocsList.push(doc.id);
+  });
+
+  const userQuery = await db.collection("users")
+      .where("coros_user_id", "==", webhookBody.sportDataList[0].openId)
+      .get();
+
+  userQuery.docs.forEach((doc)=>{
+    // exclude devs that are not managed by this webhook subscription
+    if (devDocsList.includes(doc.data()["devId"])) {
+      userDocsList.push(doc);
+    }
+  });
+
+  if (userDocsList.length == 0) {
+    // there is an issue if there are no users with a userId in the DB.
+    console.log("error: zero users registered to coros webhook: " + webhookBody.sportDataList[0].openId);
+    throw Error("zero users registered to coros webhook owner_id "+webhookBody.user.id);
+  }
+
+  // now we have a list of user Id's that are interested in this
+  //  data
+  // 1) sanatise and 2) send
+  // const sanitisedActivity = filters.corosSanitise(webhookBody);
+
+  // save raw and sanitised activites as a backup for each user
+  for (const userDoc of userDocsList) {
+    saveAndSendActivity(userDoc,
+        {activity_id: webhookBody.sportDataList[0].labelId},
         webhookBody);
   }
   return;

@@ -1,0 +1,198 @@
+// Follow the instructions in README.md for running these tests.
+// Visit https://firebase.google.com/docs/functions/unit-testing to learn more
+// about using the `firebase-functions-test` SDK.
+
+// -----------------------COMMON TEST SETUP---------------------------//
+// Chai is a commonly used library for creating unit test suites. It is easily 
+// extended with plugins.
+const chai = require('chai');
+const assert = chai.assert;
+// Sinon is a library used for mocking or verifying function calls in JavaScript.
+const sinon = require('sinon');
+// -------------------END COMMON TEST SETUP---------------------------//
+
+// -----------INITIALISE THE ROVE TEST PARAMETERS----------------------------//
+const testParameters = require('../testParameters.json');
+const firebaseConfig = testParameters.firebaseConfig;
+const testUser = testParameters.testUser
+const testDev = testParameters.testDev
+const unsuccessfulWebhookMessageDoc = "unsuccessfulTestWebhookMessageDoc";
+const successfulWebhookMessageDoc = "successfulTestWebhookMessageDoc";
+let successfulWebhookMessage;
+let unsuccessfulWebhookMessage;
+const devTestData = testParameters.devTestData
+const devUserData = testParameters.devUserData
+const test = require('firebase-functions-test')(firebaseConfig, testParameters.testKeyFile);
+const admin = require("firebase-admin");
+myFunctions = require('../../index.js');
+const corosPush = JSON.stringify(require("./coros.json"));
+// -----------END INITIALISE ROVE TEST PARAMETERS----------------------------//
+
+// ---------REQUIRE FUNCTONS TO BE STUBBED----------------------//
+// include the functions that we are going to be stub in the
+// testing processes - these have to have the same constant
+// name as in the function we are testing
+const got = require('got');
+const webhookInBox = require('../../webhookInBox');
+//-------------TEST --- webhooks-------
+describe("Testing that the Coros Webhooks work: ", () => {
+    before ('set up the userIds in the test User doc', async () => {
+      await admin.firestore()
+      .collection("users")
+      .doc(testDev+testUser)
+      .set({
+          "devId": testDev,
+          "userId": testUser,
+          "coros_user_id": "42dbb958c5a146f29ce9f89e05e5195a",
+      }, {merge: true});
+
+      activityDocs = await admin.firestore()
+          .collection("users")
+          .doc(testDev+testUser)
+          .collection("activities")
+          .get();
+      
+      activityDocs.forEach(async (doc)=>{
+          await doc.ref.delete();
+      });
+
+      successfulWebhookMessage = {
+            provider: "coros",
+            body: corosPush,
+            method: "POST",
+            secret_lookup: "roveLiveSecrets",
+            status: "added before the tests to be successful",
+        }
+
+            unsuccessfulWebhookMessage = {
+                provider: "coros",
+                body: corosPush,
+                method: "POST",
+                secret_lookup: "roveLiveSecrets",
+                status: "added before the tests to be unsuccessful",
+            }
+
+    });
+    after('clean-up the webhookInbox documents',async ()=>{
+
+    })
+    it.only('Webhooks should log event and repond with status 200...', async () => {
+      // set the request object with the correct provider, developerId and userId
+      const req = {
+          debug: true,
+          url: "https://us-central1-rovetest-beea7.cloudfunctions.net/corosWebhook",
+          method: "POST",
+          body: corosPush
+    };
+    res = {
+        status: (code)=>{assert.equal(code, 200);},
+        send: (text)=>{assert.equal(text, undefined)},
+    }
+    // set up stubs so that WebhookInBox is not written to
+    // this would trigger the function in the online environment
+    const stubbedWebhookInBox = sinon.stub(webhookInBox, "push");
+    stubbedWebhookInBox.onCall(0).returns("testDoc");
+
+    await myFunctions.corosWebhook(req, res);
+
+    const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+    await wait(1000);
+    // check the webhookInBox was called correctly
+    args = stubbedWebhookInBox.getCall(0).args; //this first call
+    /*
+    assert(stubbedWebhookInBox.calledOnceWith(req, "coros", "roveTestSecrets"),
+            "webhookInBox called with wrong args: "+args);*/
+    });
+    it.only('read webhookInBox event and process it successfully...', async () => {
+
+        const snapshot = test.firestore.makeDocumentSnapshot(successfulWebhookMessage, "webhookInBox/"+successfulWebhookMessageDoc);
+
+        // set up stubs so that WebhookInBox is not deleted as the record
+        // will not be there - it was not written
+        const stubbedWebhookInBox = sinon.stub(webhookInBox, "delete");
+
+        wrapped = test.wrap(myFunctions.processWebhookInBox);
+        await wrapped(snapshot);
+
+        const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+        await wait(1000);
+        // check the webhookInBox function was called with the correct args
+        assert(stubbedWebhookInBox.calledOnceWith(snapshot.ref), "webhookInBox called incorrectly");
+        //now check the database was updated correctly
+       const testUserDocs = await admin.firestore()
+       .collection("users")
+       .doc(testDev+testUser)
+       .collection("activities")
+       .get();
+  
+       const sanatisedActivity = testUserDocs.docs[0].data();
+       const expectedResults = {
+            raw: JSON.parse(successfulWebhookMessage.body),
+            sanitised: {activity_id: "418173292602490880",
+            userId: "paulsNewTestUser"},
+            "status": "sent",
+            "timestamp": "not tested",
+        }
+       sanatisedActivity.timestamp = "not tested";
+       assert.deepEqual(sanatisedActivity, expectedResults);
+       sinon.restore();
+      });
+    it.only('Webhooks should repond with status 401 if method incorrect...', async () => {
+    // set the request object with the correct provider, developerId and userId
+    const req = {
+        debug: true,
+        url: "https://us-central1-rovetest-beea7.cloudfunctions.net/corosWebhook",
+        method: "DELETE",
+        body: corosPush
+    };
+    res = {
+        sendStatus: (code)=>{assert.equal(code, 401);},
+    }
+    // set up stubs so that WebhookInBox is not written to
+    // this would trigger the function in the online environment
+    const stubbedWebhookInBox = sinon.stub(webhookInBox, "push");
+    stubbedWebhookInBox.onCall().returns("testDoc");
+    await myFunctions.wahooWebhook(req, res);
+    // check the inBox was not written to
+    assert.equal(stubbedWebhookInBox.notCalled, true);
+    sinon.restore();
+    });
+    it.only('Webhooks should repond with status 401 if webhook token is incorrect...', async () => {
+        // set the request object with the correct provider, developerId and userId
+        const req = {
+            debug: true,
+            url: "https://us-central1-rovetest-beea7.cloudfunctions.net/wahooWebhook",
+            method: "POST",
+            body: corosPush
+        };
+        res = {
+            send: (text)=>{assert.equal(text, "NOT AUTHORISED")},
+            status: (code)=>{assert.equal(code, 401);},
+        }
+        // set up stubs so that WebhookInBox is not written to
+        // this would trigger the function in the online environment
+        const stubbedWebhookInBox = sinon.stub(webhookInBox, "push");
+        stubbedWebhookInBox.onCall().returns("testDoc");
+        await myFunctions.wahooWebhook(req, res);
+        // check the inBox was not written to
+        assert.equal(stubbedWebhookInBox.notCalled, true);
+        sinon.restore();
+
+    });
+    it.only('read webhook message and error if sanitise fails and repond with status 200...', async () => {
+
+        const data = unsuccessfulWebhookMessage;
+
+        const snapshot = test.firestore.makeDocumentSnapshot(data, "webhookInBox/"+unsuccessfulWebhookMessageDoc);
+        // set up stubs so that WebhookInBox is updated 
+        const stubbedWebhookInBox = sinon.stub(webhookInBox, "writeError");
+        wrapped = test.wrap(myFunctions.processWebhookInBox);
+        await wrapped(snapshot);
+        args = stubbedWebhookInBox.getCall(0).args; //this first call
+        // check webhookInBox called with the correct parameters
+        assert(stubbedWebhookInBox.calledOnce, "webhookInBox called too many times");
+        assert.equal(args[1].message, "don't recognise the coros event_type: incorrect");
+        assert.equal(args[0], snapshot.ref);
+        sinon.restore();
+    });
+}); //End TEST
