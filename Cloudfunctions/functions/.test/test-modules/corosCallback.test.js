@@ -47,7 +47,7 @@ describe("Testing that the Coros callbacks work: ", () => {
       "redirectUrl": "https://bbc.co.uk",
     });
   });
-  it.only('Coros callback should request and store tokens for connected user...', async () => {
+  it('Coros callback should request and store tokens for connected user...', async () => {
       //set up the stubbed response to mimic Coros' response when called with the
       //code to get the token
       /* {

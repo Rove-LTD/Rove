@@ -1733,13 +1733,20 @@ async function processCorosWebhook(webhookDoc) {
   // now we have a list of user Id's that are interested in this
   //  data
   // 1) sanatise and 2) send
-  // const sanitisedActivity = filters.corosSanitise(webhookBody);
-
+  let sanitisedActivities = [];
+  let currentActivity;
+  // return a list of sanitisedActivities
+  for (let i = 0; i<webhookBody.sportDataList.length; i++) {
+    currentActivity = filters.corosSanatise(webhookBody.sportDataList[i]);
+    sanitisedActivities = sanitisedActivities.concat(currentActivity);
+  }
   // save raw and sanitised activites as a backup for each user
   for (const userDoc of userDocsList) {
-    saveAndSendActivity(userDoc,
-        {activity_id: webhookBody.sportDataList[0].labelId},
-        webhookBody);
+    for (let i = 0; i<sanitisedActivities.length; i++) {
+      saveAndSendActivity(userDoc,
+          sanitisedActivities[i],
+          webhookBody);
+    }
   }
   return;
 }

@@ -68,7 +68,7 @@ describe("Check the Wahoo Disconnect Service works: ", () => {
         .collection("activities")
         .doc()
         .set({raw: {field1: "somedata"},
-            sanitised: {data_source: "wahoo"}});
+            sanitised: {provider: "wahoo"}});
 
   });
   it('Check that service returns with error if user is not already authorised', async () => {
@@ -121,7 +121,7 @@ describe("Check the Wahoo Disconnect Service works: ", () => {
         .collection("users")
         .doc(testDev+testUser)
         .collection("activities")
-        .where("sanitised.data_source","==","wahoo")
+        .where("sanitised.provider","==","wahoo")
         .get();
     
     const expectedUserResults = {
@@ -178,7 +178,7 @@ describe("Check the Wahoo Disconnect Service works: ", () => {
         .collection("users")
         .doc(testDev+testUser)
         .collection("activities")
-        .where("sanitised.data_source","==","wahoo")
+        .where("sanitised.provider","==","wahoo")
         .get();
     
     const expectedUserResults = {
@@ -234,7 +234,7 @@ describe("Check the Wahoo Disconnect Service works: ", () => {
         .collection("users")
         .doc(testDev+testUser)
         .collection("activities")
-        .where("sanitised.data_source","==","wahoo")
+        .where("sanitised.provider","==","wahoo")
         .get();
     
     const expectedUserResults = {
@@ -310,7 +310,7 @@ describe("Check the Wahoo Disconnect Service works: ", () => {
           .collection("users")
           .doc(testDev+testUser)
           .collection("activities")
-          .where("sanitised.data_source","==","wahoo")
+          .where("sanitised.provider","==","wahoo")
           .get();
       
       const expectedUserResults = {

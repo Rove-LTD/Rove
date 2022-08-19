@@ -251,7 +251,7 @@ describe("Check the coros Disconnect Service works: ", () => {
 
     sinon.restore();
   });
-    it.only('Check that service succeeds if user authorised already and refresh code needed', async () => {
+    it('Check that service succeeds if user authorised already and refresh code needed', async () => {
 
       await admin.firestore()
       .collection("users")
@@ -286,11 +286,11 @@ describe("Check the coros Disconnect Service works: ", () => {
       testResponsePost = {
         json() { return {
           "expires_in":2592000,
-          "refresh_token":"08a06b7df38d0d2852e5927c763f09d5",
-          "access_token":"db0214b6006e7570bd80b1894132b7bc",
-          "openId":"b93ac3b5df6b4db3be5477706689427e"
-        }
-        }
+          "refresh_token":"test-coros-refresh",
+          "access_token":"test-coros-access",
+          "openId":"test-coros-id"
+      }
+      }
       }
 
       const stubbedPost = sinon.stub(got, "post");
@@ -298,12 +298,7 @@ describe("Check the coros Disconnect Service works: ", () => {
       stubbedPost.onSecondCall().returns(testResponseDelete);
       
       await myFunctions.disconnectService(req, res);
-      // check the got function was called with the correct options
-      // check the wahoo fields were deleted from the database
-      // check the wahoo activities were deleted from the database only for this user
-      // got function call checks
-      //stubbedDelete.calledOnceWith("deleteArgs");
-      //stubbedPost.calledOnceWith("postArgs");
+
       const userDoc = await admin.firestore()
           .collection("users")
           .doc(testDev+testUser)

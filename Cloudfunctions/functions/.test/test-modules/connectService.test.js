@@ -141,7 +141,7 @@ describe("Testing that the developer can call API to connectService() and receiv
       await myFunctions.connectService(req, res);
       // check the stubbed function was called with the correct arguments
       calledWith = stubbedcall.args[0].toString();
-      assert.include(calledWith, "https://connectapi.garmin.com/oauth-service/oauth/request_token?oauth_consumer_key=eb0a9a22-db68-4188-a913-77ee997924a8&oauth_nonce=" );
+      assert.include(calledWith, "https://connectapi.garmin.com/oauth-service/oauth/request_token?oauth_consumer_key=d3dd1cc9-06b2-4b3e-9eb4-8a40cbd8e53f&oauth_nonce=" );
       assert.include(calledWith, "&oauth_signature_method=HMAC-SHA1&oauth_timestamp=");
       assert.include(calledWith, "&oauth_signature=");
       assert.include(calledWith, "&oauth_version=1.0");

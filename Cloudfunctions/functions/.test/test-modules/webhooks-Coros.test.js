@@ -129,7 +129,7 @@ describe("Testing that the Coros Webhooks work: ", () => {
        const expectedResults = {
             raw: JSON.parse(successfulWebhookMessage.body),
             sanitised: {activity_id: "418173292602490880",
-            userId: "paulsNewTestUser"},
+            userId: testParameters.testUser},
             "status": "sent",
             "timestamp": "not tested",
         }
@@ -137,7 +137,7 @@ describe("Testing that the Coros Webhooks work: ", () => {
        assert.deepEqual(sanatisedActivity, expectedResults);
        sinon.restore();
       });
-    it.only('Webhooks should repond with status 401 if method incorrect...', async () => {
+    it('Webhooks should repond with status 401 if method incorrect...', async () => {
     // set the request object with the correct provider, developerId and userId
     const req = {
         debug: true,
@@ -179,7 +179,7 @@ describe("Testing that the Coros Webhooks work: ", () => {
         sinon.restore();
 
     });
-    it('read webhook message and error if sanitise fails and repond with status 200...', async () => {
+    it.skip('read webhook message and error if sanitise fails and repond with status 200...', async () => {
 
         const data = unsuccessfulWebhookMessage;
 
