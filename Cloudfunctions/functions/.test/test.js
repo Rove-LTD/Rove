@@ -87,4 +87,5 @@ describe('ROVE full integration test scripts', () => {
     require ('./test-modules/getDetailedActivity.test.js');
     require ('./test-modules/corosCallback.test');
     require ('./test-modules/webhooks-Coros.test');
+    require ('./test-modules/corosDisconnect.test');
 });

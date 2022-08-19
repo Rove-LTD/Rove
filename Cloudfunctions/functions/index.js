@@ -448,7 +448,7 @@ exports.disconnectService = functions.https.onRequest(async (req, res) => {
     return;
   }
 
-  const providers = ["strava", "garmin", "polar", "wahoo"];
+  const providers = ["strava", "garmin", "polar", "wahoo", "coros"];
   // check if this user is authorized already
   // if they are then deauthorize and respond with success/failure message
   // if they are not then error - user not authorised with this provider
@@ -498,6 +498,22 @@ exports.disconnectService = functions.https.onRequest(async (req, res) => {
     } else if (provider == "wahoo") {
       if (userDocData["wahoo_connected"] == true) {
         result = await deleteWahooActivity(userDoc, false);
+        // check success or fail. result 200 is success 400 is failure
+        if (result == 200) {
+          res.status(200);
+          message = JSON.stringify({status: "disconnected"});
+        } else {
+          res.status(result);
+          message = "error: unexpected problem";
+        }
+      } else {
+        res.status(400);
+        message = "error: the userId was not authorised for this provider";
+        // error the user is not authorizes already
+      }
+    } else if (provider == "coros") {
+      if (userDocData["coros_connected"] == true) {
+        result = await deleteCorosActivity(userDoc, false);
         // check success or fail. result 200 is success 400 is failure
         if (result == 200) {
           res.status(200);
@@ -563,7 +579,7 @@ async function deleteStravaActivity(userDoc, webhookCall) {
   });
 
   const activities = await userDoc.ref.collection("activities")
-      .where("sanitised.data_source", "==", "strava")
+      .where("sanitised.provider", "==", "strava")
       .get();
   await activities.forEach(async (doc)=>{
     await doc.ref.delete();
@@ -604,7 +620,7 @@ async function deleteGarminActivity(userDoc, webhookCall) {
     });
     // delete activities from provider.
     const activities = await userDoc.ref.collection("activities")
-        .where("sanitised.data_source", "==", "garmin")
+        .where("sanitised.provider", "==", "garmin")
         .get();
     activities.forEach(async (doc)=>{
       await doc.ref.delete();
@@ -680,7 +696,7 @@ async function deletePolarActivity(userDoc, webhookCall) {
     });
     // delete activities from provider.
     const activities = await userDoc.ref.collection("activities")
-        .where("sanitised.data_source", "==", "polar")
+        .where("sanitised.provider", "==", "polar")
         .get();
     activities.forEach(async (doc)=>{
       await doc.ref.delete();
@@ -731,7 +747,7 @@ async function deleteWahooActivity(userDoc) {
     });
     // delete activities from provider.
     const activities = await userDoc.ref.collection("activities")
-        .where("sanitised.data_source", "==", "wahoo")
+        .where("sanitised.provider", "==", "wahoo")
         .get();
     activities.forEach(async (doc)=>{
       await doc.ref.delete();
@@ -741,6 +757,93 @@ async function deleteWahooActivity(userDoc) {
   } catch (error) {
     return 400;
   }
+}
+
+async function deleteCorosActivity(userDoc) {
+  const userQueryList = await db.collection("users").
+      where("coros_id", "==", userDoc.data()["coros_id"])
+      .get();
+  if (userQueryList.docs.length == 1) {
+    try {
+      const accessToken = await getCorosToken(userDoc);
+      const options = {
+        url: "https://open.coros.com/oauth2/deauthorize?token=" + accessToken,
+        method: "POST",
+      };
+      const deAuthResponse = await got.post(options).json();
+      if (deAuthResponse.result != "0000") {
+        return 400;
+      }
+    } catch (error) {
+      if (error == 401) { // unauthorised
+        // consider refreshing the access code and trying again
+      }
+      return 400;
+    }
+  }
+  try {
+    // delete wahoo keys and activities
+    await db.collection("users").doc(userDoc.id).update({
+      coros_access_token: admin.firestore.FieldValue.delete(),
+      coros_connected: admin.firestore.FieldValue.delete(),
+      coros_refresh_token: admin.firestore.FieldValue.delete(),
+      coros_token_expires_in: admin.firestore.FieldValue.delete(),
+      coros_token_expires_at: admin.firestore.FieldValue.delete(),
+      wahoo_created_at: admin.firestore.FieldValue.delete(),
+      coros_id: admin.firestore.FieldValue.delete(),
+    });
+    // delete activities from provider.
+    const activities = await userDoc.ref.collection("activities")
+        .where("sanitised.provider", "==", "coros")
+        .get();
+    activities.forEach(async (doc)=>{
+      await doc.ref.delete();
+    });
+    await sendToDeauthoriseWebhook(userDoc, "coros", 0);
+    return 200;
+  } catch (error) {
+    return 400;
+  }
+}
+
+async function getCorosToken(userDoc) {
+  const userToken = userDoc.data()["coros_access_token"];
+  const devId = userDoc.data()["devId"];
+  const userId = userDoc.data()["userId"];
+  if (userId == undefined || devId == undefined) {
+    throw (new Error("error: userId or DevId not set"));
+  }
+  const expiresAt = userDoc.data()["coros_token_expires_at"];
+  if (expiresAt < Date.now()/1000) {
+    // out of date token can be refreshed by Coros.
+    const secretLookup = await db.collection("developers").doc(devId).get();
+    const lookup = await secretLookup.data()["secret_lookup"];
+    const options = {
+      "headers": {"Content-Type": "application/x-www-form-urlencoded"},
+      "form": {
+        "client_id": configurations[lookup]["corosClientId"],
+        "refresh_token": userDoc.data()["coros_refresh_token"],
+        "client_secret": configurations[lookup]["corosSecret"],
+        "grant_type": "refresh_token"}};
+    const accessCodeResponse = await got.post("https://open.coros.com/oauth2/refresh-token", options).json();
+    if (accessCodeResponse.hasOwnProperty("access_token")) {
+      const accessToken = await corosStoreTokens(accessCodeResponse, userDoc);
+      return accessToken;
+    }
+  } else {
+    return userToken;
+  }
+}
+async function corosStoreTokens(tokens, userDoc) {
+  await db.collection("users").doc(userDoc.id).set({
+    "coros_connected": true,
+    "coros_access_token": tokens["access_token"],
+    "coros_refresh_token": tokens["refresh_token"],
+    "coros_token_expires_at": Date.now()/1000 + tokens["expires_in"],
+    "coros_token_expires_in": tokens["expires_in"],
+    "coros_id": tokens["openId"],
+  }, {merge: true});
+  return tokens["access_token"];
 }
 
 async function sendToDeauthoriseWebhook(userDoc, provider, triesSoFar) {

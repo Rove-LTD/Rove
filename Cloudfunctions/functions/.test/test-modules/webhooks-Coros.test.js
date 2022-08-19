@@ -76,7 +76,7 @@ describe("Testing that the Coros Webhooks work: ", () => {
     after('clean-up the webhookInbox documents',async ()=>{
 
     })
-    it.only('Webhooks should log event and repond with status 200...', async () => {
+    it('Webhooks should log event and repond with status 200...', async () => {
       // set the request object with the correct provider, developerId and userId
       const req = {
           debug: true,
@@ -103,7 +103,7 @@ describe("Testing that the Coros Webhooks work: ", () => {
     assert(stubbedWebhookInBox.calledOnceWith(req, "coros", "roveTestSecrets"),
             "webhookInBox called with wrong args: "+args);*/
     });
-    it.only('read webhookInBox event and process it successfully...', async () => {
+    it('read webhookInBox event and process it successfully...', async () => {
 
         const snapshot = test.firestore.makeDocumentSnapshot(successfulWebhookMessage, "webhookInBox/"+successfulWebhookMessageDoc);
 
@@ -157,7 +157,7 @@ describe("Testing that the Coros Webhooks work: ", () => {
     assert.equal(stubbedWebhookInBox.notCalled, true);
     sinon.restore();
     });
-    it.only('Webhooks should repond with status 401 if webhook token is incorrect...', async () => {
+    it('Webhooks should repond with status 401 if webhook token is incorrect...', async () => {
         // set the request object with the correct provider, developerId and userId
         const req = {
             debug: true,
@@ -179,7 +179,7 @@ describe("Testing that the Coros Webhooks work: ", () => {
         sinon.restore();
 
     });
-    it.only('read webhook message and error if sanitise fails and repond with status 200...', async () => {
+    it('read webhook message and error if sanitise fails and repond with status 200...', async () => {
 
         const data = unsuccessfulWebhookMessage;
 
