@@ -54,7 +54,7 @@ const webhookInBox = require('../../webhookInBox');
         .collection("activities")
         .doc()
         .set({raw: {field1: "somedata"},
-            sanitised: {data_source: "strava"}});
+            sanitised: {provider: "strava"}});
 
   });
   it('Check Strava De-auth webhook saves to the InBox.', async () => {
@@ -125,7 +125,7 @@ const webhookInBox = require('../../webhookInBox');
         .collection("users")
         .doc(testDev+testUser)
         .collection("activities")
-        .where("sanitised.data_source","==","strava")
+        .where("sanitised.provider","==","strava")
         .get();
     
     const expectedUserResults = {
@@ -176,7 +176,7 @@ const webhookInBox = require('../../webhookInBox');
         .collection("users")
         .doc(testDev+testUser)
         .collection("activities")
-        .where("sanitised.data_source","==","strava")
+        .where("sanitised.provider","==","strava")
         .get();
     
     const expectedUserResults = {
