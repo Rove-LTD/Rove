@@ -32,6 +32,7 @@ const db = admin.firestore();
 const storage = admin.storage();
 
 const webhookInBox = require("./webhookInBox");
+const getHistoryInBox = require("./getHistoryInBox");
 const oauthWahoo = new OauthWahoo(configurations, db);
 const callbackBaseUrl = "https://us-central1-"+process.env.GCLOUD_PROJECT+".cloudfunctions.net";
 const redirectPageUrl = "https://"+process.env.GCLOUD_PROJECT+".web.app";
@@ -236,7 +237,7 @@ exports.getActivityList = functions.https.onRequest(async (req, res) => {
       saveAndSendActivity(userDoc,
           payload[i].sanitised,
           payload[i].raw);
-    } // TODO: set a status in the activity doc to prevent sending to developer? also check userId is being set properly - perhaps should call saveAndSendToDeveloper()
+    }
     res.send("OK");
   } catch (error) {
     res.status(400);
@@ -905,6 +906,8 @@ exports.oauthCallbackHandlerGarmin = functions.https
       const transactionData =
           await getParametersFromTransactionId(transactionId);
       await oauthCallbackHandlerGarmin(oAuthCallback, transactionData);
+      await getHistoryInBox.push("garmin",
+          transactionData.devId+transactionData.userId);
       const urlString = await successDevCallback(transactionData);
       res.redirect(urlString);
     }),
@@ -940,6 +943,8 @@ exports.corosCallback = functions.https.onRequest(async (req, res) => {
     },
     {merge: true});
   }
+  await getHistoryInBox("coros",
+      transactionData.devId + transactionData.userId);
   res.status(200);
   const urlString = await successDevCallback(transactionData);
   res.redirect(urlString);
@@ -982,18 +987,11 @@ exports.stravaCallback = functions.https.onRequest(async (req, res) => {
       // this is where the tokens come back.
       stravaStoreTokens(userId, devId, JSON.parse(body), db);
       await getStravaAthleteId(userId, devId, JSON.parse(body));
-      // send a response now to endpoint for devId confirming success
-      // await sendDevSuccess(devId); //TODO: create dev success post.
-      // userResponse = "Some good redirect.";
       const urlString = await successDevCallback(transactionData);
       res.redirect(urlString);
     } else {
       res.send("Error: "+response.statusCode+
          " please close this window and try again");
-      // console.log(JSON.parse(body));
-      // send an error response to dev.
-      // TODO: create dev fail post.
-      // userResponse = "Some bad redirect";
     }
   });
 });
@@ -1356,21 +1354,12 @@ exports.polarCallback = functions.https.onRequest(async (req, res) => {
       let message ="";
       message = await registerUserWithPolar(userId, devId, JSON.parse(body), db);
       await polarStoreTokens(userId, devId, JSON.parse(body), db);
-      // send a response now to endpoint for devId confirming success
-      // await sendDevSuccess(devId); //TODO: create dev success post.
-      // userResponse = "Some good redirect.";
+      await getHistoryInBox("polar", devId + userId);
       const urlString = await successDevCallback(transactionData);
-      const recentActivities = await getPolarActivityList(userId);
-      for (const activity of recentActivities) {
-        await saveAndSendActivity(db.collection("users").doc(userId), activity["sanitised"], activity["raw"]);
-      }
       res.redirect(urlString);
     } else {
       res.send("Error: "+response.statusCode+":"+body.toString()+" please close this window and try again");
       console.log(JSON.parse(body));
-      // send an error response to dev.
-      // TODO: create dev fail post.
-      // userResponse = "Some bad redirect";
     }
   });
   return;
@@ -1449,6 +1438,7 @@ exports.wahooCallback = functions.https.onRequest(async (req, res) => {
     await oauthWahoo.getAndSaveAccessCodes();
   }
   if (!oauthWahoo.error) {
+    await getHistoryInBox.push("wahoo", oauthWahoo.userDocId);
     const urlString = await successDevCallback(transactionData);
     res.redirect(urlString);
   } else {
@@ -1864,8 +1854,7 @@ async function processPolarWebhook(webhookDoc) {
     const contents = fitFile.rawBody;
     // storing FIT file in bucket under activityId.fit
     const storageRef = storage.bucket();
-    // TODO: shouldn't this be the default bucket without an argument?
-    // then live will use live storage and test will use test storage?
+    // live will use live storage and test will use test storage?
     await storageRef.file("public/"+webhookBody.entity_id+".fit").save(contents);
     // create signed URL for developer to download file.
     const urlOptions = {
@@ -2587,11 +2576,6 @@ async function oauthCallbackHandlerGarmin(oAuthCallback, transactionData) {
     await db.collection("users").doc(userDocId).set(firestoreParameters, {merge: true});
     return true;
   }
-  // TODO: push to inbox here
-  const userDoc = (await db.collection("users").doc(devId+userId).get()).data();
-  const start = new Date(Date.now());
-  const end = new Date(Date.now() - 30*24*60*60*1000);
-  await getGarminActivityList(start, end, userDoc);
 }
 
 async function checkStravaTokens(userDocId, db) {
