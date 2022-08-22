@@ -29,10 +29,13 @@ myFunctions = require('../../index.js');
 // name as in the function we are testing
 const got = require('got');
 //-------------TEST 2--- Test Callbacks from Strava-------
-describe("Check the Wahoo Disconnect Service works: ", () => {
-  const now = new Date()/1000;
+describe("Check the coros Disconnect Service works: ", () => {
+  const now = Date.now()/1000;
   const tokenFutureExpiryDate = now+1000;
   const tokenPastExpiryDate = now-1000;
+  // possible issues with Wahoo tests,
+   // the two docs interfere with token testing if it's in the past.
+   // the before block on the later testing doesn't work before the tests.
   beforeEach(async () => {
     await admin.firestore()
         .collection("users")
@@ -41,12 +44,12 @@ describe("Check the Wahoo Disconnect Service works: ", () => {
             "devId": testDev,
             "userId": testUser,
             "email": "paul.userTest@gmail.com",
-            "wahoo_connected": true,
-            "wahoo_access_token": "test_access_token",
-            "wahoo_refresh_token": "test_refresh_token",
-            "wahoo_token_expires_at": tokenFutureExpiryDate,
-            "wahoo_token_expires_in": 7200,
-            "wahoo_user_id": "test_id"});
+            "coros_connected": true,
+            "coros_access_token": "rg2-6ee918c0c7d3347aeaa1eae04a78d926",
+            "coros_refresh_token": "rg2-b725c123e2494d58e8576642fdef6833",
+            "coros_token_expires_at": tokenFutureExpiryDate,
+            "coros_token_expires_in": 7200,
+            "coros_id": "4211cf484d264f75935047b0d709d76c"});
 
       await admin.firestore()
       .collection("users")
@@ -55,12 +58,12 @@ describe("Check the Wahoo Disconnect Service works: ", () => {
           "devId": testDev,
           "userId": "secondTestUser",
           "email": "paul.userTest@gmail.com",
-          "wahoo_connected": true,
-          "wahoo_access_token": "test_access_token",
-          "wahoo_refresh_token": "test_refresh_token",
-          "wahoo_token_expires_at": tokenFutureExpiryDate,
-          "wahoo_token_expires_in": 7200,
-          "wahoo_user_id": "test_id"});
+          "coros_connected": true,
+          "coros_access_token": "rg2-6ee918c0c7d3347aeaa1eae04a78d926",
+          "coros_refresh_token": "rg2-b725c123e2494d58e8576642fdef6833",
+          "coros_token_expires_at": tokenFutureExpiryDate,
+          "coros_token_expires_in": 7200,
+          "coros_id": "4211cf484d264f75935047b0d709d76c"});
 
     await admin.firestore()
         .collection("users")
@@ -68,7 +71,7 @@ describe("Check the Wahoo Disconnect Service works: ", () => {
         .collection("activities")
         .doc()
         .set({raw: {field1: "somedata"},
-            sanitised: {provider: "wahoo"}});
+            sanitised: {provider: "coros"}});
 
   });
   it('Check that service returns with error if user is not already authorised', async () => {
@@ -87,7 +90,7 @@ describe("Check the Wahoo Disconnect Service works: ", () => {
     .delete();
 
     req = {
-      url: "https://us-central1-rovetest-beea7.cloudfunctions.net/disconnectService?devId="+testDev+"&userId="+testUser+"&provider=wahoo&devKey=test-key",
+      url: "https://us-central1-rovetest-beea7.cloudfunctions.net/disconnectService?devId="+testDev+"&userId="+testUser+"&provider=coros&devKey=test-key",
     };
     res = {
       status: (code) => {
@@ -101,11 +104,11 @@ describe("Check the Wahoo Disconnect Service works: ", () => {
     // set up stubbed functions
     testResponse = {
       json: ()=>{
-        return {"error":"Access Token not authorised"};
+        return 1005;
       }
     }
 
-   const stubbedGot = sinon.stub(got, "delete");
+   const stubbedGot = sinon.stub(got, "post");
    stubbedGot.onFirstCall().returns(testResponse);
     
     await myFunctions.disconnectService(req, res);
@@ -121,7 +124,7 @@ describe("Check the Wahoo Disconnect Service works: ", () => {
         .collection("users")
         .doc(testDev+testUser)
         .collection("activities")
-        .where("sanitised.provider","==","wahoo")
+        .where("sanitised.provider","==","coros")
         .get();
     
     const expectedUserResults = {
@@ -135,7 +138,7 @@ describe("Check the Wahoo Disconnect Service works: ", () => {
 
     sinon.restore();
   });
-  it('Check that service returns with error if wahoo reports and error', async () => {
+  it('Check that service returns with error if coros reports and error', async () => {
     // for this the second test user should not exist data needs to be 
 
     await admin.firestore()
@@ -144,7 +147,7 @@ describe("Check the Wahoo Disconnect Service works: ", () => {
     .delete();
 
     req = {
-      url: "https://us-central1-rovetest-beea7.cloudfunctions.net/disconnectService?devId="+testDev+"&userId="+testUser+"&provider=wahoo&devKey=test-key",
+      url: "https://us-central1-rovetest-beea7.cloudfunctions.net/disconnectService?devId="+testDev+"&userId="+testUser+"&provider=coros&devKey=test-key",
     };
     res = {
       status: (code) => {
@@ -158,11 +161,11 @@ describe("Check the Wahoo Disconnect Service works: ", () => {
     // set up stubbed functions
     testResponse = {
       json: ()=>{
-        return {"error":"Access Token not authorised"};
+        return "1005";
       }
     }
 
-   const stubbedGot = sinon.stub(got, "delete");
+   const stubbedGot = sinon.stub(got, "post");
    stubbedGot.onFirstCall().returns(testResponse);
     
     await myFunctions.disconnectService(req, res);
@@ -178,19 +181,19 @@ describe("Check the Wahoo Disconnect Service works: ", () => {
         .collection("users")
         .doc(testDev+testUser)
         .collection("activities")
-        .where("sanitised.provider","==","wahoo")
+        .where("sanitised.provider","==","coros")
         .get();
     
     const expectedUserResults = {
       "devId": testDev,
       "userId": testUser,
       "email": "paul.userTest@gmail.com",
-      "wahoo_connected": true,
-      "wahoo_access_token": "test_access_token",
-      "wahoo_refresh_token": "test_refresh_token",
-      "wahoo_token_expires_at": tokenFutureExpiryDate,
-      "wahoo_token_expires_in": 7200,
-      "wahoo_user_id": "test_id",
+      "coros_connected": true,
+      "coros_access_token": "rg2-6ee918c0c7d3347aeaa1eae04a78d926",
+      "coros_refresh_token": "rg2-b725c123e2494d58e8576642fdef6833",
+      "coros_token_expires_at": tokenFutureExpiryDate,
+      "coros_token_expires_in": 7200,
+      "coros_id": "4211cf484d264f75935047b0d709d76c"
     };
     
     assert.deepEqual(userDoc.data(), expectedUserResults);
@@ -200,7 +203,7 @@ describe("Check the Wahoo Disconnect Service works: ", () => {
   });
   it('Check that service succeeds if user authorised already', async () => {
     req = {
-      url: "https://us-central1-rovetest-beea7.cloudfunctions.net/disconnectService?devId="+testDev+"&userId="+testUser+"&provider=wahoo&devKey=test-key",
+      url: "https://us-central1-rovetest-beea7.cloudfunctions.net/disconnectService?devId="+testDev+"&userId="+testUser+"&provider=coros&devKey=test-key",
     };
     res = {
       status: (code) => {
@@ -214,11 +217,11 @@ describe("Check the Wahoo Disconnect Service works: ", () => {
     // set up stubbed functions
     testResponse = {
       json: ()=>{
-        return {"success":"Application has been revoked"};
+        return {"result": "0000","message": "OK"};
       }
     }
 
-   const stubbedGot = sinon.stub(got, "delete");
+   const stubbedGot = sinon.stub(got, "post");
    stubbedGot.onFirstCall().returns(testResponse);
     
     await myFunctions.disconnectService(req, res);
@@ -234,7 +237,7 @@ describe("Check the Wahoo Disconnect Service works: ", () => {
         .collection("users")
         .doc(testDev+testUser)
         .collection("activities")
-        .where("sanitised.provider","==","wahoo")
+        .where("sanitised.provider","==","coros")
         .get();
     
     const expectedUserResults = {
@@ -247,21 +250,23 @@ describe("Check the Wahoo Disconnect Service works: ", () => {
     assert.equal(activities.docs.length, 0);
 
     sinon.restore();
-  })
-  describe("test with the token expiry date in the past", ()=>{
-    before(async ()=> {
-      // set the expiry date for the token in the past
+  });
+    it('Check that service succeeds if user authorised already and refresh code needed', async () => {
+
+      await admin.firestore()
+      .collection("users")
+      .doc(testDev+"secondTestUser")
+      .delete();
+
       await admin.firestore()
       .collection("users")
       .doc(testDev+testUser)
       .set({
-          "wahoo_token_expires_at": tokenPastExpiryDate},
+          "coros_token_expires_at": tokenPastExpiryDate},
           {merge: true});
-    });
-    it('Check that service succeeds if user authorised already and refresh code needed', async () => {
 
       req = {
-        url: "https://ourDomain.com?devId="+testDev+"&userId="+testUser+"&provider=wahoo&devKey=test-key",
+        url: "https://ourDomain.com?devId="+testDev+"&userId="+testUser+"&provider=coros&devKey=test-key",
       };
       res = {
         status: (code) => {
@@ -275,32 +280,25 @@ describe("Check the Wahoo Disconnect Service works: ", () => {
       // set up stubbed functions
       testResponseDelete = {
         json: ()=>{
-          return {"success":"Application has been revoked"};
+          return {"result": "0000","message": "OK"};
         }
       }
       testResponsePost = {
         json() { return {
-            access_token: 'test-wahoo-refreshed-access-token',
-            refresh_token: 'test-wahoo-new-refresh-token',
-            created_at: now,
-            expires_in: 'test-wahoo-new-refresh-token',
-            expires_in: 7200,  
-          }
-        }
+          "expires_in":2592000,
+          "refresh_token":"test-coros-refresh",
+          "access_token":"test-coros-access",
+          "openId":"test-coros-id"
+      }
+      }
       }
 
-      const stubbedDelete = sinon.stub(got, "delete");
       const stubbedPost = sinon.stub(got, "post");
-      stubbedDelete.onFirstCall().returns(testResponseDelete);
       stubbedPost.onFirstCall().returns(testResponsePost);
+      stubbedPost.onSecondCall().returns(testResponseDelete);
       
       await myFunctions.disconnectService(req, res);
-      // check the got function was called with the correct options
-      // check the wahoo fields were deleted from the database
-      // check the wahoo activities were deleted from the database only for this user
-      // got function call checks
-      //stubbedDelete.calledOnceWith("deleteArgs");
-      //stubbedPost.calledOnceWith("postArgs");
+
       const userDoc = await admin.firestore()
           .collection("users")
           .doc(testDev+testUser)
@@ -310,7 +308,7 @@ describe("Check the Wahoo Disconnect Service works: ", () => {
           .collection("users")
           .doc(testDev+testUser)
           .collection("activities")
-          .where("sanitised.provider","==","wahoo")
+          .where("sanitised.provider","==","coros")
           .get();
       
       const expectedUserResults = {
@@ -323,6 +321,5 @@ describe("Check the Wahoo Disconnect Service works: ", () => {
       assert.equal(activities.docs.length, 0);
 
       sinon.restore();
-    });
   });
 });//End TEST 2

@@ -149,11 +149,11 @@ describe("Testing that the garmin Webhooks work: ", () => {
 
         wrapped = test.wrap(myFunctions.processWebhookInBox);
         await wrapped(snapshot);
-
-        const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
-        await wait(1500);
         // check the webhookInBox function was called with the correct args
         assert(stubbedWebhookInBox.calledOnceWith(snapshot.ref), "webhookInBox called incorrectly");
+        // give the sendToDeveloper function a chance to run
+        const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+        await wait(6000);
          //now check the database was updated correctly
         const testUserDocs = await admin.firestore()
             .collection("users")
@@ -199,6 +199,7 @@ describe("Testing that the garmin Webhooks work: ", () => {
                 },
             "status": "sent",
             "timestamp": "not tested",
+            "triesSoFar": 1,
         }
         sanatisedActivity.timestamp = "not tested";
         assert.deepEqual(sanatisedActivity, expectedResults);

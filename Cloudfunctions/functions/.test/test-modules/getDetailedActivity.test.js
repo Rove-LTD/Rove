@@ -54,25 +54,62 @@ describe("Check the get detailed activity service works: ", () => {
             "strava_refresh_token": "922dd204d91e03515b003fe8f5516d99563d9f0c",
             "strava_token_expires_at": 1661182632,
             "strava_id": 7995810,
-            "polar_access_token" : "04c9315a4da52c91cc43aace5630e65b",
+            "polar_access_token" : "d717dd39d09b91939f835d66a640927d",
             "polar_connected": true,
             "polar_token_expires_at": 2120725270,
             "polar_token_expires_in": 461375999,
             "polar_token_type": "bearer",
-            "polar_user_id": 26925145,
-        };
-    stravaDoc = {"id": 7530448332};
-    polarDoc = {"id": "yNZpdMNq"};
-    wahooDoc = {"file": {"url": "https://cdn.wahooligan.com/wahoo-cloud/production/uploads/workout_file/file/0KNBLnbwOndDYh5MhonDZw/2022-07-07-071356-ELEMNT_AE48-282-0.fit"}};
-    garminDoc = {
-                "activityId": 9377961249,
-                "startTimeInSeconds": 1660111129,
-                "durationInSeconds": 3923,
-            };
-    })
+            "polar_user_id": 45395466,
+        });
+    await admin.firestore()
+        .collection("users")
+        .doc(testDev+testUser)
+        .collection("activities")
+        .doc("stravaActivity")
+        .set({
+            "sanitised": {"provider": "strava"},
+            "raw": {"id": 7530448332}
+        });
+    await admin.firestore()
+        .collection("users")
+        .doc(testDev+testUser)
+        .collection("activities")
+        .doc("polarActivity")
+        .set({
+            "sanitised": {"provider": "polar"},
+            "raw": {"start_time": "2022-08-10T11:18:42"}
+        });
+    await admin.firestore()
+        .collection("users")
+        .doc(testDev+testUser)
+        .collection("activities")
+        .doc("wahooActivity")
+        .set({
+            "sanitised": {
+                "id": "wahooActivityId",
+                "provider": "wahoo"
+            },
+            "raw": {"file": {"url": "https://cdn.wahooligan.com/wahoo-cloud/production/uploads/workout_file/file/0KNBLnbwOndDYh5MhonDZw/2022-07-07-071356-ELEMNT_AE48-282-0.fit"}}
+        });
+    });
     it("Check Get Detailed Strava Activity Works.", async () => {
-        sanitisedActivityJson = await myFunctions.getDetailedActivity(userDoc, stravaDoc, "strava");
-        assert.deepEqual(sanitisedActivityJson, "shite")
+        req = {
+            debug: true,
+            url: "https://ourDomain.com",
+            method: "POST",
+            query:{},
+            body:{"devId": testDev, "devKey": "test-key", "userId": testDev+testUser, "activityId": "stravaActivity"},
+        }
+        res = {
+            status: (code) => {
+                assert.equal(code, 200);
+            },
+            send: (message) => {
+                assert.equal(message,"Complete")
+            }
+        }
+
+        await myFunctions.getDetailedActivity(req, res);
     })
     it.only("Check Get Wahoo Detailed Activity Works.", async () => {
         const sanitisedActivityJson = await myFunctions.getDetailedActivity(userDoc, wahooDoc, "wahoo");
@@ -80,14 +117,24 @@ describe("Check the get detailed activity service works: ", () => {
         const expectedResult = wahooActivity;
         assert.deepEqual(sanitisedActivityJson, expectedResult);
     })
-    it.only("Check Get Polar Detailed Activity Works.", async () => {
-        const activity = await myFunctions.getDetailedActivity(userDoc, polarDoc, "polar");
-        assert.deepEqual(activity, "shite")
-    })
-    it.only("Check Get Garmin detailed Activity Works.", async () => {
-        const sanitisedActivityJson = await myFunctions.getDetailedActivity(userDoc, garminDoc, "garmin");
-        // await fs.promises.writeFile('./garminDetailed.json', JSON.stringify(sanitisedActivityJson));
-        const expectedResult = garminActivity
-        assert.deepEqual(sanitisedActivityJson, expectedResult);
+    it.skip("Check Get Polar Detailed Activity Works.", async () => {
+        req = {
+            debug: true,
+            url: "https://ourDomain.com",
+            method: "POST",
+            query:{},
+            body:{"devId": testDev, "devKey": "test-key", "userId": testDev+testUser, "activityId": "polarActivity"},
+        }
+        res = {
+            status: (code) => {
+                assert.equal(code, 200);
+            },
+            send: (message) => {
+                assert.equal(message, 'complete')
+            }
+        }
+
+        const activity = await myFunctions.getDetailedActivity(req, res);
+        console.log(activity);
     })
 })

@@ -167,9 +167,9 @@ describe("Testing that the Polar Webhooks work: ", () => {
 
         wrapped = test.wrap(myFunctions.processWebhookInBox);
         await wrapped(snapshot);
-
+        // give the sendToDeveloper function a chance to run
         const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
-        await wait(1000);
+        await wait(6000);
         // check the webhookInBox function was called with the correct args
         assert(stubbedWebhookInBox.calledOnceWith(snapshot.ref), "webhookInBox called incorrectly");
         //now check the database was updated correctly
@@ -204,6 +204,7 @@ describe("Testing that the Polar Webhooks work: ", () => {
           raw: polarExercisePayload.json(),
           "status": "sent",
           "timestamp": "not tested",
+          "triesSoFar": 1,
       }
      sanatisedActivity.timestamp = "not tested";
      assert.deepEqual(sanatisedActivity, expectedResults);
@@ -290,7 +291,7 @@ describe("Testing that the Polar Webhooks work: ", () => {
     sinon.restore();
     });
     it.skip('NO STUBBS so SKIPPED - read a specific webhookInBox event and process it without stubbing...', async () => {
-        const testDocId = "OWdxJh4Fa5nZDiGsyaEX";
+        const testDocId = "JtDTxPWIFBj55FcTQEEX";
         webhookDoc = await admin.firestore()
             .collection("webhookInBox")
             .doc(testDocId)
@@ -298,7 +299,7 @@ describe("Testing that the Polar Webhooks work: ", () => {
         
         webhookDocData = webhookDoc.data();
         
-        const snapshot = test.firestore.makeDocumentSnapshot(webhookDocData, "webhookInBox/"+webhookDocData.id);
+        const snapshot = test.firestore.makeDocumentSnapshot(webhookDocData, "webhookInBox/"+webhookDoc.id);
 
         wrapped = test.wrap(myFunctions.processWebhookInBox);
         await wrapped(snapshot);

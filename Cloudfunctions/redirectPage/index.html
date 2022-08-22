@@ -24,7 +24,7 @@
 						<div class="wrapper">
 							<div class="inner">
 								<div>
-									<h1 id="text28" class="style3"><span style="color: #fa7921">R</span>ove</h1>
+									<h1 id="text28" class="style3" onclick="logoClick()"><span style="color: #fa7921">R</span>ove</h1>
 									<p id="text03" class="style1">Providing integration services for <span style="color: white" id="devName">***</span></p>
 									<ul id="buttons01" class="style2 buttons">
 										<li>
@@ -73,12 +73,18 @@ const userId = urlVars["userId"];
 if (userId == "notion") {
 devId = "Notion Templates";
 }
+if (devId == "AiEndurance") {
+	devId = "AI Endurance"
+}
 const params = "?transactionId="+transactionId+"&isRedirect=true";
 var textBlock = document.getElementById("devName")
 textBlock.innerHTML = devId;
 function f1() {
     document.getElementById("continueButton").href="/connectService"+params; 
   };
+function logoClick() {
+	window.location.replace("https://rove.crd.co");
+}
 		</script>
 	</body>
 </html>

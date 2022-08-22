@@ -1,5 +1,5 @@
-{ "testDev" :  "anotherTestDev",
-  "testUser": "paulsNewTestUser",
+{ "testDev" :  "alexTestDev",
+  "testUser": "alexTestUser",
   "testNotionDev" :  "9e796cc24091489d97865364dc726b7b",
   "testNotionUser": "notion",
   "firebaseConfig": {
