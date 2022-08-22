@@ -292,6 +292,7 @@ async function getWahooActivityList(start, end, userDoc) {
       const sanitisedList = [];
       for (let i = 0; i<activityList.workouts.length; i++) {
         sanitisedList.push({"raw": activityList.workouts[i], "sanitised": filters.wahooSanitise(activityList.workouts[i])});
+        sanitisedList[i]["sanitised"]["samples"] = await getDetailedActivity(userDoc.data(), activityList.workouts[i]);
       }
       // now filter for start times
       const startTime = start.getTime();
@@ -326,6 +327,7 @@ async function getPolarActivityList(start, end, userDoc) {
     const sanitisedList = [];
     for (let i = 0; i<activityList.length; i++) {
       sanitisedList.push({"raw": activityList[i], "sanitised": filters.polarSanatise(activityList[i])});
+      sanitisedList[i]["sanitised"]["samples"] = await getDetailedActivity(userDoc.data(), activityList[i]);
     }
     const startTime = start.getTime();
     const endTime = end.getTime();
@@ -364,7 +366,8 @@ async function getGarminActivityList(start, end, userDoc) {
   const listOfSanitisedActivities = filters.garminSanitise(activityList);
   const listOfValidActivities = [];
   for (let i=0; i< activityList.length; i++) {
-    listOfValidActivities.push({raw: activityList[i], sanitised: listOfSanitisedActivities[i]});
+    listOfValidActivities.push({"raw": activityList[i], "sanitised": listOfSanitisedActivities[i]});
+    listOfValidActivities[i]["sanitised"]["samples"] = await getDetailedActivity(userDocData, activityList[i]);
   }
   return listOfValidActivities;
 }
@@ -384,6 +387,7 @@ async function getStravaActivityList(start, end, userDoc) {
   const listOfValidActivities = [];
   for (let i = 0; i<sanitisedActivities.length; i++) {
     listOfValidActivities.push({"raw": result[i], "sanitised": sanitisedActivities[i]});
+    // listOfValidActivities[i]["sanitised"]["samples"] = getDetailedActivity(userDocData, result[i]);
   }
   return listOfValidActivities;
 }
@@ -958,6 +962,8 @@ async function processGarminWebhook(webhookDoc) {
     userQuery.docs.forEach((doc)=> {
       userDocsList.push(doc);
     });
+    const samples = await getDetailedActivity(userDocsList[0].data(), webhookBody.activities[index], "garmin");
+    sanitisedActivity["samples"] = samples;
     // save raw and sanitised activites as a backup for each user
     for (const userDoc of userDocsList) {
       saveAndSendActivity(userDoc,
@@ -1180,6 +1186,10 @@ exports.polarCallback = functions.https.onRequest(async (req, res) => {
       // await sendDevSuccess(devId); //TODO: create dev success post.
       // userResponse = "Some good redirect.";
       const urlString = await successDevCallback(transactionData);
+      const recentActivities = await getPolarActivityList(userId);
+      for (const activity of recentActivities) {
+        await saveAndSendActivity(db.collection("users").doc(userId), activity["sanitised"], activity["raw"]);
+      }
       res.redirect(urlString);
     } else {
       res.send("Error: "+response.statusCode+":"+body.toString()+" please close this window and try again");
@@ -1397,6 +1407,8 @@ async function processStravaWebhook(webhookDoc) {
     activity = await stravaApi.activities
         .get({"access_token": stravaAccessToken, "id": webhookBody.object_id});
     sanitisedActivity = filters.stravaSanitise([activity]);
+    /* const samples = await getDetailedActivity(userDocsList[0].data(), activity, "strava");
+    sanitisedActivity[0]["samples"] = samples;*/
   }
   for (const userDoc of userDocsList) {
     saveAndSendActivity(userDoc,
@@ -1504,6 +1516,8 @@ async function processWahooWebhook(webhookDoc) {
   //  data
   // 1) sanatise and 2) send
   const sanitisedActivity = filters.wahooSanitise(webhookBody);
+  const samples = await getDetailedActivity(userDocsList[0].data(), sanitisedActivity, "wahoo");
+  sanitisedActivity["samples"] = samples;
 
   // save raw and sanitised activites as a backup for each user
   for (const userDoc of userDocsList) {
@@ -1627,6 +1641,8 @@ async function processPolarWebhook(webhookDoc) {
     sanitisedActivity["file"] = {"url": downloadURL[0]};
     // write sanitised information and raw information to each user and then
     // send to developer
+    const samples = await getDetailedActivity(userDocsList[0].data(), activity, "polar");
+    sanitisedActivity["samples"] = samples;
     for (const userDoc of userDocsList) {
       sanitisedActivity["userId"] = userDoc.data()["userId"];
       saveAndSendActivity(userDoc, sanitisedActivity, activity);
@@ -1760,7 +1776,7 @@ exports.polarWebhookSetup = functions.https.onRequest(async (req, res) => {
 });
 
 async function getStravaDetailedActivity(userDoc, activityDoc) {
-  const stravaActivityId = await activityDoc["raw"]["id"];
+  const stravaActivityId = await activityDoc["id"];
   const devId = await userDoc["devId"];
   const secretLookup = await db.collection("developers").doc(devId).get();
   const lookup = await secretLookup.data()["secret_lookup"];
@@ -1788,127 +1804,111 @@ async function getStravaDetailedActivity(userDoc, activityDoc) {
 }
 
 async function getPolarDetailedActivity(userDoc, activityDoc) {
-  const polarId = userDoc["polar_user_id"];
-  const exerciseDate = activityDoc["raw"]["start_time"];
-  let exerciseId;
+  const exerciseId = activityDoc["id"];
   const accessToken = userDoc["polar_access_token"];
-  let transactionId;
+  let sanitised = {};
   const headers = {
-    "Accept": "application/json", "Authorization": "Bearer " + accessToken,
+    "Accept": "*/*", "Authorization": "Bearer " + accessToken,
   };
 
   try {
-    // Create transaction
-    const transactionOptions = {
-      url: "https://www.polaraccesslink.com/v3/users/"+polarId+"/exercise-transactions",
-      method: "POST",
-      headers: headers,
-    };
-    const transactionResponse = await got.post(transactionOptions);
-    if (transactionResponse.statusCode == 201) {
-      const transactionResponseObject = JSON.parse(transactionResponse.body);
-      transactionId = String(transactionResponseObject["transaction-id"]);
-    } else if (transactionResponse.statusCode == 204) {
-      const message = "No activities in the last 30 days";
-      console.log(message);
-      const options = {
-        url: "https://www.polaraccesslink.com/v3/users/"+polarId+"/exercise-transactions/"+transactionId,
-        method: "PUT",
-        headers: headers,
-      };
-      const res = await got.put(options);
-      console.log("Comit transaction response: " + res.statusCode);
-      return message;
-    }
-
-    // Get available sessions
-    const sessionsOptions = {
-      url: "https://www.polaraccesslink.com/v3/users/"+polarId+"/exercise-transactions/" + transactionId,
+    const options = {
+      url: "https://www.polaraccesslink.com/v3/exercises/" + exerciseId + "/fit",
       method: "GET",
       headers: headers,
     };
-    const sessionsResponse = await got.get(sessionsOptions);
-    if (sessionsResponse.statusCode == 200) {
-      const sessionsResponseObject = JSON.parse(sessionsResponse.body);
-      const sessionURLs = sessionsResponseObject["exercises"];
-      // Get session summaries
-      for (let i=0; i<sessionURLs.length; i++) {
-        const options = {
-          url: sessionURLs[i],
-          method: "GET",
-          headers: headers,
-        };
-        const res = await got.get(options);
-        const session = JSON.parse(res.body);
-        exerciseId = session["id"];
-        if (session["start-time"] == exerciseDate) {
-          exerciseId = session["id"];
-          break;
+    const fitFile = await got.get(options);
+    if (fitFile.statusCode == 200) {
+      const fitParser = new FitParser();
+      fitParser.parse(fitFile.rawBody, (error, jsonRaw)=>{
+        // Handle result of parse method
+        if (error) {
+          console.log(error);
+          sanitised = error;
+        } else {
+          sanitised["samples"] = sanitisePolarFitFile(jsonRaw);
         }
-        // for testing only if exerciseId is not found and remain undefined
-        // just take the last one
-      }
-
-      // Get available samples
-      const fitOptions = {
-        url: "https://www.polaraccesslink.com/v3/users/"+polarId+"/exercise-transactions/"+transactionId+"/exercises/"+exerciseId+"/fit",
-        method: "GET",
-        headers: {
-          "Accept": "*/*", "Authorization": "Bearer " + accessToken,
-        },
-      };
-      const fitFile = await got.get(fitOptions);
-      if (fitFile.statusCode == 200) {
-        const fitParser = new FitParser();
-        let jsonRaw;
-        fitParser.parse(fitFile.rawBody, (error, jsonRaw)=>{
-          // Handle result of parse method
-          if (error) {
-            console.log(error);
-          } else {
-            console.log(JSON.stringify(jsonRaw));
-          }
-        }); // the file is parsing but the code below will not work
-        // with the JSON that is created by fitParser
-        // as fitParser and fitDecoder will not
-        // operate together.  So we need to rewire this bit now.
-        const json = fitDecoder.parseRecords(jsonRaw);
-        const records = json.records;
-        const sanitised = jsonFitSanitise(records);
-        // Comit transaction
-        const options = {
-          url: "https://www.polaraccesslink.com/v3/users/"+polarId+"/exercise-transactions/"+transactionId,
-          method: "PUT",
-          headers: headers,
-        };
-        const res = await got.put(options);
-        return sanitised;
-      } else {
-        const message = "No activities in the last 30 days";
-        console.log(message);
-        const options = {
-          url: "https://www.polaraccesslink.com/v3/users/"+polarId+"/exercise-transactions/"+transactionId,
-          method: "PUT",
-          headers: headers,
-        };
-        const res = await got.put(options);
-        console.log("Comit transaction response: " + res.statusCode);
-        return message;
-      }
-    } else if (sessionsResponse.statusCode == 204) {
-      const message = "No activities in the last 30 days";
-      console.log(message);
-      return message;
+      });
     }
+    return sanitised;
   } catch (error) {
     console.log(error);
     return error;
   }
 }
 
+function sanitisePolarFitFile(fitFile) {
+  const session = fitFile.sessions[0];
+  let cadence;
+  if (session.sport == "running") {
+    cadence = "running_cadence";
+  } else if (session.sport == "CYCLING") {
+    cadence = "cadence";
+  }
+  const records = fitFile.records;
+  const timerSamples = [];
+  const timestampSamples = [];
+  const temperatureSamples = [];
+  const distanceSamples = [];
+  const powerSamples = [];
+  const heartRateSamples = [];
+  const speedSamples = [];
+  const altitudeSamples = [];
+  const positionSamples = [];
+  const gradientSamples = [];
+  const calorieSamples = [];
+  const cadenceSamples = [];
+  const acentSamples = [];
+  const decentSamples = [];
+  records.forEach((record) => {
+    timestampSamples.push((record.timestamp).toISOString());
+    temperatureSamples.push(record.temperature);
+    distanceSamples.push(record.distance);
+    powerSamples.push(record.power);
+    heartRateSamples.push(record.heart_rate);
+    speedSamples.push(record.speed);
+    altitudeSamples.push(record.altitude);
+    positionSamples.push([record.position_lat, record.position_long]);
+    gradientSamples.push(null);
+    calorieSamples.push(null);
+    cadenceSamples.push(record[cadence]);
+    acentSamples.push(null);
+    decentSamples.push(null);
+  });
+  const sanitisedSamples= {
+    "timestampSamples": timestampSamples,
+    "distanceSamples": distanceSamples,
+    "powerSamples": powerSamples,
+    "heartRateSamples": heartRateSamples,
+    "speedSamples": speedSamples,
+    "altitudeSamples": altitudeSamples,
+    "positionSamples": positionSamples,
+    "gradientSamples": gradientSamples,
+    "calorieSamples": calorieSamples,
+    "cadenceSamples": cadenceSamples,
+    "acentSamples": acentSamples,
+    "decentSamples": decentSamples,
+    "timerSamples": timerSamples,
+  };
+  for (const prop in sanitisedSamples) {
+    if (Object.prototype.hasOwnProperty.call(sanitisedSamples, prop)) {
+      for (let i=0; i<sanitisedSamples[prop].length; i++) {
+        if (sanitisedSamples[prop][i] == undefined) {
+          sanitisedSamples[prop][i] = null;
+        } if (prop == "positionSamples") {
+          if (sanitisedSamples[prop][i][0] == undefined) {
+            sanitisedSamples[prop][i] = [null, null];
+          }
+        }
+      }
+    }
+  }
+  return sanitisedSamples;
+}
+
 async function getWahooDetailedActivity(userDoc, activityDoc) {
   try { // or 'https' for https:// URLs
-    const fileLocation = activityDoc["raw"]["file"]["url"];
+    const fileLocation = activityDoc["file"]["url"];
     const fitFile = await got.get(fileLocation);
     const buffer = fitFile.rawBody.buffer;
     const jsonRaw = fitDecoder.fit2json(buffer);
@@ -1930,11 +1930,12 @@ async function getGarminDetailedActivity(userDoc, activityDoc) {
     const lookup = await secretLookup.data()["secret_lookup"];
     const consumerSecret = configurations[lookup]["consumerSecret"];
     const oAuthConsumerSecret = configurations[lookup]["oauth_consumer_key"];
-    let startTime = activityDoc["raw"]["startTimeInSeconds"];
-    const activityId = activityDoc["raw"]["activityId"];
-    startTime += activityDoc["raw"]["durationInSeconds"];
+    let startTime = activityDoc["startTimeInSeconds"];
+    const endTime = startTime + 7*24*60*60;
+    const activityId = activityDoc["activityId"];
+    startTime += activityDoc["durationInSeconds"];
     let activity;
-    while (activity == undefined) {
+    while (activity == undefined && startTime < endTime) {
       const options = await encodeparams.garminCallOptions(url, "GET", consumerSecret, oAuthConsumerSecret, userDoc["garmin_access_token"], userDoc["garmin_access_token_secret"], {from: startTime, to: startTime+24*60*60});
       const response = await got.get(options);
       const activityList = JSON.parse(response.body);
@@ -1956,10 +1957,13 @@ async function getGarminDetailedActivity(userDoc, activityDoc) {
 function garminDetailedSanitise(activity) {
   const type = activity["summary"]["activityType"];
   let cadence;
+  let aveCadence;
   if (type == "RUNNING") {
     cadence = "stepsPerMinute";
+    aveCadence = "averageRunCadenceInStepsPerMinute";
   } else if (type == "CYCLING") {
     cadence = "bikeCadenceInRPM";
+    aveCadence ="averageBikeCadenceInRPM";
   }
   const timerSamples = [];
   const timestampSamples = [];
@@ -1976,7 +1980,7 @@ function garminDetailedSanitise(activity) {
   const acentSamples = [];
   const decentSamples = [];
   activity["samples"].forEach((sample) => {
-    timestampSamples.push(new Date(sample["startTimeInSeconds"]*1000));
+    timestampSamples.push((new Date(sample["startTimeInSeconds"]*1000)).toISOString());
     timerSamples.push(sample["timerDurationInSeconds"]);
     temperatureSamples.push(sample["airTemperatureCelcius"]);
     distanceSamples.push(sample["totalDistanceInMeters"]);
@@ -1993,58 +1997,58 @@ function garminDetailedSanitise(activity) {
   });
   const sanitisedData = {
     "summary": {
-      "start_time": null,
+      "start_time": (new Date(activity["summary"]["startTimeInSeconds"]*1000)).toISOString(),
       "total_elapsed_time": null,
-      "total_timer_time": null,
-      "avg_speed": null,
-      "max_speed": null,
-      "total_distance": null,
+      "activity_duration": activity["summary"]["durationInSeconds"],
+      "avg_speed": activity["summary"]["averageSpeedInMetersPerSecond"],
+      "max_speed": activity["summary"]["maxSpeedInMetersPerSecond"],
+      "distance": activity["summary"]["distanceInMeters"],
       "min_heart_rate": null,
-      "avg_heart_rate": null,
-      "max_heart_rate": null,
+      "avg_heart_rate": activity["summary"]["averageHeartRateInBeatsPerMinute"],
+      "max_heart_rate": activity["summary"]["maxHeartRateInBeatsPerMinute"],
       "min_altitude": null,
       "avg_altitude": null,
       "max_altitude": null,
       "max_neg_grade": null,
       "avg_grade": null,
       "max_pos_grade": null,
-      "total_calories": null,
+      "active_calories": activity["summary"]["activeKilocalories"],
       "avg_temperature": null,
       "max_temperature": null,
-      "total_ascent": null,
-      "total_descent": null,
-      "sport": null,
+      "elevation_gain": activity["summary"]["totalElevationGainInMeters"],
+      "elevation_loss": activity["summary"]["totalElevationLossInMeters"],
+      "activity_type": activity["summary"]["activityType"],
       "num_laps": null,
       "threshold_power": null,
-      "workout_type": null,
     },
-  };
-  sanitisedData["samples"]= {
-    "timestampSamples": timestampSamples,
-    "distanceSamples": distanceSamples,
-    "powerSamples": powerSamples,
-    "heartRateSamples": heartRateSamples,
-    "speedSamples": speedSamples,
-    "altitudeSamples": altitudeSamples,
-    "positionSamples": positionSamples,
-    "gradientSamples": gradientSamples,
-    "calorieSamples": calorieSamples,
-    "cadenceSamples": cadenceSamples,
-    "acentSamples": acentSamples,
-    "decentSamples": decentSamples,
-    "timerSamples": timerSamples,
+    "samples": {
+      "timestampSamples": timestampSamples,
+      "distanceSamples": distanceSamples,
+      "powerSamples": powerSamples,
+      "heartRateSamples": heartRateSamples,
+      "speedSamples": speedSamples,
+      "altitudeSamples": altitudeSamples,
+      "positionSamples": positionSamples,
+      "gradientSamples": gradientSamples,
+      "calorieSamples": calorieSamples,
+      "cadenceSamples": cadenceSamples,
+      "acentSamples": acentSamples,
+      "decentSamples": decentSamples,
+      "timerSamples": timerSamples,
+    },
   };
   for (const prop in sanitisedData["samples"]) {
     if (Object.prototype.hasOwnProperty.call(sanitisedData["samples"], prop)) {
-      let initValue = sanitisedData["samples"][prop].find((element) => element != undefined && element != [undefined, undefined]);
+      /* let initValue = sanitisedData["samples"][prop].find((element) => element != undefined && element != [undefined, undefined]);
       if (initValue == undefined) {
         initValue = null;
-      }
+      } */
       for (let i=0; i<sanitisedData["samples"][prop].length; i++) {
-        if (sanitisedData["samples"][prop][i] != undefined) {
-          break;
+        if (sanitisedData["samples"][prop][i] == undefined) {
+          sanitisedData["samples"][prop][i] = null;
+        } if (sanitisedData["samples"][prop][i] == [undefined, undefined]) {
+          sanitisedData["samples"][prop][i] = [null, null];
         }
-        sanitisedData["samples"][prop][i] = initValue;
       }
     }
   }
@@ -2071,36 +2075,35 @@ function jsonFitSanitise(jsonRecords) {
   const decentSamples = [];
   const sanitisedData = {
     "summary": {
-      "start_time": null,
-      "total_elapsed_time": null,
-      "total_timer_time": null,
-      "avg_speed": null,
-      "max_speed": null,
-      "total_distance": null,
-      "min_heart_rate": null,
-      "avg_heart_rate": null,
-      "max_heart_rate": null,
-      "min_altitude": null,
-      "avg_altitude": null,
-      "max_altitude": null,
-      "max_neg_grade": null,
-      "avg_grade": null,
-      "max_pos_grade": null,
-      "total_calories": null,
-      "avg_temperature": null,
-      "max_temperature": null,
-      "total_ascent": null,
-      "total_descent": null,
-      "sport": null,
-      "num_laps": null,
-      "threshold_power": null,
-      "workout_type": null,
+      "start_time": (summary["start_time"]).toISOString(),
+      "total_elapsed_time": summary["total_elapsed_time"],
+      "activity_duration": summary["total_timer_time"],
+      "avg_speed": summary["avg_speed"],
+      "max_speed": summary["max_speed"],
+      "distance": summary["total_distance"],
+      "min_heart_rate": summary["min_heart_rate"],
+      "avg_heart_rate": summary["avg_heart_rate"],
+      "max_heart_rate": summary["max_heart_rate"],
+      "min_altitude": summary["min_altitude"],
+      "avg_altitude": summary["avg_altitude"],
+      "max_altitude": summary["max_altitude"],
+      "max_negative_grade": summary["max_neg_grade"],
+      "avg_grade": summary["avg_grade"],
+      "max_positive_grade": summary["max_pos_grade"],
+      "active_calories": summary["total_calories"],
+      "avg_temperature": summary["avg_temperature"],
+      "max_temperature": summary["max_temperature"],
+      "elevation_gain": summary["total_ascent"],
+      "elevation_loss": summary["total_descent"],
+      "activity_type": summary["sport"],
+      "num_laps": summary["num_laps"],
+      "threshold_power": summary["threshold_power"],
     },
   };
   // assign arrays
   records.forEach((_record) => {
     const record = _record["data"];
-    timestampSamples.push(record["timestamp"]);
+    timestampSamples.push((record["timestamp"]).toISOString());
     distanceSamples.push(record["distance"]);
     powerSamples.push(record["power"]);
     heartRateSamples.push(record["heart_rate"]);
@@ -2131,15 +2134,18 @@ function jsonFitSanitise(jsonRecords) {
   // remove undefined samples
   for (const prop in sanitisedData["samples"]) {
     if (Object.prototype.hasOwnProperty.call(sanitisedData["samples"], prop)) {
-      let initValue = sanitisedData["samples"][prop].find((element) => element != undefined);
+      /* let initValue = sanitisedData["samples"][prop].find((element) => element != undefined);
       if (initValue == undefined) {
         initValue = null;
-      }
+      } */
       for (let i=0; i<sanitisedData["samples"][prop].length; i++) {
-        if (sanitisedData["samples"][prop][i] != undefined) {
-          break;
+        if (sanitisedData["samples"][prop][i] == undefined) {
+          sanitisedData["samples"][prop][i] = null;
+        } if (prop == "positionSamples") {
+          if (sanitisedData["samples"][prop][i][0] == undefined) {
+            sanitisedData["samples"][prop][i] = [null, null];
+          }
         }
-        sanitisedData["samples"][prop][i] = initValue;
       }
     }
   }
@@ -2164,102 +2170,23 @@ function jsonFitSanitise(jsonRecords) {
       index += 1;
     }
   }
-  sanitisedData["samples"]["timerSamples"] = timerSamples;
-  // assign summary data
-  for (const prop in sanitisedData["summary"]) {
-    if (Object.prototype.hasOwnProperty.call(sanitisedData["summary"], prop)) {
-      sanitisedData["summary"][prop] = summary[prop];
-    }
-  }
   return sanitisedData;
 }
 
-exports.getDetailedActivity = functions.https.onRequest(async (req, res) => {
-  const devId = req.body["devId"];
-  const devKey = req.body["devKey"];
-  const userId = req.body["userId"];
-  const activityId = req.body["activityId"];
-  const userPath = db.collection("users").doc(userId);
-  let userDoc;
-  let activityDoc;
+async function getDetailedActivity(userDoc, activityDoc, source) {
+  // activityDoc is just the raw doc
   let sanitisedDetailedActivity;
-
-  // firt, checking the devId and devKey
-  if (devId != null) {
-    await db.collection("developers").doc(devId).get()
-        .then((docSnapshot) => {
-          if (docSnapshot.exists) {
-            if (docSnapshot.data().devKey != devKey || devKey == null) {
-              res.status(400);
-              res.send("error: the developerId was badly formatted, missing or not authorised");
-              return;
-            }
-          } else {
-            res.status(400);
-            res.send("error: the developerId was badly formatted, missing or not authorised");
-            return;
-          }
-        });
-  } else {
-    res.status(400);
-    res.send("error: the developerId parameter is missing");
-    return;
+  if (source == "strava") {
+    sanitisedDetailedActivity = await getStravaDetailedActivity(userDoc, activityDoc);
+  } else if (source == "polar") {
+    sanitisedDetailedActivity = await getPolarDetailedActivity(userDoc, activityDoc);
+  } else if (source == "wahoo") {
+    sanitisedDetailedActivity = await getWahooDetailedActivity(userDoc, activityDoc);
+  } else if (source == "garmin") {
+    sanitisedDetailedActivity = await getGarminDetailedActivity(userDoc, activityDoc);
   }
-
-  // checking the userId is valid and matches the devId
-  if (userId != null) {
-    await userPath.get()
-        .then((docSnapshot) => {
-          if (docSnapshot.exists) {
-            if (docSnapshot.data().devId != devId) {
-              res.status(400);
-              res.send("error: the userId was badly formatted, missing or nor authorised");
-              return;
-            }
-            userDoc = docSnapshot.data();
-          } else {
-            res.status(400);
-            res.send("error: the userId was badly formatted, missing or nor authorised");
-            return;
-          }
-        });
-  } else {
-    res.status(400);
-    res.send("error: the userId parameter is missing");
-    return;
-  }
-
-  // now check activity exist and get the detailed activity
-  if (activityId != null) {
-    await userPath.collection("activities").doc(activityId).get()
-        .then(async (docSnapshot) => {
-          if (docSnapshot.exists) {
-            activityDoc = docSnapshot.data();
-            const source = activityDoc["sanitised"]["provider"];
-            if (source == "strava") {
-              sanitisedDetailedActivity = await getStravaDetailedActivity(userDoc, activityDoc);
-            } else if (source == "polar") {
-              sanitisedDetailedActivity = await getPolarDetailedActivity(userDoc, activityDoc);
-            } else if (source == "wahoo") {
-              sanitisedDetailedActivity = await getWahooDetailedActivity(userDoc, activityDoc);
-            } else if (source == "garmin") {
-              sanitisedDetailedActivity = await getGarminDetailedActivity(userDoc, activityDoc);
-            }
-            // based on source, get detailed activity
-          } else {
-            res.status(400);
-            res.send("error: the activity requested does not exist");
-          }
-        });
-  } else {
-    res.status(400);
-    res.send("error: the activityId parameter is missing");
-    return;
-  }
-  res.status(200);
-  res.send("Complete");
-  return sanitisedDetailedActivity;
-});
+  return sanitisedDetailedActivity["samples"];
+}
 
 exports.createNotionLink = functions.https.onRequest(async (req, res) => {
   const databaseId = (Url.parse(req.url, true).query)["databaseId"];
@@ -2382,9 +2309,12 @@ async function oauthCallbackHandlerGarmin(oAuthCallback, transactionData) {
       "garmin_user_id": garminUserId,
     };
     await db.collection("users").doc(userDocId).set(firestoreParameters, {merge: true});
-
     return true;
   }
+  const userDoc = (await db.collection("users").doc(devId+userId).get()).data();
+  const start = new Date(Date.now());
+  const end = new Date(Date.now() - 30*24*60*60*1000);
+  await getGarminActivityList(start, end, userDoc);
 }
 
 async function checkStravaTokens(userDocId, db) {

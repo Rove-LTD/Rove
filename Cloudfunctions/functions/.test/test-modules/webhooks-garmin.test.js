@@ -169,17 +169,18 @@ describe("Testing that the garmin Webhooks work: ", () => {
                 activity_id: 7698241609,
                 activity_name: "Indoor Cycling",
                 activity_type: "INDOOR_CYCLING",
-                distance_in_meters: null, //float no trailing 0
-                average_pace_in_meters_per_second: null, //float
+                distance: null, //float no trailing 0
+                avg_speed: null, //float
                 active_calories: 391,
-                activity_duration_in_seconds: 1811,
+                activity_duration: 1811,
                 start_time: '2021-10-22T12:54:21.000Z', //ISO 8601 UTC
-                average_heart_rate_bpm: 139,
+                avg_heart_rate: 139,
                 max_heart_rate_bpm: 178,
-                average_cadence: null,
+                avg_cadence: null,
                 elevation_gain: null,
                 elevation_loss: null,
                 provider: "garmin",
+                version: "1.0"
             },
             raw: {
                 "activeKilocalories": 391,

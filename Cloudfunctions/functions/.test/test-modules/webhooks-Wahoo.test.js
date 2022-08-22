@@ -130,13 +130,13 @@ describe("Testing that the Wahoo Webhooks work: ", () => {
                 activity_id: 140473420,
                 activity_name: "Cycling",
                 activity_type: "BIKING",
-                distance_in_meters: "0.0",
-                average_pace_in_meters_per_second: "0.0",
+                distance: "0.0",
+                avg_speed: "0.0",
                 active_calories: "0.0",
-                activity_duration_in_seconds: "9.0",
+                activity_duration: "9.0",
                 start_time: '2022-06-13T16:38:51.000Z',
-                average_heart_rate_bpm: "0.0",
-                average_cadence: "0.0",
+                avg_heart_rate: "0.0",
+                avg_cadence: "0.0",
                 elevation_gain: "0.0",
                 elevation_loss: null,
                 provider: "wahoo",
@@ -150,6 +150,7 @@ describe("Testing that the Wahoo Webhooks work: ", () => {
                 file: {
                     "url":"https://cdn.wahooligan.com/wahoo-cloud/production/uploads/workout_file/file/WpHvKL3irWsv2vHzGzGF_Q/2022-06-13-163851-ELEMNT_AE48-274-0.fit"
                 },
+                version: "1.0"
             },
             raw: JSON.parse(successfulWebhookMessage.body),
             "status": "sent",

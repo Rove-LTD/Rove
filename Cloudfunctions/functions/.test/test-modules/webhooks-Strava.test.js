@@ -134,17 +134,18 @@ describe("Testing that the strava Webhooks work: ", () => {
             activity_id: 12345678987654321,
             activity_name: "Happy Friday",
             activity_type: "Ride",
-            distance_in_meters: 28099, //float no trailing 0
-            average_pace_in_meters_per_second:"6.7", //float
+            distance: 28099, //float no trailing 0
+            avg_speed:"6.7", //float
             active_calories: 781,
-            activity_duration_in_seconds: 4207,
+            activity_duration: 4207,
             start_time: '2018-02-16T06:52:54.000Z', //ISO 8601 UTC
-            average_heart_rate_bpm: null,
+            avg_heart_rate: null,
             // max_heart_rate_bpm: null,
-            average_cadence: "78.5",
+            avg_cadence: "78.5",
             elevation_gain: "446.6",
             elevation_loss:"17.2",
             provider: "strava",
+            version: "1.0",
         }
         assert.deepEqual(sanatisedActivity, expectedResults);
         sinon.restore();
