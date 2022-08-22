@@ -145,9 +145,9 @@ exports.getActivityList = functions.https.onRequest(async (req, res) => {
   } else {
     parameters = await getParametersFromTransactionId(transactionId);
     updateTransactionWithStatus(transactionId, "userClickedAuthButton");
-  }
+  } // TODO: this is unnecessary
   let url = "";
-  console.log(callbackBaseUrl);
+  console.log(callbackBaseUrl); // TODO: not necessary
   // parameter checks
   // first check developer exists and the devKey matches
   if (parameters.devId != null) {
@@ -218,6 +218,7 @@ exports.getActivityList = functions.https.onRequest(async (req, res) => {
     return;
   }
   // now we need to make a request to the user's authenticated services.
+  // TODO: "<provider_connected" is the way to determine.
   const providersConnected = {"polar": false, "garmin": false, "strava": false, "wahoo": false};
   providersConnected["polar"] = userDoc.data().hasOwnProperty("polar_user_id");
   providersConnected["garmin"] = userDoc.data().hasOwnProperty("garmin_access_token");
@@ -233,7 +234,7 @@ exports.getActivityList = functions.https.onRequest(async (req, res) => {
     for (let i = 0; i < payload.length; i++) {
       currentActivity = payload[i];
       db.collection("users").doc(userDoc.id).collection("activities").doc(currentActivity["sanitised"]["activity_id"] + currentActivity["sanitised"]["provider"]).set(payload[i], {merge: true});
-    }
+    } // TODO: set a status in the activity doc to prevent sending to developer? also check userId is being set properly - perhaps should call saveAndSendToDeveloper()
     res.send("OK");
   } catch (error) {
     res.status(400);
@@ -2311,6 +2312,7 @@ async function oauthCallbackHandlerGarmin(oAuthCallback, transactionData) {
     await db.collection("users").doc(userDocId).set(firestoreParameters, {merge: true});
     return true;
   }
+  // TODO: push to inbox here
   const userDoc = (await db.collection("users").doc(devId+userId).get()).data();
   const start = new Date(Date.now());
   const end = new Date(Date.now() - 30*24*60*60*1000);
