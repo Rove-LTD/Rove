@@ -42,7 +42,7 @@ const strava = require("strava-v3");
           "redirectUrl": null,
         });
   })
-  it('strava callback should check userId and DevId and write the access tokens to the database...', async () => {
+  it.only('strava callback should check userId and DevId and write the access tokens to the database...', async () => {
       //set up the stubbed response to mimic strava's response when called with the
       //code to get the token
       const responseObject = {

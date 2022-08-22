@@ -987,6 +987,8 @@ exports.stravaCallback = functions.https.onRequest(async (req, res) => {
       // this is where the tokens come back.
       stravaStoreTokens(userId, devId, JSON.parse(body), db);
       await getStravaAthleteId(userId, devId, JSON.parse(body));
+      await getHistoryInBox.push("strava",
+          transactionData.devId+transactionData.userId);
       const urlString = await successDevCallback(transactionData);
       res.redirect(urlString);
     } else {
