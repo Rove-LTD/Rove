@@ -13,18 +13,25 @@ class OauthFitbit {
   * @param {Object} firebaseDb
   */
   constructor(config, firebaseDb) {
+    const GCproject = process.env.GCLOUD_PROJECT;
     this.db = firebaseDb;
     this.config = config;
-    this.provider = "fitbit"; // edit to put in provider name
+    this.provider = "fitbit";
+    this.oauthCallbackUrl =
+        "https://us-central1-"+
+        GCproject+
+        ".cloudfunctions.net/fitbitCallback";
   }
   /**
-   * @param {String} devId
-   * @param {String} devsUserTag
-   * @param {String} provider
+   * @param {Object} transactionData
+   * @param {String} transactionId
+   * @return {Future}
    */
-  setDevUser(devId, devsUserTag) {
-    this.devId = devId;
-    this.userId = devsUserTag;
+  async setDevUser(transactionData, transactionId) { // just call userId
+    this.devId = transactionData.devId;
+    this.userId = transactionData.userId;
+    await this.getDevDoc();
+    this.transactionId = transactionId;
     this.status = {redirectUrl: false,
       gotCode: false,
       gotAccessToken: false,
@@ -35,30 +42,49 @@ class OauthFitbit {
     this.redirectUrl = this.getRedirect();
   }
   /**
-   *
-   * @param {String} provider
-   * @param {Object} data - the parsed JSON body returned from the provider
+  * @return {Future}
+  */
+  async getDevDoc() {
+    this.devDoc = await this.db.collection("developers").doc(this.devId).get();
+  }
+  /**
+   * @return {String} userDocId
    */
-  fromCallbackData(provider, data) {
+  get userDocId() {
+    return this.devId+this.userId;
+  }
+  /**
+   * @return {String} lookup
+   */
+  get lookup() {
+    return this.devDoc.data()["secret_lookup"];
+  }
+  /**
+   *
+   * @param {Object} data - the parsed JSON body returned from the provider
+   * @param {Object} transactionData
+   * @return {Future}
+   */
+  async fromCallbackData(data, transactionData) {
     this.error = false;
     this.errorMessage = "";
-    const _state = data["state"].split(":");
-    this.devId = _state[1];
-    this.userId = _state[0];
+    this.devId = transactionData.devId;
+    this.userId = transactionData.userId;
+    await this.getDevDoc();
+    this.transactionId = data["state"];
     this.code = data["code"];
     this.error = data["error"] || false;
-    this.provider = provider;
     this.status = {redirectUrl: true,
       gotCode: (this.code == undefined) ? false : true,
       gotAccessToken: false,
       gotUserData: false,
       tokenExpired: false};
-    if (this.code == undefined || null || "") {
+    if (this.code == undefined || this.code == null || this.code =="") {
       if (!this.error) {
         this.error = true;
         this.errorMessage = "Valid code not received from provider";
       }
-    } else if (this.devId == "" || undefined || null) {
+    } else if (this.devId == "" || this.devId == undefined || this.devId ==null) {
       this.error = true;
       this.errorMessage = "valid state of devId not received from provider";
     }
@@ -67,18 +93,19 @@ class OauthFitbit {
    * @return {void}
    */
   getRedirect() { // choose the right properties for the provider
-    this.clientId = this.config[this.devId]["fitbitClientId"];
-    this.clientSecret = this.config[this.devId]["fitbitToken"];
+    this.clientId = this.config[this.lookup]["fitbitClientId"];
+    this.clientSecret = this.config[this.lookup]["fitbitToken"];
     this.scope= "activity";
-    this.callbackBaseUrl = "https://us-central1-rove-26.cloudfunctions.net/oauthCallbackHandlerFitbit";
     this.baseUrl = "https://www.fitbit.com/oauth2/authorize?";
-    this.state = this.userId+":"+this.devId;
+    this.state = this.transactionId;
     this.codeChallenge = this.getCodeChallenge();
 
     const parameters = {
       client_id: this.clientId,
       response_type: "code",
-      redirect_url: this.callbackBaseUrl+"?state="+this.state,
+      redirect_url: this.oauthCallbackUrl+"?state="+this.state,
+      code_challenge: this.codeChallenge,
+      code_challenge_method: "S256",
       scope: this.scope,
     };
 
@@ -133,23 +160,40 @@ class OauthFitbit {
         .replace(/=/g, "");
   }
   /**
-   *
-   * @return {void}
-   */
+ *
+ * @return {Future}
+ */
   async storeTokens() {
     // set tokens for userId doc.
-    const userRef = this.db.collection("users").doc(this.userId);
-    await userRef.set(this.tokenData, {merge: true});
+    const userRef = this.db.collection("users").doc(this.userDocId);
+    const fitbitUserDoc = await userRef.get();
+    const fitbitUserId = fitbitUserDoc.data()["fitbit_user_id"];
+    const userQuery = await this.db.collection("users")
+        .where("fitbit_user_id", "==", fitbitUserId)
+        .get();
+    userQuery.docs.forEach(async (doc)=>{
+      await doc.ref.set(this.tokenData, {merge: true});
+    });
     return;
   }
   /**
    * returns accessCodeFields from the response to update database with
    */
   get tokenData() {
-    // CHANGE to match field names from provider
+    const nowInSecondsSinceEpoch = Math.round(new Date()/1000);
+    const createDate = this.accessCodeResponse["created_at"];
+    const expiresIn = this.accessCodeResponse["expires_in"];
+    let expiryDate = createDate+expiresIn;
+    expiryDate = expiryDate || nowInSecondsSinceEpoch+expiresIn;
     return {
-      "provider_access_token": this.accessCodeResponse["access_token"],
-      "provider_connected": true,
+      "fitbit_access_token": this.accessCodeResponse["access_token"],
+      "fitbit_token_expires_in": this.accessCodeResponse["expires_in"],
+      "fitbit_created_at": this.accessCodeResponse["created_at"] || null,
+      "fitbit_token_expires_at": expiryDate,
+      "fitbit_refresh_token": this.accessCodeResponse["refresh_token"],
+      "fitbit_connected": true,
+      "devId": this.devId,
+      "userId": this.userId,
     };
   }
 
@@ -200,6 +244,25 @@ class OauthFitbit {
     };
   }
   /**
+   *
+   */
+  get refreshCodeOptions() {
+    const _dataString = "refresh_token="+
+    this.refreshCode+
+    "&client_id="+this.config[this.lookup]["fitbitClientId"]+
+    "&client_secret="+this.config[this.lookup]["fitbitSecret"]+
+    "&grant_type=refresh_token";
+    return {
+      url: "https://api.fitbit.com/oauth/token?"+_dataString,
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Accept": "application/json;charset=UTF-8",
+        "Authorization": "Basic "+ Buffer.from(this.config[this.devId]["fitbitClientId"]+":"+this.config[this.devId]["fitbitSecret"], "base64"),
+      },
+    };
+  }
+  /**
    * @return {Object}
    */
   get registerUserOptions() {
@@ -211,6 +274,27 @@ class OauthFitbit {
         "Authorization": "Bearer "+this.accessCodeResponse["access_token"],
       },
     };
+  }
+  /**
+   *
+   * @param {FirebaseDocument} userDoc
+   * @return {Future}
+   */
+  async getUserToken(userDoc) {
+    const userToken = userDoc.data()["fitbit_access_token"];
+    this.devId = userDoc.data()["devId"];
+    this.userId = userDoc.data()["userId"];
+    await this.getDevDoc();
+    if (this.userId == undefined || this.devId == undefined) {
+      throw (new Error("error: userId or DevId not set"));
+    }
+    if (userDoc.data()["fitbit_token_expires_at"] < new Date()/1000) {
+      // token out of date needs to be refreshed
+      await this.refreshAndSaveAccessCodes(userDoc.data()["fitbit_refresh_token"], userToken);
+      return this.accessCodeResponse["access_token"];
+    } else {
+      return userToken;
+    }
   }
 }
 
