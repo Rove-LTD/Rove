@@ -1583,8 +1583,8 @@ async function processStravaWebhook(webhookDoc) {
     activity = await stravaApi.activities
         .get({"access_token": stravaAccessToken, "id": webhookBody.object_id});
     sanitisedActivity = filters.stravaSanitise([activity]);
-    /* const samples = await getDetailedActivity(userDocsList[0].data(), activity, "strava");
-    sanitisedActivity[0]["samples"] = samples;*/
+    const samples = await getDetailedActivity(userDocsList[0].data(), activity, "strava");
+    sanitisedActivity[0]["samples"] = samples;
   }
   for (const userDoc of userDocsList) {
     saveAndSendActivity(userDoc,
@@ -2043,27 +2043,21 @@ async function getStravaDetailedActivity(userDoc, activityDoc) {
   const devId = await userDoc["devId"];
   const secretLookup = await db.collection("developers").doc(devId).get();
   const lookup = await secretLookup.data()["secret_lookup"];
-  let streamResponse;
   stravaApi.config({
     "client_id": configurations[lookup]["stravaClientId"],
     "client_secret": configurations[lookup]["stravaClientSecret"],
     "redirect_uri": callbackBaseUrl+"/stravaCallback",
   });
-  // delete activities
-  // check if this is the last user with this stravaId and this is not a call from the webhook
+
   let accessToken = userDoc["strava_access_token"];
-  const userQueryList = await db.collection("users").
-      where("strava_id", "==", userDoc["strava_id"])
-      .get();
-  if ( userQueryList.docs.length == 1) {
-    if (await checkStravaTokens(userDoc["devId"]+userDoc["userId"], db) == true) {
-      // token out of date, make request for new ones.
-      const payload = await stravaApi.oauth.refreshToken(userDoc["strava_refresh_token"]);
-      await stravaTokenStorage(userDoc["devId"]+userDoc["userId"], payload, db);
-      accessToken = payload["access_token"];
-    }
-    streamResponse = await stravaApi.streams.activity({"access_token": accessToken, "id": stravaActivityId, "types": ["time", "distance", "latlng", "altitude", "velocity_smooth", "heartrate", "cadence", "watts", "temp", "moving", "grade_smooth"], "key_by_type": true});
+  if (await checkStravaTokens(userDoc["devId"]+userDoc["userId"], db) == true) {
+    // token out of date, make request for new ones.
+    const payload = await stravaApi.oauth.refreshToken(userDoc["strava_refresh_token"]);
+    await stravaTokenStorage(userDoc["devId"]+userDoc["userId"], payload, db);
+    accessToken = payload["access_token"];
   }
+  const streamResponse = await stravaApi.streams.activity({"access_token": accessToken, "id": stravaActivityId, "types": ["time", "distance", "latlng", "altitude", "velocity_smooth", "heartrate", "cadence", "watts", "temp", "moving", "grade_smooth"], "key_by_type": true});
+  return streamResponse;
 }
 
 async function getPolarDetailedActivity(userDoc, activityDoc) {
@@ -2630,6 +2624,8 @@ async function stravaTokenStorage(userDocId, data, db) {
     "strava_connected": true,
   };
   await db.collection("users").doc(userDocId).set(parameters, {merge: true});
+  // TODO the access token needs to update all users with the old access code
+  // and strava user id
 }
 async function getGarminUserId(consumerSecret, oauthConsumerKey, garminAccessToken, garminAccessTokenSecret) {
   let garminUserId = "";
