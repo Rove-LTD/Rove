@@ -14,6 +14,7 @@ const got = require("got");
 const request = require("request");
 const strava = require("strava-v3");
 const OauthWahoo = require("./oauthWahoo");
+const OauthFitbit = require("./oauthFitbit");
 const contentsOfDotEnvFile = require("./config.json");
 const filters = require("./data-filter");
 
@@ -89,6 +90,8 @@ exports.connectService = functions.https.onRequest(async (req, res) => {
     url = await polarOauth(req);
   } else if (provider == "wahoo") {
     url = await wahooOauth(req);
+  } else if (provider =="fitbit") {
+    url = await fitbitOauth(req);
   } else {
     // the request was badly formatted with incorrect provider parameter
     url = "error: the provider was badly formatted, missing or not supported";
@@ -426,6 +429,15 @@ async function polarStoreTokens(userId, devId, data, db) {
   // const devRef = db.collection("developers").doc(devId);
   // write resultant message to dev endpoint.
   return;
+}
+
+function fitbitOauth(req) {
+  const appQuery = Url.parse(req.url, true).query;
+  const userId = appQuery["userId"];
+  const devId = appQuery["devId"];
+
+  OauthFitbit.setDevUser(devId, userId);
+  return OauthFitbit.redirectUrl;
 }
 
 function wahooOauth(req) {
