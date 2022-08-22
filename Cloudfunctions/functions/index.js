@@ -1905,8 +1905,6 @@ async function saveAndSendActivity(userDoc,
 
   if (!doc.exists) {
     activityDoc.set({"sanitised": localSanitisedActivity, "raw": activity});
-    // const triesSoFar = 0; // this is our first try to write to developer
-    // await sendToDeveloper(userDoc, localSanitisedActivity, activity, activityDoc, triesSoFar);
   } else {
     console.log("duplicate activity - not written or sent");
   }
@@ -2476,6 +2474,41 @@ exports.createNotionLink = functions.https.onRequest(async (req, res) => {
   // redirect the user to connectService with new dev and user credentials.
   res.redirect("/connectService?userId=notion"+"&devId="+databaseId+"&provider="+provider+"&devKey="+key);
 });
+exports.processGetHistoryInBox = functions.firestore
+    .document("getHistoryInBox/{docId}")
+    .onCreate(async (snap, context) => {
+      console.log("processing getHistory inbox written to... with doc: "+snap.id);
+      const provider = snap.data()["provider"];
+      const userDocId = snap.data()["userDocId"];
+      const providersConnected = {};
+      providersConnected[provider] = true;
+      const start = new Date(Date.now());
+      const end = new Date(Date.now() - 30*24*60*60*1000);
+      try {
+        const userDoc = await db.collection("users")
+            .doc(userDocId)
+            .get();
+        if (!userDoc.exists) {
+          throw Error("userDocument does not exist when trying to get "+provider+" History!");
+        }
+        const payload =
+          await requestForDateRange(
+              providersConnected,
+              userDoc,
+              start,
+              end);
+        // write the docs into the database and send to the developer.
+        for (let i = 0; i < payload.length; i++) {
+          saveAndSendActivity(userDoc,
+              payload[i].sanitised,
+              payload[i].raw);
+        }
+        webhookInBox.delete(snap.ref);
+      } catch (error) {
+        webhookInBox.writeError(snap.ref, error);
+      }
+      return;
+    });
 
 async function polarWebhookUtility(devId, action, webhookId) {
   const secretLookup = await db.collection("developers").doc(devId).get();
