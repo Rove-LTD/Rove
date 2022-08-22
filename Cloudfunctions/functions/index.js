@@ -18,6 +18,7 @@ const got = require("got");
 const request = require("request");
 const stravaApi = require("strava-v3");
 const OauthWahoo = require("./oauthWahoo");
+const OauthFitbit = require("./oauthFitbit");
 const contentsOfDotEnvFile = require("./config.json");
 const filters = require("./data-filter");
 const fs = require("fs");
