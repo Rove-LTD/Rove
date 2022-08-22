@@ -107,6 +107,7 @@ describe("Testing that the strava Webhooks work: ", () => {
 
         //set up the stubbed response to mimic Strava's response when called with the
         const stravaExercisePayload = require('./strava.json');
+        const stravaStreamPayload = require('./stravaStream.json');
         stubbedStravaCall = sinon.stub(stravaApi.activities, "get");
         stubbedStravaStreamCall = sinon.stub(stravaApi.streams, "activity");
         stubbedStravaCall.onFirstCall().returns(stravaExercisePayload);
