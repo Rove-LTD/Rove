@@ -111,7 +111,7 @@ describe("Check the get detailed activity service works: ", () => {
 
         await myFunctions.getDetailedActivity(req, res);
     })
-    it.only("Check Get Wahoo Detailed Activity Works.", async () => {
+    it("Check Get Wahoo Detailed Activity Works.", async () => {
         const sanitisedActivityJson = await myFunctions.getDetailedActivity(userDoc, wahooDoc, "wahoo");
         // await fs.promises.writeFile('./wahooDetailed.json', JSON.stringify(sanitisedActivityJson));
         const expectedResult = wahooActivity;

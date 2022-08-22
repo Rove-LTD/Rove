@@ -103,11 +103,11 @@ describe("Testing that the strava Webhooks work: ", () => {
         sinon.restore();
 
     });
-    it('read webhookInBox event and process it successfully...', async () => {
+    it.only('read webhookInBox event and process it successfully...', async () => {
 
         //set up the stubbed response to mimic Strava's response when called with the
         const stravaExercisePayload = require('./strava.json');
-        const stravaStreamPayload = require('./stravaStream.json');
+        const stravaStreamPayload = {"samples":"temp"}//require('./stravaStream.json');
         stubbedStravaCall = sinon.stub(stravaApi.activities, "get");
         stubbedStravaStreamCall = sinon.stub(stravaApi.streams, "activity");
         stubbedStravaCall.onFirstCall().returns(stravaExercisePayload);
