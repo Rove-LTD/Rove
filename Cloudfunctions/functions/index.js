@@ -218,7 +218,7 @@ exports.getActivityList = functions.https.onRequest(async (req, res) => {
     return;
   }
   // now we need to make a request to the user's authenticated services.
-  // TODO: "<provider_connected" is the way to determine.
+  // TODO: "<provider>_connected" is the way to determine.
   const providersConnected = {"polar": false, "garmin": false, "strava": false, "wahoo": false};
   providersConnected["polar"] = userDoc.data().hasOwnProperty("polar_user_id");
   providersConnected["garmin"] = userDoc.data().hasOwnProperty("garmin_access_token");
@@ -229,11 +229,11 @@ exports.getActivityList = functions.https.onRequest(async (req, res) => {
     const payload = await requestForDateRange(providersConnected, userDoc, start, end);
     url = "all checks passing";
     res.status(200);
-    let currentActivity = "";
     // write the docs into the database now.
     for (let i = 0; i < payload.length; i++) {
-      currentActivity = payload[i];
-      db.collection("users").doc(userDoc.id).collection("activities").doc(currentActivity["sanitised"]["activity_id"] + currentActivity["sanitised"]["provider"]).set(payload[i], {merge: true});
+      saveAndSendActivity(userDoc,
+          payload[i].sanatised,
+          payload[i].raw);
     } // TODO: set a status in the activity doc to prevent sending to developer? also check userId is being set properly - perhaps should call saveAndSendToDeveloper()
     res.send("OK");
   } catch (error) {
