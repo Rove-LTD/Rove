@@ -943,7 +943,7 @@ exports.corosCallback = functions.https.onRequest(async (req, res) => {
     },
     {merge: true});
   }
-  await getHistoryInBox("coros",
+  await getHistoryInBox.push("coros",
       transactionData.devId + transactionData.userId);
   res.status(200);
   const urlString = await successDevCallback(transactionData);
@@ -1356,7 +1356,7 @@ exports.polarCallback = functions.https.onRequest(async (req, res) => {
       let message ="";
       message = await registerUserWithPolar(userId, devId, JSON.parse(body), db);
       await polarStoreTokens(userId, devId, JSON.parse(body), db);
-      await getHistoryInBox("polar", devId + userId);
+      await getHistoryInBox.push("polar", devId + userId);
       const urlString = await successDevCallback(transactionData);
       res.redirect(urlString);
     } else {

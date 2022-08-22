@@ -103,7 +103,7 @@ describe("Testing that the strava Webhooks work: ", () => {
         sinon.restore();
 
     });
-    it.only('read webhookInBox event and process it successfully...', async () => {
+    it('read webhookInBox event and process it successfully...', async () => {
 
         //set up the stubbed response to mimic Strava's response when called with the
         const stravaExercisePayload = require('./strava.json');
