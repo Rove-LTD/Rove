@@ -153,7 +153,9 @@ describe("Testing that the Polar Webhooks work: ", () => {
                 }
             }
         }
-        const fitFilePayload = "longStringofFitFile";
+        const fitFilePayload = {
+            rawBody: Buffer.from("this file stuff"),
+         }; // TODO: make this an actual fit file payload
         stubbedPolarCall = sinon.stub(got, "get");
         stubbedPolarCall.onFirstCall().returns(polarExercisePayload);
         const stubbedWebhookInBox = sinon.stub(webhookInBox, "delete");
@@ -199,6 +201,7 @@ describe("Testing that the Polar Webhooks work: ", () => {
               elevation_loss: null,
               provider: "polar",
               file: {"url": "someURL"},
+              samples: {"powerSamples":[0.1,0.3],"speedSamples":[0.2,0.3]},
               version: "1.0"
           },
           raw: polarExercisePayload.json(),
