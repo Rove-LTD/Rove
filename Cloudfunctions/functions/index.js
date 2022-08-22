@@ -232,7 +232,7 @@ exports.getActivityList = functions.https.onRequest(async (req, res) => {
     // write the docs into the database now.
     for (let i = 0; i < payload.length; i++) {
       saveAndSendActivity(userDoc,
-          payload[i].sanatised,
+          payload[i].sanitised,
           payload[i].raw);
     } // TODO: set a status in the activity doc to prevent sending to developer? also check userId is being set properly - perhaps should call saveAndSendToDeveloper()
     res.send("OK");
