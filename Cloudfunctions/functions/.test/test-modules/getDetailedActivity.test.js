@@ -23,6 +23,7 @@ const admin = require("firebase-admin");
 const fs = require("fs");
 const wahooActivity = require("./wahooDetailed.json")
 const garminActivity = require("./garminDetailed.json")
+const db = admin.firestore();
 
 myFunctions = require('../../index.js');
 // -----------END INITIALISE ROVE TEST PARAMETERS----------------------------//
@@ -33,6 +34,7 @@ myFunctions = require('../../index.js');
 // name as in the function we are testing
 const got = require('got');
 const { default: strava } = require('strava-v3');
+const { deleteBlock } = require('@notionhq/client/build/src/api-endpoints');
 let userDoc;
 let stravaDoc;
 let garminDoc;
@@ -52,7 +54,7 @@ describe("Check the get detailed activity service works: ", () => {
             "strava_connected": true,
             "strava_access_token": "6763bdab406b0d30a8a9f4694e7716e04e0ed20d",
             "strava_refresh_token": "922dd204d91e03515b003fe8f5516d99563d9f0c",
-            "strava_token_expires_at": 1661182632,
+            "strava_token_expires_at": Date.now()/1000,
             "strava_id": 7995810,
             "polar_access_token" : "04c9315a4da52c91cc43aace5630e65b",
             "polar_connected": true,
@@ -61,6 +63,7 @@ describe("Check the get detailed activity service works: ", () => {
             "polar_token_type": "bearer",
             "polar_user_id": 26925145,
         };
+    await db.collection("users").doc(testDev+testUser).set(userDoc);
     stravaDoc = {"id": 7530448332};
     polarDoc = {"id": "yNZpdMNq"};
     wahooDoc = {"file": {"url": "https://cdn.wahooligan.com/wahoo-cloud/production/uploads/workout_file/file/0KNBLnbwOndDYh5MhonDZw/2022-07-07-071356-ELEMNT_AE48-282-0.fit"}};
@@ -70,7 +73,7 @@ describe("Check the get detailed activity service works: ", () => {
                 "durationInSeconds": 3923,
             };
     })
-    it("Check Get Detailed Strava Activity Works.", async () => {
+    it.only("Check Get Detailed Strava Activity Works.", async () => {
         sanitisedActivityJson = await myFunctions.getDetailedActivity(userDoc, stravaDoc, "strava");
         assert.deepEqual(sanitisedActivityJson, "shite")
     })
