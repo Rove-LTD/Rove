@@ -60,7 +60,7 @@ describe("Check the get detailed activity service works: ", () => {
             "polar_token_expires_in": 461375999,
             "polar_token_type": "bearer",
             "polar_user_id": 45395466,
-        });
+        };
     await admin.firestore()
         .collection("users")
         .doc(testDev+testUser)

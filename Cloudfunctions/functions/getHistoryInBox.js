@@ -27,7 +27,7 @@ const end = new Date(Date.now() - 30*24*60*60*1000);
 await getGarminActivityList(start, end, userDoc);
 
 
-
 const recentActivities = await getPolarActivityList(userId);
 for (const activity of recentActivities) {
-  await saveAndSendActivity(db.collection("users").doc(userId), activity["sanitised"], activity["raw"]); */
+  await saveAndSendActivity(db.collection("users").doc(userId),
+    activity["sanitised"], activity["raw"]); */
