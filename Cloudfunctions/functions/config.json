@@ -2,20 +2,24 @@
     "roveLiveSecrets": {
       "stravaClientId": 72486,
       "stravaClientSecret": "b0d500111e3d1774903da1f067b5b7adf38ca726",
-      "consumerSecret": "ffqgs2OxeJkFHUM0c3pGysdCp1Znt0tnc2s",
-      "oauth_consumer_key": "eb0a9a22-db68-4188-a913-77ee997924a8",
+      "consumerSecret": "RvHa65YoagdgEgczFWLNfBrAtPCN8lKUtzA",
+      "oauth_consumer_key": "d3dd1cc9-06b2-4b3e-9eb4-8a40cbd8e53f",
       "polarClientId": "654623e7-7191-4cfe-aab5-0bc24785fdee",
       "polarSecret": "f797c0e1-a39d-4b48-a2d9-89c2baea9005",
       "whaooClientId": "iA2JRS_dBkikcb0uEnHPtb6IDt1vDYNbityEEhp801I",
-      "wahooSecret": "w4FvDllcO0zYrnV1-VKR-T2gJ4mYUOiFJuwx-8C-C2I"
+      "wahooSecret": "w4FvDllcO0zYrnV1-VKR-T2gJ4mYUOiFJuwx-8C-C2I",
+      "corosClientId": "e8925760066a490b9d26187f731020f8",
+      "corosSecret": "3fec831e956045db9ec000d2083fa056"
     },
     "roveTestSecrets": {
-      "consumerSecret": "ffqgs2OxeJkFHUM0c3pGysdCp1Znt0tnc2s",
-      "oauth_consumer_key": "eb0a9a22-db68-4188-a913-77ee997924a8",
+      "consumerSecret": "RvHa65YoagdgEgczFWLNfBrAtPCN8lKUtzA",
+      "oauth_consumer_key": "d3dd1cc9-06b2-4b3e-9eb4-8a40cbd8e53f",
       "whaooClientId": "IGQW1vInhei9CE_tEyoso2V4COhNOn53AfYGsTx96oA",
       "wahooSecret": "-TQHcASsAk-cTUN3485_oyY6lUqsKhFLLpoKoWrCnHs",
       "polarClientId": "0544732f-0024-4645-a844-6f46ba09fe8d",
-      "polarSecret": "42b1eed7-108c-4ab6-b090-b21e42f1dca1"
+      "polarSecret": "42b1eed7-108c-4ab6-b090-b21e42f1dca1",
+      "corosClientId": "e8925760066a490b9d26187f731020f8",
+      "corosSecret": "3fec831e956045db9ec000d2083fa056"
     },
     "stravaSubscriptions": {
       "217520": {

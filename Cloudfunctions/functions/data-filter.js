@@ -42,6 +42,44 @@ class standard_format {
   }
 }
 
+  exports.corosSanatise = function (a) {
+    summaryActivity = {
+      // standard fields
+      "activity_id": a["labelId"],
+      "activity_name": "Coros " + corosSportLookup.a["mode"],
+      "activity_type": corosSportLookup.a["mode"],
+      "distance_in_meters": a["distance"],
+      "active_calories": a["calorie"],
+      "start_time": new Date(a["startTime"]).toISOString(),
+      "provider": "coros",
+      "average_pace_in_meters_per_second": (1/a["avgSpeed"])*1000,
+      "activity_duration_in_seconds": a["duration"],
+      "file": {"url": a["fitUrl"]}
+    }
+  }
+// sports lookup with {mode: [name, submode]} //ignoring submodes for now...
+const corosSportLookup = {
+8:	["Run", 	1],	
+9:	["Bike", 	1],
+10:	["Swimming", 	1],
+13:	["Multisport",	1],
+14:	["Mountaineering", 	1],	
+15:	["Trail Run", 	1],
+16:	["Hike", 	1],
+18:	["Cardio", 	1],	
+19:	["XC Ski", 	1],
+20:	["Track Run", 1],
+21:	["Ski", 1	],	
+22:	["Pilot", 1],
+23:	["Strength", 2],
+24:	["Rowing", 	1],
+25:	["Whitewater", 1],
+26:	["Flatwater", 	1],
+27:	["Windsurfing", 	1],
+28:	["Speedsurfing", 	1],
+29:	["Ski Touring", 	1],
+31:	["Walk", 1],}
+
   exports.polarSanatise = function (activity) {
     // standard fields
     summaryActivity = {

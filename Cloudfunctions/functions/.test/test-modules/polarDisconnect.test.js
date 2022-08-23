@@ -51,7 +51,7 @@ const got = require('got');
         .collection("activities")
         .doc()
         .set({raw: {field1: "somedata"},
-            sanitised: {data_source: "polar"}});
+            sanitised: {provider: "polar"}});
 
   });
   it('Check that service returns with error if user is not already authorised', async () => {
@@ -90,7 +90,7 @@ const got = require('got');
         .collection("users")
         .doc(testDev+testUser)
         .collection("activities")
-        .where("sanitised.data_source","==","polar")
+        .where("sanitised.provider","==","polar")
         .get();
     
     const expectedUserResults = {
@@ -147,7 +147,7 @@ const got = require('got');
         .collection("users")
         .doc(testDev+testUser)
         .collection("activities")
-        .where("sanitised.data_source","==","polar")
+        .where("sanitised.provider","==","polar")
         .get();
     
     const expectedUserResults = {

@@ -107,17 +107,20 @@ describe("Testing that the strava Webhooks work: ", () => {
 
         //set up the stubbed response to mimic Strava's response when called with the
         const stravaExercisePayload = require('./strava.json');
+        const stravaStreamPayload = {"samples":"temp"}//require('./stravaStream.json');
         stubbedStravaCall = sinon.stub(stravaApi.activities, "get");
+        stubbedStravaStreamCall = sinon.stub(stravaApi.streams, "activity");
         stubbedStravaCall.onFirstCall().returns(stravaExercisePayload);
+        stubbedStravaStreamCall.onFirstCall().returns(stravaStreamPayload);
         const stubbedWebhookInBox = sinon.stub(webhookInBox, "delete");
 
         const snapshot = test.firestore.makeDocumentSnapshot(successfulWebhookMessage, "webhookInBox/"+successfulWebhookMessageDoc);
 
         wrapped = test.wrap(myFunctions.processWebhookInBox);
         await wrapped(snapshot);
-
+        // give the sendToDeveloper function a chance to run
         const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
-        await wait(1000);
+        await wait(6000);
         // check the webhookInBox function was called with the correct args
         assert(stubbedWebhookInBox.calledOnceWith(snapshot.ref), "webhookInBox called incorrectly");
         //now check the database was updated correctly
@@ -129,7 +132,7 @@ describe("Testing that the strava Webhooks work: ", () => {
             .get();
 
         const sanatisedActivity = testUserDocs.docs[0].data()["sanitised"];
-        const expectedResults = { // TODO:
+        const expectedResults = {
             userId: testUser,
             activity_id: 12345678987654321,
             activity_name: "Happy Friday",
