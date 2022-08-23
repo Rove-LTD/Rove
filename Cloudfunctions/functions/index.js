@@ -2127,7 +2127,7 @@ function sanitisePolarFitFile(fitFile) {
     heartRateSamples.push(record.heart_rate);
     speedSamples.push(record.speed);
     altitudeSamples.push(record.altitude);
-    positionSamples.push([record.position_lat, record.position_long]);
+    positionSamples.push({"latitude": record.position_lat, "longitute": record.position_long});
     gradientSamples.push(null);
     calorieSamples.push(null);
     cadenceSamples.push(record[cadence]);
@@ -2247,7 +2247,7 @@ function garminDetailedSanitise(activity) {
     heartRateSamples.push(sample["heartRate"]);
     speedSamples.push(sample["speedMetersPerSecond"]);
     altitudeSamples.push(sample["elevationInMeters"]);
-    positionSamples.push([sample["latitudeInDegree"], sample["longitudeInDegree"]]);
+    positionSamples.push({"latitude": sample["latitudeInDegree"], "longitude": sample["longitudeInDegree"]});
     gradientSamples.push(sample["grade"]);
     calorieSamples.push(sample["calories"]);
     cadenceSamples.push(sample[cadence]);
@@ -2368,7 +2368,7 @@ function jsonFitSanitise(jsonRecords) {
     heartRateSamples.push(record["heart_rate"]);
     speedSamples.push(record["speed"]);
     altitudeSamples.push(record["altitude"]);
-    positionSamples.push([record["position_lat"], record["position_long"]]);
+    positionSamples.push({"latitude": record["position_lat"], "longitude": record["position_long"]});
     gradientSamples.push(record["grade"]);
     calorieSamples.push(record["calories"]);
     cadenceSamples.push(record["cadence"]);
