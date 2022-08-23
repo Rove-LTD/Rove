@@ -117,7 +117,8 @@ describe("Testing that the Wahoo Webhooks work: ", () => {
     });
     it.only('read webhookInBox event and process it successfully...', async () => {
         // set up response to the request for detailed data from wahoo
-        file = await fs.readFile("/Users/paul/development/Rove/Cloudfunctions/functions/.test/test-modules/wahooFitExample.fit");
+        console.log(process.cwd())
+        file = await fs.readFile(".test/test-modules/wahooFitExample.fit");
         fitfileBuffer = new Buffer.from(file); //Cloudfunctions/functions/.test/test-modules/wahooFitExample.fit
         detailedDataResponse = {
             rawBody: fitfileBuffer
