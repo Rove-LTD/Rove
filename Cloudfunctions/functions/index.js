@@ -1701,7 +1701,7 @@ async function processWahooWebhook(webhookDoc) {
 
   // save raw and sanitised activites as a backup for each user
   for (const userDoc of userDocsList) {
-    saveAndSendActivity(userDoc,
+    await saveAndSendActivity(userDoc,
         sanitisedActivity,
         webhookBody);
   }
@@ -1906,7 +1906,7 @@ async function saveAndSendActivity(userDoc,
   const doc = await activityDoc.get();
 
   if (!doc.exists) {
-    activityDoc.set({"sanitised": localSanitisedActivity, "raw": activity});
+    await activityDoc.set({"sanitised": localSanitisedActivity, "raw": activity});
   } else {
     console.log("duplicate activity - not written or sent");
   }

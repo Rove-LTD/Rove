@@ -28,6 +28,7 @@ myFunctions = require('../../index.js');
 // testing processes - these have to have the same constant
 // name as in the function we are testing
 const got = require('got');
+const getHistoryInBox = require('../../getHistoryInBox');
 //-------------TEST --- Test Callbacks from Garmin-------
 describe("Testing that the Coros callbacks work: ", () => {
   before(async () => {
@@ -82,6 +83,7 @@ describe("Testing that the Coros callbacks work: ", () => {
       }
 
       const stubbedcall = sinon.stub(got, "post");
+      const stubbedgetHistory = sinon.stub(getHistoryInBox, "push");
       stubbedcall.onFirstCall().returns(responseObject1);
 
       // set the request object with the correct provider, developerId and userId
@@ -97,6 +99,9 @@ describe("Testing that the Coros callbacks work: ", () => {
           },
       }
       await myFunctions.corosCallback(req, res);
+      //check the getHistoryInBox was called with the correct parameters
+      assert(stubbedgetHistory
+        .calledOnceWithExactly("coros", testDev+testUser));
       const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
       await wait(1000);
 

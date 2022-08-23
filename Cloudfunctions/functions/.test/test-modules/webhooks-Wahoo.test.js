@@ -26,6 +26,7 @@ const devUserData = testParameters.devUserData
 const test = require('firebase-functions-test')(firebaseConfig, testParameters.testKeyFile);
 const admin = require("firebase-admin");
 myFunctions = require('../../index.js');
+const fs = require('fs').promises;
 // -----------END INITIALISE ROVE TEST PARAMETERS----------------------------//
 
 // ---------REQUIRE FUNCTONS TO BE STUBBED----------------------//
@@ -114,14 +115,20 @@ describe("Testing that the Wahoo Webhooks work: ", () => {
             "webhookInBox called with wrong args: "+args);
 
     });
-    it('read webhookInBox event and process it successfully...', async () => {
-
+    it.only('read webhookInBox event and process it successfully...', async () => {
+        // set up response to the request for detailed data from wahoo
+        file = await fs.readFile("/Users/paul/development/Rove/Cloudfunctions/functions/.test/test-modules/wahooFitExample.fit");
+        fitfileBuffer = new Buffer.from(file); //Cloudfunctions/functions/.test/test-modules/wahooFitExample.fit
+        detailedDataResponse = {
+            rawBody: fitfileBuffer
+        }
         const snapshot = test.firestore.makeDocumentSnapshot(successfulWebhookMessage1, "webhookInBox/"+successfulWebhookMessageDoc1);
 
         // set up stubs so that WebhookInBox is not deleted as the record
         // will not be there - it was not written
         const stubbedWebhookInBox = sinon.stub(webhookInBox, "delete");
-
+        const stubbedGot = sinon.stub(got, "get");
+        stubbedGot.returns(detailedDataResponse)
         wrapped = test.wrap(myFunctions.processWebhookInBox);
         await wrapped(snapshot);
         // check the webhookInBox function was called with the correct args
