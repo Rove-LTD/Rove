@@ -28,6 +28,7 @@ myFunctions = require('../../index.js');
 // testing processes - these have to have the same constant
 // name as in the function we are testing
 const got = require('got');
+const getHistoryInBox = require('../../getHistoryInBox');
 //-------------TEST --- Test Callbacks from Garmin-------
 describe("Testing that the Garmin callbacks work: ", () => {
   before(async () => {
@@ -74,6 +75,7 @@ describe("Testing that the Garmin callbacks work: ", () => {
       }
 
       const stubbedcall = sinon.stub(got, "post");
+      const stubbedgetHistory = sinon.stub(getHistoryInBox, "push");
       stubbedcall.onFirstCall().returns(responseObject1);
       sinon.stub(got, "get").returns(responseObject2);
 
@@ -91,7 +93,9 @@ describe("Testing that the Garmin callbacks work: ", () => {
           },
       }
       await myFunctions.oauthCallbackHandlerGarmin(req, res);
-
+      //check the getHistoryInBox was called with the correct parameters
+      assert(stubbedgetHistory
+        .calledOnceWithExactly("garmin", testDev+testUser));
       //now check the database was updated correctly
       testUserDoc = await admin.firestore()
       .collection("users")
