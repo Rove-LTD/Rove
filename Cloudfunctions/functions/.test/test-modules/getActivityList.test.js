@@ -172,7 +172,7 @@ describe("Testing that the developer can call API to getActivityList() and recei
 
    assert.deepEqual(sanatisedActivity, expectedResults);
 })
-it.only('Check that activities are correctly sanitised and concatonated...', async () => {
+it('Check that activities are correctly sanitised and concatonated...', async () => {
     // set the request object with the correct provider, developerId and userId
     const req = {
         url: 'https://us-central1-rovetest-beea7.cloudfunctions.net/getActivityList?devId='+testDev+'&userId='+testUser+'&devKey=test-key&start=2022-07-27T09:15:33.000Z&end=2022-07-29T09:15:33.000Z',

@@ -139,7 +139,7 @@ describe("Testing that sending webhook messages to developers work: ", () => {
             "suppress_webhook": false
         }, {merge: true});
     })
-    it.only('Check sending webhook message to developers works...', async ()=>{
+    it('Check sending webhook message to developers works...', async ()=>{
       // set up the activities in the database
       await admin.firestore()
           .collection("users")
