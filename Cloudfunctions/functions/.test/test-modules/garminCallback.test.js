@@ -75,7 +75,7 @@ describe("Testing that the Garmin callbacks work: ", () => {
       }
 
       const stubbedcall = sinon.stub(got, "post");
-      const stubbedgetHistory = sinon.stub(getHistoryInBox, "push");
+      //const stubbedgetHistory = sinon.stub(getHistoryInBox, "push");
       stubbedcall.onFirstCall().returns(responseObject1);
       sinon.stub(got, "get").returns(responseObject2);
 
@@ -94,8 +94,8 @@ describe("Testing that the Garmin callbacks work: ", () => {
       }
       await myFunctions.oauthCallbackHandlerGarmin(req, res);
       //check the getHistoryInBox was called with the correct parameters
-      assert(stubbedgetHistory
-        .calledOnceWithExactly("garmin", testDev+testUser));
+      //assert(stubbedgetHistory
+      //  .calledOnceWithExactly("garmin", testDev+testUser));
       //now check the database was updated correctly
       testUserDoc = await admin.firestore()
       .collection("users")

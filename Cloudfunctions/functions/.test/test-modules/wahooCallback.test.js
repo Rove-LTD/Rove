@@ -92,7 +92,7 @@ describe("Testing that the Wahoo callbacks work: ", () => {
 
       const stubbedpost = sinon.stub(got, "post");
       const stubbedget = sinon.stub(got, "get");
-      const stubbedgetHistory = sinon.stub(getHistoryInBox, "push");
+      //const stubbedgetHistory = sinon.stub(getHistoryInBox, "push");
       stubbedpost.onFirstCall().returns(responseObject1);
       stubbedget.onFirstCall().returns(responseObject2);
 
@@ -110,8 +110,8 @@ describe("Testing that the Wahoo callbacks work: ", () => {
       }
       await myFunctions.wahooCallback(req, res);
       //check the getHistoryInBox was called with the correct parameters
-      assert(stubbedgetHistory
-          .calledOnceWithExactly("wahoo", testDev+testUser));
+      //assert(stubbedgetHistory
+      //    .calledOnceWithExactly("wahoo", testDev+testUser));
       //now check the database was updated correctly
       testUserDoc = await admin.firestore()
       .collection("users")

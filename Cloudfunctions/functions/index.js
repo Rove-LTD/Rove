@@ -2567,7 +2567,7 @@ exports.processGetHistoryInBox = functions.firestore
               end);
         // write the docs into the database and send to the developer.
         for (let i = 0; i < payload.length; i++) {
-          saveAndSendActivity(userDoc,
+          await saveAndSendActivity(userDoc,
               payload[i].sanitised,
               payload[i].raw);
         }
