@@ -153,7 +153,9 @@ describe("Testing that the Polar Webhooks work: ", () => {
                 }
             }
         }
-        const fitFilePayload = "longStringofFitFile";
+        const fitFilePayload = {
+            rawBody: Buffer.from("this file stuff"),
+         }; // TODO: make this an actual fit file payload
         stubbedPolarCall = sinon.stub(got, "get");
         stubbedPolarCall.onFirstCall().returns(polarExercisePayload);
         const stubbedWebhookInBox = sinon.stub(webhookInBox, "delete");
@@ -187,26 +189,29 @@ describe("Testing that the Polar Webhooks work: ", () => {
               activity_id: 1937529874,
               activity_name: "WATERSPORTS_WATERSKI",
               activity_type: "OTHER",
-              distance_in_meters: 1600, //float no trailing 0
-              average_pace_in_meters_per_second: null, //float
+              distance: 1600, //float no trailing 0
+              avg_speed: null, //float
               active_calories: 530,
-              activity_duration_in_seconds: 9840,
+              activity_duration: 9840,
               start_time: '2008-10-13T10:40:02.000Z', //ISO 8601 UTC
-              average_heart_rate_bpm: 129,
+              avg_heart_rate: 129,
               max_heart_rate_bpm: 147,
-              average_cadence: null,
+              avg_cadence: null,
               elevation_gain: null,
               elevation_loss: null,
               provider: "polar",
-              file: {"url": "someURL"}
+              file: "someURL",
+              version: "1.0"
           },
           raw: polarExercisePayload.json(),
-          "status": "sent",
+          "status": "not tested",
           "timestamp": "not tested",
-          "triesSoFar": 1,
+          "triesSoFar": "not tested",
       }
-     sanatisedActivity.timestamp = "not tested";
-     assert.deepEqual(sanatisedActivity, expectedResults);
+      sanatisedActivity.status = "not tested";
+      sanatisedActivity.timestamp = "not tested";
+      sanatisedActivity.triesSoFar = "not tested";
+      assert.deepEqual(sanatisedActivity, expectedResults);
      sinon.restore();
       });
     it('read webhookInBox PING event and process it successfully...', async () => {

@@ -1,4 +1,5 @@
 {"config": {
+    "InBoxRealTimeCheck": false,
     "roveLiveSecrets": {
       "stravaClientId": 72486,
       "stravaClientSecret": "b0d500111e3d1774903da1f067b5b7adf38ca726",

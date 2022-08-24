@@ -28,6 +28,7 @@ myFunctions = require('../../index.js');
 // testing processes - these have to have the same constant
 // name as in the function we are testing
 const got = require('got');
+const getHistoryInBox = require('../../getHistoryInBox');
 //-------------TEST 2--- Test Callbacks from Strava-------
 describe("Testing that the Wahoo callbacks work: ", () => {
   before(async () => {
@@ -59,6 +60,8 @@ describe("Testing that the Wahoo callbacks work: ", () => {
           }
         }
       }
+      //set up the stubbed response to mimic wahoo's response when
+      //called to get user information
       const responseObject2 = {
           json() { return  {
               "id": 60462,
@@ -89,6 +92,7 @@ describe("Testing that the Wahoo callbacks work: ", () => {
 
       const stubbedpost = sinon.stub(got, "post");
       const stubbedget = sinon.stub(got, "get");
+      const stubbedgetHistory = sinon.stub(getHistoryInBox, "push");
       stubbedpost.onFirstCall().returns(responseObject1);
       stubbedget.onFirstCall().returns(responseObject2);
 
@@ -105,7 +109,9 @@ describe("Testing that the Wahoo callbacks work: ", () => {
           },
       }
       await myFunctions.wahooCallback(req, res);
-
+      //check the getHistoryInBox was called with the correct parameters
+      assert(stubbedgetHistory
+          .calledOnceWithExactly("wahoo", testDev+testUser));
       //now check the database was updated correctly
       testUserDoc = await admin.firestore()
       .collection("users")

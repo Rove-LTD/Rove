@@ -26,6 +26,7 @@ const devUserData = testParameters.devUserData
 const test = require('firebase-functions-test')(firebaseConfig, testParameters.testKeyFile);
 const admin = require("firebase-admin");
 myFunctions = require('../../index.js');
+const fs = require('fs').promises;
 // -----------END INITIALISE ROVE TEST PARAMETERS----------------------------//
 
 // ---------REQUIRE FUNCTONS TO BE STUBBED----------------------//
@@ -115,20 +116,26 @@ describe("Testing that the Wahoo Webhooks work: ", () => {
 
     });
     it('read webhookInBox event and process it successfully...', async () => {
-
+        // set up response to the request for detailed data from wahoo
+        file = await fs.readFile(".test/test-modules/wahooFitExample.fit");
+        fitfileBuffer = new Buffer.from(file);
+        detailedDataResponse = {
+            rawBody: fitfileBuffer
+        }
         const snapshot = test.firestore.makeDocumentSnapshot(successfulWebhookMessage1, "webhookInBox/"+successfulWebhookMessageDoc1);
 
         // set up stubs so that WebhookInBox is not deleted as the record
         // will not be there - it was not written
         const stubbedWebhookInBox = sinon.stub(webhookInBox, "delete");
-
+        const stubbedGot = sinon.stub(got, "get");
+        stubbedGot.returns(detailedDataResponse)
         wrapped = test.wrap(myFunctions.processWebhookInBox);
         await wrapped(snapshot);
         // check the webhookInBox function was called with the correct args
         assert(stubbedWebhookInBox.calledOnceWith(snapshot.ref), "webhookInBox called incorrectly");
         // give the sendToDeveloper function a chance to run
         const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
-        await wait(6000);
+        await wait(1000);
 
         //now check the database was updated correctly
        const testUserDocs = await admin.firestore()
@@ -144,13 +151,13 @@ describe("Testing that the Wahoo Webhooks work: ", () => {
                 activity_id: 140473420,
                 activity_name: "Cycling",
                 activity_type: "BIKING",
-                distance_in_meters: "0.0",
-                average_pace_in_meters_per_second: "0.0",
+                distance: "0.0",
+                avg_speed: "0.0",
                 active_calories: "0.0",
-                activity_duration_in_seconds: "9.0",
+                activity_duration: "9.0",
                 start_time: '2022-06-13T16:38:51.000Z',
-                average_heart_rate_bpm: "0.0",
-                average_cadence: "0.0",
+                avg_heart_rate: "0.0",
+                avg_cadence: "0.0",
                 elevation_gain: "0.0",
                 elevation_loss: null,
                 provider: "wahoo",
@@ -164,13 +171,16 @@ describe("Testing that the Wahoo Webhooks work: ", () => {
                 file: {
                     "url":"https://cdn.wahooligan.com/wahoo-cloud/production/uploads/workout_file/file/WpHvKL3irWsv2vHzGzGF_Q/2022-06-13-163851-ELEMNT_AE48-274-0.fit"
                 },
+                version: "1.0"
             },
             raw: JSON.parse(successfulWebhookMessage1.body),
-            "status": "sent",
+            "status": "not tested",
             "timestamp": "not tested",
-            "triesSoFar": 1,
+            "triesSoFar": "not tested",
         }
+        sanatisedActivity.status = "not tested";
         sanatisedActivity.timestamp = "not tested";
+        sanatisedActivity.triesSoFar = "not tested";
   
        assert.deepEqual(sanatisedActivity, expectedResults);
        sinon.restore();

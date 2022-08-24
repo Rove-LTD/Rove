@@ -1,0 +1,41 @@
+
+<h5>Sign in with Wahoo!</h5>
+<input type="submit" value="Start" onclick="signUpWith('wahoo')">
+<h5>Sign in with garmin!</h5>
+<input type="submit" value="Start" onclick="signUpWith('garmin')">
+<h5>Sign in with polar!</h5>
+<input type="submit" value="Start" onclick="signUpWith('polar')">
+
+ <h5>Disconnect with Wahoo!</h5>
+ <input type="submit" value="Start" onclick="signOutWith('wahoo')">
+ <h5>Disconnect with garmin!</h5>
+<input type="submit" value="Start" onclick="signOutWith('garmin')">
+<h5>Disconnect with polar!</h5>
+<input type="submit" value="Start" onclick="signOutWith('polar')">
+
+<h5>Error Message</h5>
+<body error>errorMessage goes here</body>
+
+<script type="text/javascript">
+	const testDev = "paulsTestDev";
+	const devKey = "test-key"
+	const testUser = "TestUser";
+	const redirectUrl = "https://bbc.co.uk"
+    function signUpWith(provider) {
+    	window.location.href = 
+    	'https://us-central1-rove-26.cloudfunctions.net/connectService?userId='
+    	+provider+testUser+
+    	'&devId='+testDev+
+    	'&devKey='+devKey+
+    	'&provider='+provider+
+    	'&redirectUrl='+redirectUrl;
+    }
+		function signOutWith(provider) {
+    	window.location.href = 
+    	'https://us-central1-rove-26.cloudfunctions.net/disconnectService?userId='
+    	+testUser+
+    	'&devId='+testDev+
+    	'&devKey='+devKey+
+    	'&provider='+provider;
+    }
+</script>

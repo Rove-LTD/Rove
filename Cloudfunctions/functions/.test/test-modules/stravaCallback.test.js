@@ -29,6 +29,7 @@ myFunctions = require('../../index.js');
 // name as in the function we are testing
 const request = require('request');
 const strava = require("strava-v3");
+const getHistoryInBox = require('../../getHistoryInBox');
 //-------------TEST 2--- Test Callbacks from Strava-------
  describe("Testing that the strava callbacks work: ", () => {
   before(async ()=>{
@@ -70,6 +71,7 @@ const strava = require("strava-v3");
           strava_connected: true,
       }
       const stubbedcall = sinon.stub(request, "post");
+      const stubbedgetHistory = sinon.stub(getHistoryInBox, "push");
       stubbedcall.yields(null, responseObject, JSON.stringify(responseBody));
       sinon.stub(strava.athlete, "get").returns({id: 12345678});
 
@@ -84,7 +86,9 @@ const strava = require("strava-v3");
           },
       }
       await myFunctions.stravaCallback(req, res);
-
+      //check the getHistoryInBox was called with the correct parameters
+      assert(stubbedgetHistory
+        .calledOnceWithExactly("strava", testDev+testUser));
       //now check the database was updated correctly
       testUserDoc = await admin.firestore()
       .collection("users")

@@ -28,6 +28,8 @@ myFunctions = require('../../index.js');
 // testing processes - these have to have the same constant
 // name as in the function we are testing
 const request = require('request');
+const getHistoryInBox = require('../../getHistoryInBox');
+
     //-------------TEST 2--- Test Callbacks for Polar-------
     describe("Testing the polar callback...", async () => {
       before(async () => {
@@ -104,6 +106,7 @@ const request = require('request');
               body: dataString,
             };
             const stubbedcall = sinon.stub(request, "post");
+            const stubbedgetHistory = sinon.stub(getHistoryInBox, "push");
             stubbedcall.onFirstCall().yields(null, responseObject1, JSON.stringify(responseBody1));
           stubbedcall.onSecondCall().yields(null, responseObject2, JSON.stringify(responseBody2));
 
@@ -118,7 +121,9 @@ const request = require('request');
               },
           }
           await myFunctions.polarCallback(req, res);
-
+          //check the getHistoryInBox was called with the correct parameters
+          assert(stubbedgetHistory
+            .calledOnceWithExactly("polar", testDev+testUser));
           //now check the database was updated correctly
           testUserDoc = await admin.firestore()
           .collection("users")
@@ -191,7 +196,8 @@ const request = require('request');
               polar_user_id: '123456polar',
           }
 
-          const stubbedcall = sinon.stub(request, "post")
+          const stubbedcall = sinon.stub(request, "post");
+          const stubbedgetHistory = sinon.stub(getHistoryInBox, "push");
           stubbedcall.onFirstCall().yields(null, responseObject1, JSON.stringify(responseBody1));
           stubbedcall.onSecondCall().yields(null, responseObject2, JSON.stringify(responseBody2));
 
@@ -206,7 +212,9 @@ const request = require('request');
               },
           }
           await myFunctions.polarCallback(req, res);
-
+          //check the getHistoryInBox was called with the correct parameters
+          assert(stubbedgetHistory
+            .calledOnceWithExactly("polar", testDev+testUser));
           //now check the database was updated correctly
           testUserDoc = await admin.firestore()
           .collection("users")

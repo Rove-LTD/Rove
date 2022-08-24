@@ -22,6 +22,8 @@ const test = require('firebase-functions-test')(firebaseConfig, testParameters.t
 const admin = require("firebase-admin");
 const fs = require("fs");
 const wahooActivity = require("./wahooDetailed.json")
+const garminActivity = require("./garminDetailed.json")
+const db = admin.firestore();
 
 myFunctions = require('../../index.js');
 // -----------END INITIALISE ROVE TEST PARAMETERS----------------------------//
@@ -31,22 +33,28 @@ myFunctions = require('../../index.js');
 // testing processes - these have to have the same constant
 // name as in the function we are testing
 const got = require('got');
-//-------------TEST 2--- Test Callbacks from Strava-------
+const { default: strava } = require('strava-v3');
+const { deleteBlock } = require('@notionhq/client/build/src/api-endpoints');
+let userDoc;
+let stravaDoc;
+let garminDoc;
+let polarDoc;
+let wahooDoc;
 describe("Check the get detailed activity service works: ", () => {
     before(async() => {
     nowInSeconds = new Date()/1000
     notExpiredDate = nowInSeconds+1000;
-    await admin.firestore()
-        .collection("users")
-        .doc(testDev+testUser)
-        .set({
+    userDoc = {
             "devId": testDev,
             "userId": testUser,
             "email": "will.userTest@gmail.com",
+            "garmin_access_token": "32ada6ab-e5fe-46a7-bd82-5bad6158d6eb",
+            "garmin_access_token_secret": "boxYMolukwHGCyk9kTBIBCmvL8Wm3y2rFq4",
+            "garmin_user_id": "eb24e8e5-110d-4a87-b976-444f40ca27d4",
             "strava_connected": true,
-            "strava_access_token": "3f1f6d3da1057cf458ffffde0ee70eccb610c468",
+            "strava_access_token": "6763bdab406b0d30a8a9f4694e7716e04e0ed20d",
             "strava_refresh_token": "922dd204d91e03515b003fe8f5516d99563d9f0c",
-            "strava_token_expires_at": nowInSeconds,
+            "strava_token_expires_at": Date.now()/1000,
             "strava_id": 7995810,
             "polar_access_token" : "d717dd39d09b91939f835d66a640927d",
             "polar_connected": true,
@@ -54,7 +62,7 @@ describe("Check the get detailed activity service works: ", () => {
             "polar_token_expires_in": 461375999,
             "polar_token_type": "bearer",
             "polar_user_id": 45395466,
-        });
+        };
     await admin.firestore()
         .collection("users")
         .doc(testDev+testUser)
@@ -106,26 +114,10 @@ describe("Check the get detailed activity service works: ", () => {
         await myFunctions.getDetailedActivity(req, res);
     })
     it("Check Get Wahoo Detailed Activity Works.", async () => {
-        req = {
-            debug: true,
-            url: "https://ourDomain.com",
-            method: "POST",
-            query:{},
-            body:{"devId": testDev, "devKey": "test-key", "userId": testDev+testUser, "activityId": "wahooActivity"},
-        }
-        res = {
-            status: (code) => {
-                assert.equal(code, 200);
-            },
-            send: (message) => {
-                assert.equal(message, "Complete")
-            }
-        }
-
-        const sanitisedActivityJson = JSON.stringify(await myFunctions.getDetailedActivity(req, res));
-        const expectedResult = JSON.stringify(wahooActivity)
+        const sanitisedActivityJson = await myFunctions.getDetailedActivity(userDoc, wahooDoc, "wahoo");
+        // await fs.promises.writeFile('./wahooDetailed.json', JSON.stringify(sanitisedActivityJson));
+        const expectedResult = wahooActivity;
         assert.deepEqual(sanitisedActivityJson, expectedResult);
-        
     })
     it.skip("Check Get Polar Detailed Activity Works.", async () => {
         req = {
