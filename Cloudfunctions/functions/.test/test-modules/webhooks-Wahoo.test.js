@@ -124,11 +124,12 @@ describe("Testing that the Wahoo Webhooks work: ", () => {
 
         wrapped = test.wrap(myFunctions.processWebhookInBox);
         await wrapped(snapshot);
-
-        const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
-        await wait(1000);
         // check the webhookInBox function was called with the correct args
         assert(stubbedWebhookInBox.calledOnceWith(snapshot.ref), "webhookInBox called incorrectly");
+        // give the sendToDeveloper function a chance to run
+        const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+        await wait(6000);
+
         //now check the database was updated correctly
        const testUserDocs = await admin.firestore()
        .collection("users")
@@ -167,12 +168,12 @@ describe("Testing that the Wahoo Webhooks work: ", () => {
             raw: JSON.parse(successfulWebhookMessage1.body),
             "status": "sent",
             "timestamp": "not tested",
+            "triesSoFar": 1,
         }
-       sanatisedActivity.timestamp = "not tested";
+        sanatisedActivity.timestamp = "not tested";
   
        assert.deepEqual(sanatisedActivity, expectedResults);
        sinon.restore();
-  
       });
     it('Webhooks should repond with status 401 if method incorrect...', async () => {
     // set the request object with the correct provider, developerId and userId
@@ -231,76 +232,5 @@ describe("Testing that the Wahoo Webhooks work: ", () => {
         assert.equal(args[1].message, "don't recognise the wahoo event_type: incorrect");
         assert.equal(args[0], snapshot.ref);
         sinon.restore();
-    });
-    it('Check that webhook messages are suppressed ...', async () => {
-
-        await admin.firestore()
-            .collection("developers")
-            .doc(testDev)
-            .set({
-                "suppress_webhook": true
-            }, {merge: true});
-
-        const data = successfulWebhookMessage2;
-
-        const snapshot = test.firestore.makeDocumentSnapshot(data, "webhookInBox/"+successfulWebhookMessageDoc2);
-        // set up stubs so that WebhookInBox is updated 
-        const stubbedWebhookInBox = sinon.stub(webhookInBox, "delete");
-        wrapped = test.wrap(myFunctions.processWebhookInBox);
-        await wrapped(snapshot);
-
-        const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
-        await wait(1000);
-
-        args = stubbedWebhookInBox.getCall(0).args; //this first call
-        // check webhookInBox called with the correct parameters
-        assert(stubbedWebhookInBox.calledOnceWith(snapshot.ref),
-                "webhookInBox called incorrectly with: "+args);
-
-        //now check the database was updated correctly
-       const testUserDocs = await admin.firestore()
-            .collection("users")
-            .doc(testDev+testUser)
-            .collection("activities")
-            .doc("1234wahoo")
-            .get();
-  
-       const sanatisedActivity = testUserDocs.data();
-       const expectedResults = {
-            sanitised: {
-                userId: testUser,
-                activity_id: 1234,
-                activity_name: "Cycling",
-                activity_type: "BIKING",
-                distance_in_meters: "0.0",
-                average_pace_in_meters_per_second: "0.0",
-                active_calories: "0.0",
-                activity_duration_in_seconds: "9.0",
-                start_time: '2022-06-13T16:38:51.000Z',
-                average_heart_rate_bpm: "0.0",
-                average_cadence: "0.0",
-                elevation_gain: "0.0",
-                elevation_loss: null,
-                provider: "wahoo",
-                power_bike_tss_last: null,
-                power_bike_np_last: null,
-                ascent_accum: "0.0",
-                duration_paused_accum: "0.0",
-                created_at: "2022-06-13T16:39:09.000Z",
-                updated_at: "2022-06-13T16:39:09.000Z",
-                power_avg: "0.0",
-                file: {
-                    "url":"https://cdn.wahooligan.com/wahoo-cloud/production/uploads/workout_file/file/WpHvKL3irWsv2vHzGzGF_Q/2022-06-13-163851-ELEMNT_AE48-274-0.fit"
-                },
-            },
-            raw: JSON.parse(successfulWebhookMessage2.body),
-            "status": "suppressed",
-            "timestamp": "not tested",
-        }
-       sanatisedActivity.timestamp = "not tested";
-  
-       assert.deepEqual(sanatisedActivity, expectedResults);
-       
-       sinon.restore();
     });
 }); //End TEST

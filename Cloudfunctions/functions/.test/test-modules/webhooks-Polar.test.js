@@ -167,9 +167,9 @@ describe("Testing that the Polar Webhooks work: ", () => {
 
         wrapped = test.wrap(myFunctions.processWebhookInBox);
         await wrapped(snapshot);
-
+        // give the sendToDeveloper function a chance to run
         const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
-        await wait(1000);
+        await wait(6000);
         // check the webhookInBox function was called with the correct args
         assert(stubbedWebhookInBox.calledOnceWith(snapshot.ref), "webhookInBox called incorrectly");
         //now check the database was updated correctly
@@ -203,6 +203,7 @@ describe("Testing that the Polar Webhooks work: ", () => {
           raw: polarExercisePayload.json(),
           "status": "sent",
           "timestamp": "not tested",
+          "triesSoFar": 1,
       }
      sanatisedActivity.timestamp = "not tested";
      assert.deepEqual(sanatisedActivity, expectedResults);

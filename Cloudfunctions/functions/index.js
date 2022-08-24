@@ -1855,7 +1855,7 @@ async function processPolarWebhook(webhookDoc) {
     const urlOptions = {
       version: "v4",
       action: "read",
-      expires: Date.now() + (7*24*60*60*1000)-1000, // 7 days in milleseconds till expiry
+      expires: Date.now() + (1*24*60*60*1000), // 1 days in milleseconds till expiry
     };
     const downloadURL = await storageRef.file("public/"+webhookBody.entity_id+".fit").getSignedUrl(urlOptions);
 
@@ -1898,95 +1898,108 @@ async function saveAndSendActivity(userDoc,
 
   if (!doc.exists) {
     activityDoc.set({"sanitised": localSanitisedActivity, "raw": activity});
-    const triesSoFar = 0; // this is our first try to write to developer
-    await sendToDeveloper(userDoc, localSanitisedActivity, activity, activityDoc, triesSoFar);
+    // const triesSoFar = 0; // this is our first try to write to developer
+    // await sendToDeveloper(userDoc, localSanitisedActivity, activity, activityDoc, triesSoFar);
   } else {
     console.log("duplicate activity - not written or sent");
   }
 }
 
-async function sendToDeveloper(userDoc,
-    sanitisedActivity,
-    activity,
-    activityDoc,
-    triesSoFar) {
-  const MaxRetries = 3;
-  const devId = userDoc.data()["devId"];
-  const datastring = {"sanitised": sanitisedActivity, "raw": activity};
-  const developerDoc = await db.collection("developers").doc(devId).get();
-  // if the developer document has the "suppress_webhook" field
-  // set to "true" then return without sending the activity.
-  if (developerDoc.data()["suppress_webhook"]) {
-    // the developer does not want webhook data to be sent
-    await activityDoc
-        .set({status: "suppressed", timestamp: new Date().toISOString()},
-            {merge: true});
-    return;
-  }
-
-  const endpoint = developerDoc.data()["endpoint"];
-  const userData = userDoc.data();
-  // check if the user is from notion.
-  if (userData["userId"] == "notion") {
-    notion.sendToNotionEndpoint(endpoint, developerDoc, sanitisedActivity);
-  } else {
-    if (endpoint == undefined || endpoint == null) {
-    // cannot send to developer as endpoint does not exist
-      console.log("Cannot send webhook payload to "+devId+" endpoint not provided");
-      return;
-    }
-    const options = {
-      method: "POST",
-      url: endpoint,
-      headers: {
-        "Accept": "application/json",
-        "Content-type": "application/json",
-      },
-      body: JSON.stringify(datastring),
-    };
-    try {
-      const response = await got.post(options);
-
-      if (response.statusCode == 200) {
-      // the developer accepted the information
-        await activityDoc
-            .set({status: "sent", timestamp: new Date().toISOString()},
-                {merge: true});
-      } else {
-        await tryAgain();
+exports.sendToDeveloper = functions
+    .runWith({failurePolicy: true})
+    .firestore
+    .document("users/{userDocId}/activities/{activityId}")
+    .onCreate(async (activitySnap, context) => {
+      const userDocId = context.params.userDocId;
+      const activityDocId = context.params.activityId;
+      const activityDoc = await db
+          .collection("users")
+          .doc(userDocId)
+          .collection("activities")
+          .doc(activityDocId)
+          .get();
+      if (!activityDoc.exists || activityDoc.data()["status"] == "sent") {
+        console.log("activity "+activityDocId+" for user "+userDocId+" has been deleted or has already been sent not sending again");
+        return;
       }
-    } catch (err) {
-      await tryAgain();
-    }
-  }
-  /**
-   *
-   * @return {promise<void>} promise to ensure function waits
-   */
-  async function tryAgain() {
-    // call the retry functionality and increment the retry counter
-    if (triesSoFar <= MaxRetries) {
-      console.log("retrying sending to developer");
-      await activityDoc
-          .set({status: "error: resending..",
-            timestamp: new Date().toISOString(),
+      const MaxRetries = 3;
+      let triesSoFar = activityDoc.data()["triesSoFar"] || 0;
+      if (triesSoFar <= MaxRetries) {
+        triesSoFar = triesSoFar+1;
+        console.log("sending to developer - try number: "+triesSoFar);
+        await activityDoc.ref
+            .set({status: "sending try number.. "+triesSoFar,
+              timestamp: new Date().toISOString(),
+              triesSoFar: triesSoFar,
+            },
+            {merge: true});
+      } else {
+        // max retries email developer
+        await activityDoc.ref
+            .set({status: "error: failed to send - max retries reached.  Fix issue before trying again",
+              timestamp: new Date().toISOString(),
+            },
+            {merge: true});
+        console.log("max retries on sending activity for userDoc: "+userDocId+" - Activity "+activityDocId+" - fail");
+        return;
+      }
+      const userDoc = await db
+          .collection("users")
+          .doc(userDocId)
+          .get();
+
+      const devId = userDoc.data()["devId"];
+      const datastring = {"sanitised": activityDoc.data()["sanitisedActivity"], "raw": activityDoc.data()["raw"]};
+      const developerDoc = await db.collection("developers").doc(devId).get();
+      // if the developer document has the "suppress_webhook" field
+      // set to "true" then return without sending the activity.
+      if (developerDoc.data()["suppress_webhook"]) {
+        // the developer does not want webhook data to be sent
+        await activityDoc.ref
+            .set({status: "suppressed", timestamp: new Date().toISOString()},
+                {merge: true});
+        return;
+      }
+
+      const endpoint = developerDoc.data()["endpoint"];
+      const userData = userDoc.data();
+      // check if the user is from notion.
+      if (userData["userId"] == "notion") {
+        notion.sendToNotionEndpoint(endpoint, developerDoc, activityDoc.data()["sanitisedActivity"]);
+      } else {
+        if (endpoint == undefined || endpoint == null) {
+        // cannot send to developer as endpoint does not exist
+          console.log("Cannot send webhook payload to "+devId+" endpoint not provided");
+          return;
+        }
+        const options = {
+          method: "POST",
+          url: endpoint,
+          headers: {
+            "Accept": "application/json",
+            "Content-type": "application/json",
           },
-          {merge: true});
-      await wait(waitTime[triesSoFar]);
-      await sendToDeveloper(userDoc, sanitisedActivity, activity, activityDoc, triesSoFar+1);
-    } else {
-    // max retries email developer
-      await activityDoc
-          .set({status: "error: failed to send - max retries reached",
-            timestamp: new Date().toISOString(),
-          },
-          {merge: true});
-      console.log("max retries on sending to developer reached - fail");
-    }
-    return;
-  }
-  return;
-}
+          body: JSON.stringify(datastring),
+        };
+
+        try {
+          const response = await got.post(options);
+          if (response.statusCode == 200) {
+          // the developer accepted the information
+            await activityDoc.ref
+                .set({status: "sent", timestamp: new Date().toISOString()},
+                    {merge: true});
+          } else {
+            const error = new Error("developer sent back wrong code: "+response.statusCode);
+            console.log("retrying sending to developer");
+            return Promise.reject(error);
+          }
+        } catch (err) {
+          console.log("retrying sending to developer: "+err.message);
+          return Promise.reject(err);
+        }
+      }
+    });
 
 exports.polarWebhookSetup = functions.https.onRequest(async (req, res) => {
   // get the devId and DevKey
