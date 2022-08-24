@@ -64,13 +64,13 @@ describe("Testing that the Coros Webhooks work: ", () => {
             status: "added before the tests to be successful",
         }
 
-            unsuccessfulWebhookMessage = {
-                provider: "coros",
-                body: corosPush,
-                method: "POST",
-                secret_lookup: "roveLiveSecrets",
-                status: "added before the tests to be unsuccessful",
-            }
+        unsuccessfulWebhookMessage = {
+            provider: "coros",
+            body: corosPush,
+            method: "POST",
+            secret_lookup: "roveLiveSecrets",
+            status: "added before the tests to be unsuccessful",
+        }
 
     });
     after('clean-up the webhookInbox documents',async ()=>{
@@ -110,6 +110,7 @@ describe("Testing that the Coros Webhooks work: ", () => {
         // set up stubs so that WebhookInBox is not deleted as the record
         // will not be there - it was not written
         const stubbedWebhookInBox = sinon.stub(webhookInBox, "delete");
+        const stubbedWebhookInBoxWriteError = sinon.stub(webhookInBox, "writeError");
 
         wrapped = test.wrap(myFunctions.processWebhookInBox);
         await wrapped(snapshot);
@@ -117,24 +118,48 @@ describe("Testing that the Coros Webhooks work: ", () => {
         const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
         await wait(1000);
         // check the webhookInBox function was called with the correct args
-        assert(stubbedWebhookInBox.calledOnceWith(snapshot.ref), "webhookInBox called incorrectly");
+        const deleteCall = stubbedWebhookInBox.getCall(0);
+        const writeErrorCall = stubbedWebhookInBoxWriteError.getCall(0);
+        assert(stubbedWebhookInBox.calledOnceWith(snapshot.ref), "webhookInBox called incorrectly with: "+deleteCall.args);
         //now check the database was updated correctly
-       const testUserDocs = await admin.firestore()
+       const sampleActivityDoc = await admin.firestore()
        .collection("users")
        .doc(testDev+testUser)
        .collection("activities")
+       .doc("418173292602490880coros")
        .get();
+
+        //now check 3 records where written correctly
+        const testActivityDocs = await admin.firestore()
+        .collection("users")
+        .doc(testDev+testUser)
+        .collection("activities")
+        .get();
   
-       const sanatisedActivity = testUserDocs.docs[0].data();
+       const sanatisedActivity = sampleActivityDoc.data();
        const expectedResults = {
             raw: JSON.parse(successfulWebhookMessage.body),
-            sanitised: {activity_id: "418173292602490880",
-            userId: testParameters.testUser},
-            "status": "sent",
+            sanitised: {"activity_id": "418173292602490880",
+                "active_calories": 220000,
+                "activity_duration_in_seconds": 2200,
+                "activity_name": "Coros Multisport",
+                "activity_type": 1,
+                "average_pace_in_meters_per_second": 0,
+                "distance_in_meters": 22000,
+                "file": null,
+                "provider": "coros",
+                "start_time": "2018-04-01T09:49:38.000Z",
+                "userId": testParameters.testUser,
+            },
+            "status": "not tested",
             "timestamp": "not tested",
+            "triesSoFar": "not tested",
         }
-       sanatisedActivity.timestamp = "not tested";
-       assert.deepEqual(sanatisedActivity, expectedResults);
+        sanatisedActivity.status = "not tested";
+        sanatisedActivity.timestamp = "not tested";
+        sanatisedActivity.triesSoFar = "not tested";
+        assert.deepEqual(sanatisedActivity, expectedResults);
+        assert.equal(testActivityDocs.docs.length, 3, "not enough activity records written");
        sinon.restore();
       });
     it('Webhooks should repond with status 401 if method incorrect...', async () => {

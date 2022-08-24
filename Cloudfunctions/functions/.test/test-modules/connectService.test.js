@@ -218,6 +218,6 @@ describe("Testing that the developer can call API to connectService() and receiv
     const req = {url: 'https://rovetest-beea7.web.app?transactionId=testTransactionId&devId='+testDev+'&devKey=test-key&provider=wahoo'};
     // set the assertions for the expected response object
     const response = await got(req);
-    assert.equal(response.body, htmlPage);
+    assert.equal(response.body, htmlPage.toString());
   });
 });

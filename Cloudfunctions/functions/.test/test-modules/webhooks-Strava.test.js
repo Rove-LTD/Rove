@@ -43,7 +43,7 @@ describe("Testing that the strava Webhooks work: ", () => {
       .set({
           "devId": testDev,
           "userId": testUser,
-          "strava_id" : "test_strava_id",
+          "strava_id" : testUser+"_test_strava_id",
           "strava_access_token": "test_strava_access_token",
           "strava_refresh_token": "test_strava_refresh_token",
           "strava_token_expires_at": new Date().getTime()/1000 + 600,      }, {merge: true});
@@ -62,7 +62,7 @@ describe("Testing that the strava Webhooks work: ", () => {
             provider: "strava",
             method: "POST",
             secret_lookup: "roveLiveSecrets",
-            body: '{"updates":{},"object_type":"activity","object_id":7345142595,"owner_id":"test_strava_id","subscription_id":217520,"aspect_type":"create","event_time":1655824005}',
+            body: '{"updates":{},"object_type":"activity","object_id":7345142595,"owner_id":"'+testUser+'_test_strava_id","subscription_id":217520,"aspect_type":"create","event_time":1655824005}',
             status: "added before the tests to be successful",
         }
 
@@ -120,9 +120,10 @@ describe("Testing that the strava Webhooks work: ", () => {
         await wrapped(snapshot);
         // give the sendToDeveloper function a chance to run
         const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
-        await wait(6000);
+        await wait(1000);
         // check the webhookInBox function was called with the correct args
-        assert(stubbedWebhookInBox.calledOnceWith(snapshot.ref), "webhookInBox called incorrectly");
+        args = stubbedWebhookInBox.getCall(0).args;
+        assert(stubbedWebhookInBox.calledOnceWith(snapshot.ref), "webhookInBox called incorrectly with: "+args);
         //now check the database was updated correctly
         const testUserDocs = await admin.firestore()
             .collection("users")
@@ -131,25 +132,34 @@ describe("Testing that the strava Webhooks work: ", () => {
             .where("raw.id", "==", 12345678987654321)
             .get();
 
-        const sanatisedActivity = testUserDocs.docs[0].data()["sanitised"];
+        const sanatisedActivity = testUserDocs.docs[0].data();
         const expectedResults = {
-            userId: testUser,
-            activity_id: 12345678987654321,
-            activity_name: "Happy Friday",
-            activity_type: "Ride",
-            distance: 28099, //float no trailing 0
-            avg_speed:"6.7", //float
-            active_calories: 781,
-            activity_duration: 4207,
-            start_time: '2018-02-16T06:52:54.000Z', //ISO 8601 UTC
-            avg_heart_rate: null,
-            // max_heart_rate_bpm: null,
-            avg_cadence: "78.5",
-            elevation_gain: "446.6",
-            elevation_loss:"17.2",
-            provider: "strava",
-            version: "1.0",
+            sanitised: {
+                userId: testUser,
+                activity_id: 12345678987654321,
+                activity_name: "Happy Friday",
+                activity_type: "Ride",
+                distance: 28099, //float no trailing 0
+                avg_speed:"6.7", //float
+                active_calories: 781,
+                activity_duration: 4207,
+                start_time: '2018-02-16T06:52:54.000Z', //ISO 8601 UTC
+                avg_heart_rate: null,
+                // max_heart_rate_bpm: null,
+                avg_cadence: "78.5",
+                elevation_gain: "446.6",
+                elevation_loss:"17.2",
+                provider: "strava",
+                version: "1.0",
+            },
+            raw: stravaExercisePayload,
+            "status": "not tested",
+            "timestamp": "not tested",
+            "triesSoFar": "not tested",
         }
+        sanatisedActivity.status = "not tested";
+        sanatisedActivity.timestamp = "not tested";
+        sanatisedActivity.triesSoFar = "not tested";
         assert.deepEqual(sanatisedActivity, expectedResults);
         sinon.restore();
       });

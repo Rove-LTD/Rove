@@ -46,16 +46,24 @@ class standard_format {
     summaryActivity = {
       // standard fields
       "activity_id": a["labelId"],
-      "activity_name": "Coros " + corosSportLookup.a["mode"],
-      "activity_type": corosSportLookup.a["mode"],
+      "activity_name": "Coros " + corosSportLookup[a.mode][0],
+      "activity_type": corosSportLookup[a.mode][1],
       "distance_in_meters": a["distance"],
       "active_calories": a["calorie"],
-      "start_time": new Date(a["startTime"]).toISOString(),
+      "start_time": new Date(a["startTime"]*1000).toISOString(),
       "provider": "coros",
-      "average_pace_in_meters_per_second": (1/a["avgSpeed"])*1000,
+      "average_pace_in_meters_per_second": (a["avgSpeed"]>0 ? 
+          (1/(a["avgSpeed"])*1000) :
+          0),
       "activity_duration_in_seconds": a["duration"],
-      "file": {"url": a["fitUrl"]}
+      "file": a["fitUrl"]
     }
+    for (const property in summaryActivity) {
+      if (typeof summaryActivity[property] == "undefined") {
+        summaryActivity[property] = null;
+      }
+    }
+    return summaryActivity;
   }
 // sports lookup with {mode: [name, submode]} //ignoring submodes for now...
 const corosSportLookup = {
@@ -369,7 +377,7 @@ exports.wahooSanitise = function (activity) {
     "created_at": activity.workout_summary.created_at,
     "updated_at": activity.workout_summary.updated_at,
     "power_avg": activity.workout_summary.power_avg,
-    "file": {"url": activity.workout_summary.file},
+    "file": activity.workout_summary.file ?? "",
     "version": "1.0",
     };
   } else if (activity.hasOwnProperty("workout_summary")) {

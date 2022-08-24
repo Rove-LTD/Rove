@@ -150,7 +150,6 @@ exports.getActivityList = functions.https.onRequest(async (req, res) => {
     updateTransactionWithStatus(transactionId, "userClickedAuthButton");
   } // TODO: this is unnecessary
   let url = "";
-  console.log(callbackBaseUrl); // TODO: not necessary
   // parameter checks
   // first check developer exists and the devKey matches
   if (parameters.devId != null) {
@@ -296,7 +295,8 @@ async function getWahooActivityList(start, end, userDoc) {
       const sanitisedList = [];
       for (let i = 0; i<activityList.workouts.length; i++) {
         sanitisedList.push({"raw": activityList.workouts[i], "sanitised": filters.wahooSanitise(activityList.workouts[i])});
-        sanitisedList[i]["sanitised"]["samples"] = await getDetailedActivity(userDoc.data(), activityList.workouts[i]);
+        // TODO: add back in when detail needed
+        // sanitisedList[i]["sanitised"]["samples"] = await getDetailedActivity(userDoc.data(), activityList.workouts[i]);
       }
       // now filter for start times
       const startTime = start.getTime();
@@ -331,7 +331,9 @@ async function getPolarActivityList(start, end, userDoc) {
     const sanitisedList = [];
     for (let i = 0; i<activityList.length; i++) {
       sanitisedList.push({"raw": activityList[i], "sanitised": filters.polarSanatise(activityList[i])});
-      sanitisedList[i]["sanitised"]["samples"] = await getDetailedActivity(userDoc.data(), activityList[i]);
+      // TODO: just get the file add the samples later when detail is needed
+      const detailedSanitisedList = await getDetailedActivity(userDoc.data(), activityList[i], "polar");
+      sanitisedList[i]["sanitised"]["file"] = detailedSanitisedList.file;
     }
     const startTime = start.getTime();
     const endTime = end.getTime();
@@ -371,7 +373,8 @@ async function getGarminActivityList(start, end, userDoc) {
   const listOfValidActivities = [];
   for (let i=0; i< activityList.length; i++) {
     listOfValidActivities.push({"raw": activityList[i], "sanitised": listOfSanitisedActivities[i]});
-    listOfValidActivities[i]["sanitised"]["samples"] = await getDetailedActivity(userDocData, activityList[i]);
+    // TODO: uncomment when detail needed
+    // listOfValidActivities[i]["sanitised"]["samples"] = await getDetailedActivity(userDocData, activityList[i]);
   }
   return listOfValidActivities;
 }
@@ -1105,8 +1108,9 @@ async function processGarminWebhook(webhookDoc) {
     userQuery.docs.forEach((doc)=> {
       userDocsList.push(doc);
     });
-    const samples = await getDetailedActivity(userDocsList[0].data(), webhookBody.activities[index], "garmin");
-    sanitisedActivity["samples"] = samples;
+    // TODO: uncomment when detail needed
+    // const samples = await getDetailedActivity(userDocsList[0].data(), webhookBody.activities[index], "garmin");
+    // sanitisedActivity["samples"] = samples;
     // save raw and sanitised activites as a backup for each user
     for (const userDoc of userDocsList) {
       saveAndSendActivity(userDoc,
@@ -1585,8 +1589,9 @@ async function processStravaWebhook(webhookDoc) {
     activity = await stravaApi.activities
         .get({"access_token": stravaAccessToken, "id": webhookBody.object_id});
     sanitisedActivity = filters.stravaSanitise([activity]);
-    const samples = await getDetailedActivity(userDocsList[0].data(), activity, "strava");
-    sanitisedActivity[0]["samples"] = samples;
+    // TODO: uncomment when detail needed
+    // const samples = await getDetailedActivity(userDocsList[0].data(), activity, "strava");
+    // sanitisedActivity[0]["samples"] = samples;
   }
   for (const userDoc of userDocsList) {
     saveAndSendActivity(userDoc,
@@ -1638,6 +1643,22 @@ exports.processWebhookInBox = functions.firestore
     .document("webhookInBox/{docId}")
     .onCreate(async (snap, context) => {
       console.log("processing webhook inbox written to... with doc: "+snap.id);
+      // return without processing if the configuration is set to
+      // switch the process off
+      if (configurations.InBoxRealTimeCheck == true) {
+        const webhookInBoxConfig = await db
+            .collection("realTimeConfigs")
+            .doc("webhookInBox")
+            .get();
+        if (webhookInBoxConfig.exists) {
+          if (webhookInBoxConfig.data()["off"]) {
+            return; // no processing should be done
+          }
+        } else {
+          // if the realTimeConfigs is not set up then carry
+          // on as normal
+        }
+      }
       try {
         switch (snap.data()["provider"]) {
           case "strava":
@@ -1661,7 +1682,6 @@ exports.processWebhookInBox = functions.firestore
       }
       return;
     });
-
 async function processWahooWebhook(webhookDoc) {
   const webhookBody = JSON.parse(webhookDoc.data()["body"]);
   const lookup = webhookDoc.data()["secret_lookup"];
@@ -1696,8 +1716,9 @@ async function processWahooWebhook(webhookDoc) {
   //  data
   // 1) sanatise and 2) send
   const sanitisedActivity = filters.wahooSanitise(webhookBody);
-  const samples = await getDetailedActivity(userDocsList[0].data(), sanitisedActivity, "wahoo");
-  sanitisedActivity["samples"] = samples;
+  // TODO: uncomment when detail is needed.
+  // const samples = await getDetailedActivity(userDocsList[0].data(), sanitisedActivity, "wahoo");
+  // sanitisedActivity["samples"] = samples;
 
   // save raw and sanitised activites as a backup for each user
   for (const userDoc of userDocsList) {
@@ -1868,13 +1889,13 @@ async function processPolarWebhook(webhookDoc) {
 
     const sanitisedActivity = filters.polarSanatise(activity);
     // add fit file URL to the sanitised activity
-    sanitisedActivity["file"] = {"url": downloadURL[0]};
+    sanitisedActivity["file"] = downloadURL[0];
+    // TODO: put back in when sanitisation of fit files is needed
+    // const samples = await getDetailedActivity(userDocsList[0].data(), activity, "polar").samples;
+    // sanitisedActivity["samples"] = samples;
     // write sanitised information and raw information to each user and then
     // send to developer
-    const samples = await getDetailedActivity(userDocsList[0].data(), activity, "polar");
-    sanitisedActivity["samples"] = samples;
     for (const userDoc of userDocsList) {
-      sanitisedActivity["userId"] = userDoc.data()["userId"];
       await saveAndSendActivity(userDoc, sanitisedActivity, activity);
     }
   } else {
@@ -1925,6 +1946,22 @@ exports.sendToDeveloper = functions
           .collection("activities")
           .doc(activityDocId)
           .get();
+      // return without processing if the configuration is set to
+      // switch the process off
+      if (configurations.InBoxRealTimeCheck == true) {
+        const sendToDevConfig = await db
+            .collection("realTimeConfigs")
+            .doc("sendToDeveloper")
+            .get();
+        if (sendToDevConfig.exists) {
+          if (sendToDevConfig.data()["off"]) {
+            return; // no processing should be done
+          }
+        } else {
+          // if the realTimeConfigs is not set up then carry
+          // on as normal
+        }
+      }
       if (!activityDoc.exists || activityDoc.data()["status"] == "sent") {
         console.log("activity "+activityDocId+" for user "+userDocId+" has been deleted or has already been sent not sending again");
         return;
@@ -2078,6 +2115,22 @@ async function getPolarDetailedActivity(userDoc, activityDoc) {
     };
     const fitFile = await got.get(options);
     if (fitFile.statusCode == 200) {
+      const contents = fitFile.rawBody;
+      // storing FIT file in bucket under polar-exerciseId.fit
+      const storageRef = storage.bucket();
+      // live will use live storage and test will use test storage?
+      await storageRef.file("public/polar"+exerciseId+".fit").save(contents);
+      // create signed URL for developer to download file.
+      const urlOptions = {
+        version: "v4",
+        action: "read",
+        expires: Date.now() + (1*24*60*60*1000), // 1 days in milleseconds till expiry
+      };
+      const downloadURL = await storageRef
+          .file("public/polar"+exerciseId+".fit")
+          .getSignedUrl(urlOptions);
+      // add fit file URL to the sanitised activity
+      sanitised["file"] = downloadURL[0];
       const fitParser = new FitParser();
       fitParser.parse(fitFile.rawBody, (error, jsonRaw)=>{
         // Handle result of parse method
@@ -2167,7 +2220,7 @@ function sanitisePolarFitFile(fitFile) {
 
 async function getWahooDetailedActivity(userDoc, activityDoc) {
   try { // or 'https' for https:// URLs
-    const fileLocation = activityDoc["file"]["url"];
+    const fileLocation = activityDoc["file"];
     const fitFile = await got.get(fileLocation);
     const buffer = fitFile.rawBody.buffer;
     const jsonRaw = fitDecoder.fit2json(buffer);
@@ -2401,8 +2454,11 @@ function jsonFitSanitise(jsonRecords) {
         if (sanitisedData["samples"][prop][i] == undefined) {
           sanitisedData["samples"][prop][i] = null;
         } if (prop == "positionSamples") {
-          if (sanitisedData["samples"][prop][i][0] == undefined) {
-            sanitisedData["samples"][prop][i] = [null, null];
+          if (sanitisedData["samples"][prop][i]["latitude"] == undefined) {
+            sanitisedData["samples"][prop][i]["latitude"] = null;
+          }
+          if (sanitisedData["samples"][prop][i]["longitude"] == undefined) {
+            sanitisedData["samples"][prop][i]["longitude"] = null;
           }
         }
       }
@@ -2444,7 +2500,7 @@ async function getDetailedActivity(userDoc, activityDoc, source) {
   } else if (source == "garmin") {
     sanitisedDetailedActivity = await getGarminDetailedActivity(userDoc, activityDoc);
   }
-  return sanitisedDetailedActivity["samples"];
+  return sanitisedDetailedActivity;
 }
 
 exports.createNotionLink = functions.https.onRequest(async (req, res) => {
@@ -2480,6 +2536,22 @@ exports.processGetHistoryInBox = functions.firestore
       providersConnected[provider] = true;
       const start = new Date(Date.now());
       const end = new Date(Date.now() - 30*24*60*60*1000);
+      // return without processing if the configuration is set to
+      // switch the process off
+      if (configurations.InBoxRealTimeCheck == true) {
+        const historyInBoxConfig = await db
+            .collection("realTimeConfigs")
+            .doc("historyInBox")
+            .get();
+        if (historyInBoxConfig.exists) {
+          if (historyInBoxConfig.data()["off"]) {
+            return; // no processing should be done
+          }
+        } else {
+          // if the realTimeConfigs is not set up then carry
+          // on as normal
+        }
+      }
       try {
         const userDoc = await db.collection("users")
             .doc(userDocId)
@@ -2499,9 +2571,9 @@ exports.processGetHistoryInBox = functions.firestore
               payload[i].sanitised,
               payload[i].raw);
         }
-        webhookInBox.delete(snap.ref);
+        getHistoryInBox.delete(snap.ref);
       } catch (error) {
-        webhookInBox.writeError(snap.ref, error);
+        getHistoryInBox.writeError(snap.ref, error);
       }
       return;
     });
