@@ -149,11 +149,11 @@ describe("Testing that the garmin Webhooks work: ", () => {
 
         wrapped = test.wrap(myFunctions.processWebhookInBox);
         await wrapped(snapshot);
-
-        const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
-        await wait(1500);
         // check the webhookInBox function was called with the correct args
         assert(stubbedWebhookInBox.calledOnceWith(snapshot.ref), "webhookInBox called incorrectly");
+        // give the sendToDeveloper function a chance to run
+        const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+        await wait(1000);
          //now check the database was updated correctly
         const testUserDocs = await admin.firestore()
             .collection("users")
@@ -169,17 +169,18 @@ describe("Testing that the garmin Webhooks work: ", () => {
                 activity_id: 7698241609,
                 activity_name: "Indoor Cycling",
                 activity_type: "INDOOR_CYCLING",
-                distance_in_meters: null, //float no trailing 0
-                average_pace_in_meters_per_second: null, //float
+                distance: null, //float no trailing 0
+                avg_speed: null, //float
                 active_calories: 391,
-                activity_duration_in_seconds: 1811,
+                activity_duration: 1811,
                 start_time: '2021-10-22T12:54:21.000Z', //ISO 8601 UTC
-                average_heart_rate_bpm: 139,
+                avg_heart_rate: 139,
                 max_heart_rate_bpm: 178,
-                average_cadence: null,
+                avg_cadence: null,
                 elevation_gain: null,
                 elevation_loss: null,
                 provider: "garmin",
+                version: "1.0"
             },
             raw: {
                 "activeKilocalories": 391,
@@ -196,10 +197,13 @@ describe("Testing that the garmin Webhooks work: ", () => {
                 "userAccessToken": "test_garmin_access_token",
                 "userId": "eb24e8e5-110d-4a87-b976-444f40ca27d4"
                 },
-            "status": "sent",
+            "status": "not tested",
             "timestamp": "not tested",
+            "triesSoFar": "not tested",
         }
+        sanatisedActivity.status = "not tested";
         sanatisedActivity.timestamp = "not tested";
+        sanatisedActivity.triesSoFar = "not tested";
         assert.deepEqual(sanatisedActivity, expectedResults);
         sinon.restore();
       });

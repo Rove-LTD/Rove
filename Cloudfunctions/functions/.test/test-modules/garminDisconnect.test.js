@@ -66,7 +66,7 @@ describe("Check the garmin Disconnect Service works: ", () => {
         .collection("activities")
         .doc()
         .set({raw: {field1: "somedata"},
-            sanitised: {data_source: "garmin"}});
+            sanitised: {provider: "garmin"}});
 
   });
   it('Check that service returns with error if user is not already authorised', async () => {
@@ -119,7 +119,7 @@ describe("Check the garmin Disconnect Service works: ", () => {
         .collection("users")
         .doc(testDev+testUser)
         .collection("activities")
-        .where("sanitised.data_source","==","garmin")
+        .where("sanitised.provider","==","garmin")
         .get();
     
     const expectedUserResults = {
@@ -176,7 +176,7 @@ describe("Check the garmin Disconnect Service works: ", () => {
         .collection("users")
         .doc(testDev+testUser)
         .collection("activities")
-        .where("sanitised.data_source","==","garmin")
+        .where("sanitised.provider","==","garmin")
         .get();
     
     const expectedUserResults = {
@@ -230,7 +230,7 @@ describe("Check the garmin Disconnect Service works: ", () => {
         .collection("users")
         .doc(testDev+testUser)
         .collection("activities")
-        .where("sanitised.data_source","==","garmin")
+        .where("sanitised.provider","==","garmin")
         .get();
     
     const expectedUserResults = {
@@ -287,7 +287,7 @@ describe("Check the garmin Disconnect Service works: ", () => {
         .collection("users")
         .doc(testDev+testUser)
         .collection("activities")
-        .where("sanitised.data_source","==","garmin")
+        .where("sanitised.provider","==","garmin")
         .get();
     
     const expectedUserResults = {
@@ -344,7 +344,7 @@ describe("Check the garmin Disconnect Service works: ", () => {
         .collection("users")
         .doc(testDev+testUser)
         .collection("activities")
-        .where("sanitised.data_source","==","garmin")
+        .where("sanitised.provider","==","garmin")
         .get();
     
     const expectedUserResults = {

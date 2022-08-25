@@ -23,6 +23,7 @@ const filters = require("./data-filter");
 const fs = require("fs");
 const notion = require("./notion");
 const fitDecoder = require("fit-decoder");
+const FitParser = require("fit-file-parser").default;
 const configurations = contentsOfDotEnvFile["config"];
 // find a way to decrypt and encrypt this information
 
@@ -31,6 +32,7 @@ const db = admin.firestore();
 const storage = admin.storage();
 
 const webhookInBox = require("./webhookInBox");
+const getHistoryInBox = require("./getHistoryInBox");
 const oauthWahoo = new OauthWahoo(configurations, db);
 const callbackBaseUrl = "https://us-central1-"+process.env.GCLOUD_PROJECT+".cloudfunctions.net";
 const redirectPageUrl = "https://"+process.env.GCLOUD_PROJECT+".web.app";
@@ -96,7 +98,7 @@ exports.connectService = functions.https.onRequest(async (req, res) => {
     res.send(url);
     return;
   }
-  const providers = ["strava", "garmin", "polar", "wahoo"];
+  const providers = ["strava", "garmin", "polar", "wahoo", "coros"];
   if (providers.includes(parameters.provider) == false) {
     url = "error: the provider was badly formatted, missing or not supported";
     res.status(400);
@@ -124,6 +126,8 @@ exports.connectService = functions.https.onRequest(async (req, res) => {
     url = await polarOauth(parameters, transactionId);
   } else if (parameters.provider == "wahoo") {
     url = await wahooOauth(parameters, transactionId);
+  } else if (parameters.provider == "coros") {
+    url = await corosOauth(parameters, transactionId);
   } else {
     // the request was badly formatted with incorrect provider parameter
     url = "error: the provider was badly formatted, missing or not supported";
@@ -144,9 +148,8 @@ exports.getActivityList = functions.https.onRequest(async (req, res) => {
   } else {
     parameters = await getParametersFromTransactionId(transactionId);
     updateTransactionWithStatus(transactionId, "userClickedAuthButton");
-  }
+  } // TODO: this is unnecessary
   let url = "";
-  console.log(callbackBaseUrl);
   // parameter checks
   // first check developer exists and the devKey matches
   if (parameters.devId != null) {
@@ -217,6 +220,7 @@ exports.getActivityList = functions.https.onRequest(async (req, res) => {
     return;
   }
   // now we need to make a request to the user's authenticated services.
+  // TODO: "<provider>_connected" is the way to determine.
   const providersConnected = {"polar": false, "garmin": false, "strava": false, "wahoo": false};
   providersConnected["polar"] = userDoc.data().hasOwnProperty("polar_user_id");
   providersConnected["garmin"] = userDoc.data().hasOwnProperty("garmin_access_token");
@@ -227,11 +231,11 @@ exports.getActivityList = functions.https.onRequest(async (req, res) => {
     const payload = await requestForDateRange(providersConnected, userDoc, start, end);
     url = "all checks passing";
     res.status(200);
-    let currentActivity = "";
     // write the docs into the database now.
     for (let i = 0; i < payload.length; i++) {
-      currentActivity = payload[i];
-      db.collection("users").doc(userDoc.id).collection("activities").doc(currentActivity["sanitised"]["activity_id"] + currentActivity["sanitised"]["provider"]).set(payload[i], {merge: true});
+      saveAndSendActivity(userDoc,
+          payload[i].sanitised,
+          payload[i].raw);
     }
     res.send("OK");
   } catch (error) {
@@ -291,6 +295,8 @@ async function getWahooActivityList(start, end, userDoc) {
       const sanitisedList = [];
       for (let i = 0; i<activityList.workouts.length; i++) {
         sanitisedList.push({"raw": activityList.workouts[i], "sanitised": filters.wahooSanitise(activityList.workouts[i])});
+        // TODO: add back in when detail needed
+        // sanitisedList[i]["sanitised"]["samples"] = await getDetailedActivity(userDoc.data(), activityList.workouts[i]);
       }
       // now filter for start times
       const startTime = start.getTime();
@@ -325,6 +331,9 @@ async function getPolarActivityList(start, end, userDoc) {
     const sanitisedList = [];
     for (let i = 0; i<activityList.length; i++) {
       sanitisedList.push({"raw": activityList[i], "sanitised": filters.polarSanatise(activityList[i])});
+      // TODO: just get the file add the samples later when detail is needed
+      const detailedSanitisedList = await getDetailedActivity(userDoc.data(), activityList[i], "polar");
+      sanitisedList[i]["sanitised"]["file"] = detailedSanitisedList.file;
     }
     const startTime = start.getTime();
     const endTime = end.getTime();
@@ -363,7 +372,9 @@ async function getGarminActivityList(start, end, userDoc) {
   const listOfSanitisedActivities = filters.garminSanitise(activityList);
   const listOfValidActivities = [];
   for (let i=0; i< activityList.length; i++) {
-    listOfValidActivities.push({raw: activityList[i], sanitised: listOfSanitisedActivities[i]});
+    listOfValidActivities.push({"raw": activityList[i], "sanitised": listOfSanitisedActivities[i]});
+    // TODO: uncomment when detail needed
+    // listOfValidActivities[i]["sanitised"]["samples"] = await getDetailedActivity(userDocData, activityList[i]);
   }
   return listOfValidActivities;
 }
@@ -383,6 +394,7 @@ async function getStravaActivityList(start, end, userDoc) {
   const listOfValidActivities = [];
   for (let i = 0; i<sanitisedActivities.length; i++) {
     listOfValidActivities.push({"raw": result[i], "sanitised": sanitisedActivities[i]});
+    // listOfValidActivities[i]["sanitised"]["samples"] = getDetailedActivity(userDocData, result[i]);
   }
   return listOfValidActivities;
 }
@@ -446,7 +458,7 @@ exports.disconnectService = functions.https.onRequest(async (req, res) => {
     return;
   }
 
-  const providers = ["strava", "garmin", "polar", "wahoo"];
+  const providers = ["strava", "garmin", "polar", "wahoo", "coros"];
   // check if this user is authorized already
   // if they are then deauthorize and respond with success/failure message
   // if they are not then error - user not authorised with this provider
@@ -496,6 +508,22 @@ exports.disconnectService = functions.https.onRequest(async (req, res) => {
     } else if (provider == "wahoo") {
       if (userDocData["wahoo_connected"] == true) {
         result = await deleteWahooActivity(userDoc, false);
+        // check success or fail. result 200 is success 400 is failure
+        if (result == 200) {
+          res.status(200);
+          message = JSON.stringify({status: "disconnected"});
+        } else {
+          res.status(result);
+          message = "error: unexpected problem";
+        }
+      } else {
+        res.status(400);
+        message = "error: the userId was not authorised for this provider";
+        // error the user is not authorizes already
+      }
+    } else if (provider == "coros") {
+      if (userDocData["coros_connected"] == true) {
+        result = await deleteCorosActivity(userDoc, false);
         // check success or fail. result 200 is success 400 is failure
         if (result == 200) {
           res.status(200);
@@ -561,7 +589,7 @@ async function deleteStravaActivity(userDoc, webhookCall) {
   });
 
   const activities = await userDoc.ref.collection("activities")
-      .where("sanitised.data_source", "==", "strava")
+      .where("sanitised.provider", "==", "strava")
       .get();
   await activities.forEach(async (doc)=>{
     await doc.ref.delete();
@@ -602,7 +630,7 @@ async function deleteGarminActivity(userDoc, webhookCall) {
     });
     // delete activities from provider.
     const activities = await userDoc.ref.collection("activities")
-        .where("sanitised.data_source", "==", "garmin")
+        .where("sanitised.provider", "==", "garmin")
         .get();
     activities.forEach(async (doc)=>{
       await doc.ref.delete();
@@ -678,7 +706,7 @@ async function deletePolarActivity(userDoc, webhookCall) {
     });
     // delete activities from provider.
     const activities = await userDoc.ref.collection("activities")
-        .where("sanitised.data_source", "==", "polar")
+        .where("sanitised.provider", "==", "polar")
         .get();
     activities.forEach(async (doc)=>{
       await doc.ref.delete();
@@ -729,7 +757,7 @@ async function deleteWahooActivity(userDoc) {
     });
     // delete activities from provider.
     const activities = await userDoc.ref.collection("activities")
-        .where("sanitised.data_source", "==", "wahoo")
+        .where("sanitised.provider", "==", "wahoo")
         .get();
     activities.forEach(async (doc)=>{
       await doc.ref.delete();
@@ -739,6 +767,93 @@ async function deleteWahooActivity(userDoc) {
   } catch (error) {
     return 400;
   }
+}
+
+async function deleteCorosActivity(userDoc) {
+  const userQueryList = await db.collection("users").
+      where("coros_id", "==", userDoc.data()["coros_id"])
+      .get();
+  if (userQueryList.docs.length == 1) {
+    try {
+      const accessToken = await getCorosToken(userDoc);
+      const options = {
+        url: "https://open.coros.com/oauth2/deauthorize?token=" + accessToken,
+        method: "POST",
+      };
+      const deAuthResponse = await got.post(options).json();
+      if (deAuthResponse.result != "0000") {
+        return 400;
+      }
+    } catch (error) {
+      if (error == 401) { // unauthorised
+        // consider refreshing the access code and trying again
+      }
+      return 400;
+    }
+  }
+  try {
+    // delete wahoo keys and activities
+    await db.collection("users").doc(userDoc.id).update({
+      coros_access_token: admin.firestore.FieldValue.delete(),
+      coros_connected: admin.firestore.FieldValue.delete(),
+      coros_refresh_token: admin.firestore.FieldValue.delete(),
+      coros_token_expires_in: admin.firestore.FieldValue.delete(),
+      coros_token_expires_at: admin.firestore.FieldValue.delete(),
+      wahoo_created_at: admin.firestore.FieldValue.delete(),
+      coros_id: admin.firestore.FieldValue.delete(),
+    });
+    // delete activities from provider.
+    const activities = await userDoc.ref.collection("activities")
+        .where("sanitised.provider", "==", "coros")
+        .get();
+    activities.forEach(async (doc)=>{
+      await doc.ref.delete();
+    });
+    await sendToDeauthoriseWebhook(userDoc, "coros", 0);
+    return 200;
+  } catch (error) {
+    return 400;
+  }
+}
+
+async function getCorosToken(userDoc) {
+  const userToken = userDoc.data()["coros_access_token"];
+  const devId = userDoc.data()["devId"];
+  const userId = userDoc.data()["userId"];
+  if (userId == undefined || devId == undefined) {
+    throw (new Error("error: userId or DevId not set"));
+  }
+  const expiresAt = userDoc.data()["coros_token_expires_at"];
+  if (expiresAt < Date.now()/1000) {
+    // out of date token can be refreshed by Coros.
+    const secretLookup = await db.collection("developers").doc(devId).get();
+    const lookup = await secretLookup.data()["secret_lookup"];
+    const options = {
+      "headers": {"Content-Type": "application/x-www-form-urlencoded"},
+      "form": {
+        "client_id": configurations[lookup]["corosClientId"],
+        "refresh_token": userDoc.data()["coros_refresh_token"],
+        "client_secret": configurations[lookup]["corosSecret"],
+        "grant_type": "refresh_token"}};
+    const accessCodeResponse = await got.post("https://open.coros.com/oauth2/refresh-token", options).json();
+    if (accessCodeResponse.hasOwnProperty("access_token")) {
+      const accessToken = await corosStoreTokens(accessCodeResponse, userDoc);
+      return accessToken;
+    }
+  } else {
+    return userToken;
+  }
+}
+async function corosStoreTokens(tokens, userDoc) {
+  await db.collection("users").doc(userDoc.id).set({
+    "coros_connected": true,
+    "coros_access_token": tokens["access_token"],
+    "coros_refresh_token": tokens["refresh_token"],
+    "coros_token_expires_at": Date.now()/1000 + tokens["expires_in"],
+    "coros_token_expires_in": tokens["expires_in"],
+    "coros_id": tokens["openId"],
+  }, {merge: true});
+  return tokens["access_token"];
 }
 
 async function sendToDeauthoriseWebhook(userDoc, provider, triesSoFar) {
@@ -794,9 +909,50 @@ exports.oauthCallbackHandlerGarmin = functions.https
       const transactionData =
           await getParametersFromTransactionId(transactionId);
       await oauthCallbackHandlerGarmin(oAuthCallback, transactionData);
+      await getHistoryInBox.push("garmin",
+          transactionData.devId+transactionData.userId);
       const urlString = await successDevCallback(transactionData);
       res.redirect(urlString);
     }),
+
+exports.corosCallback = functions.https.onRequest(async (req, res) => {
+  const oAuthCallback = Url.parse(req.url, true).query;
+  const code = oAuthCallback["code"];
+  const transactionId = oAuthCallback["state"];
+  const transactionData =
+          await getParametersFromTransactionId(transactionId);
+  const secretLookup = await db.collection("developers").doc(transactionData.devId).get();
+  const lookup = await secretLookup.data()["secret_lookup"];
+  const options = {
+    "headers": {"Content-Type": "application/x-www-form-urlencoded"},
+    "form": {
+      "client_id": configurations[lookup]["corosClientId"],
+      "redirect_uri": callbackBaseUrl+"/corosCallback",
+      "code": code,
+      "client_secret": configurations[lookup]["corosSecret"],
+      "grant_type": "authorization_code"}};
+  const accessTokens = await got.post("https://open.coros.com/oauth2/accesstoken?", options);
+  if (accessTokens.statusCode == 200) {
+    const jsonTokens = JSON.parse(accessTokens.body);
+    await db.collection("users").doc(transactionData.devId + transactionData.userId).set({
+      "devId": transactionData.devId,
+      "userId": transactionData.userId,
+      "coros_access_token": jsonTokens["access_token"],
+      "coros_id": jsonTokens["openId"],
+      "coros_refresh_token": jsonTokens["refresh_token"],
+      "coros_expires_in": jsonTokens["expires_in"],
+      "coros_connected": true,
+      "coros_expires_at": (Date.now()/1000) + jsonTokens["expires_in"],
+    },
+    {merge: true});
+  }
+  await getHistoryInBox.push("coros",
+      transactionData.devId + transactionData.userId);
+  res.status(200);
+  const urlString = await successDevCallback(transactionData);
+  res.redirect(urlString);
+  res.send();
+}),
 
 // callback from strava with token in
 exports.stravaCallback = functions.https.onRequest(async (req, res) => {
@@ -834,18 +990,13 @@ exports.stravaCallback = functions.https.onRequest(async (req, res) => {
       // this is where the tokens come back.
       stravaStoreTokens(userId, devId, JSON.parse(body), db);
       await getStravaAthleteId(userId, devId, JSON.parse(body));
-      // send a response now to endpoint for devId confirming success
-      // await sendDevSuccess(devId); //TODO: create dev success post.
-      // userResponse = "Some good redirect.";
+      await getHistoryInBox.push("strava",
+          transactionData.devId+transactionData.userId);
       const urlString = await successDevCallback(transactionData);
       res.redirect(urlString);
     } else {
       res.send("Error: "+response.statusCode+
          " please close this window and try again");
-      // console.log(JSON.parse(body));
-      // send an error response to dev.
-      // TODO: create dev fail post.
-      // userResponse = "Some bad redirect";
     }
   });
 });
@@ -957,6 +1108,9 @@ async function processGarminWebhook(webhookDoc) {
     userQuery.docs.forEach((doc)=> {
       userDocsList.push(doc);
     });
+    // TODO: uncomment when detail needed
+    // const samples = await getDetailedActivity(userDocsList[0].data(), webhookBody.activities[index], "garmin");
+    // sanitisedActivity["samples"] = samples;
     // save raw and sanitised activites as a backup for each user
     for (const userDoc of userDocsList) {
       saveAndSendActivity(userDoc,
@@ -1099,6 +1253,37 @@ async function garminOauth(transactionData, transactionId) {
   return _url;
 }
 
+async function corosOauth(transactionData, transactionId) {
+  const userId = transactionData.userId;
+  const devId =transactionData.devId;
+  const secretLookup = await db.collection("developers").doc(devId).get();
+  const lookup = await secretLookup.data()["secret_lookup"];
+  // add parameters from user onto the callback redirect.
+  const parameters = {
+    client_id: configurations[lookup]["corosClientId"],
+    response_type: "code",
+    redirect_uri: callbackBaseUrl+"/corosCallback",
+    state: transactionId,
+  };
+  //  https://open.coros.com/oauth2/authorize?
+
+  let encodedParameters = "";
+  let k = 0;
+  for (k in parameters) {
+    if (parameters[k] != null) {
+      const encodedValue = parameters[k];
+      const encodedKey = k;
+      if (encodedParameters === "") {
+        encodedParameters += `${encodedKey}=${encodedValue}`;
+      } else {
+        encodedParameters += `&${encodedKey}=${encodedValue}`;
+      }
+    }
+  }
+  const baseUrl = "https://open.coros.com/oauth2/authorize?";
+  return (baseUrl + encodedParameters);
+}
+
 async function polarOauth(transactionData, transactionId) {
   const userId = transactionData.userId;
   const devId =transactionData.devId;
@@ -1175,17 +1360,12 @@ exports.polarCallback = functions.https.onRequest(async (req, res) => {
       let message ="";
       message = await registerUserWithPolar(userId, devId, JSON.parse(body), db);
       await polarStoreTokens(userId, devId, JSON.parse(body), db);
-      // send a response now to endpoint for devId confirming success
-      // await sendDevSuccess(devId); //TODO: create dev success post.
-      // userResponse = "Some good redirect.";
+      await getHistoryInBox.push("polar", devId + userId);
       const urlString = await successDevCallback(transactionData);
       res.redirect(urlString);
     } else {
       res.send("Error: "+response.statusCode+":"+body.toString()+" please close this window and try again");
       console.log(JSON.parse(body));
-      // send an error response to dev.
-      // TODO: create dev fail post.
-      // userResponse = "Some bad redirect";
     }
   });
   return;
@@ -1264,11 +1444,24 @@ exports.wahooCallback = functions.https.onRequest(async (req, res) => {
     await oauthWahoo.getAndSaveAccessCodes();
   }
   if (!oauthWahoo.error) {
+    await getHistoryInBox.push("wahoo", oauthWahoo.userDocId);
     const urlString = await successDevCallback(transactionData);
     res.redirect(urlString);
   } else {
     res.send(oauthWahoo.errorMessage);
   }
+});
+
+exports.corosWebhook = functions.https.onRequest(async (request, response) => {
+  const webhookDoc = await webhookInBox.push(request, "wahoo", "roveLiveSecrets");
+  response.status(200);
+  response.send();
+});
+
+exports.corosStatus = functions.https.onRequest(async (request, response) => {
+  // a service status request, which at the moment is always ok.
+  response.status(200);
+  response.send();
 });
 
 exports.stravaWebhook = functions.https.onRequest(async (request, response) => {
@@ -1396,6 +1589,9 @@ async function processStravaWebhook(webhookDoc) {
     activity = await stravaApi.activities
         .get({"access_token": stravaAccessToken, "id": webhookBody.object_id});
     sanitisedActivity = filters.stravaSanitise([activity]);
+    // TODO: uncomment when detail needed
+    // const samples = await getDetailedActivity(userDocsList[0].data(), activity, "strava");
+    // sanitisedActivity[0]["samples"] = samples;
   }
   for (const userDoc of userDocsList) {
     saveAndSendActivity(userDoc,
@@ -1447,6 +1643,22 @@ exports.processWebhookInBox = functions.firestore
     .document("webhookInBox/{docId}")
     .onCreate(async (snap, context) => {
       console.log("processing webhook inbox written to... with doc: "+snap.id);
+      // return without processing if the configuration is set to
+      // switch the process off
+      if (configurations.InBoxRealTimeCheck == true) {
+        const webhookInBoxConfig = await db
+            .collection("realTimeConfigs")
+            .doc("webhookInBox")
+            .get();
+        if (webhookInBoxConfig.exists) {
+          if (webhookInBoxConfig.data()["off"]) {
+            return; // no processing should be done
+          }
+        } else {
+          // if the realTimeConfigs is not set up then carry
+          // on as normal
+        }
+      }
       try {
         switch (snap.data()["provider"]) {
           case "strava":
@@ -1461,6 +1673,8 @@ exports.processWebhookInBox = functions.firestore
           case "garmin":
             await processGarminWebhook(snap);
             break;
+          case "coros":
+            await processCorosWebhook(snap);
         }
         webhookInBox.delete(snap.ref);
       } catch (error) {
@@ -1468,7 +1682,6 @@ exports.processWebhookInBox = functions.firestore
       }
       return;
     });
-
 async function processWahooWebhook(webhookDoc) {
   const webhookBody = JSON.parse(webhookDoc.data()["body"]);
   const lookup = webhookDoc.data()["secret_lookup"];
@@ -1503,12 +1716,66 @@ async function processWahooWebhook(webhookDoc) {
   //  data
   // 1) sanatise and 2) send
   const sanitisedActivity = filters.wahooSanitise(webhookBody);
+  // TODO: uncomment when detail is needed.
+  // const samples = await getDetailedActivity(userDocsList[0].data(), sanitisedActivity, "wahoo");
+  // sanitisedActivity["samples"] = samples;
 
   // save raw and sanitised activites as a backup for each user
   for (const userDoc of userDocsList) {
-    saveAndSendActivity(userDoc,
+    await saveAndSendActivity(userDoc,
         sanitisedActivity,
         webhookBody);
+  }
+  return;
+}
+
+async function processCorosWebhook(webhookDoc) {
+  const webhookBody = JSON.parse(webhookDoc.data()["body"]);
+  const lookup = webhookDoc.data()["secret_lookup"];
+  const userDocsList = [];
+  const devDocsList = [];
+
+  const devQuery = await db.collection("developers")
+      .where("secret_lookup", "==", lookup)
+      .get();
+  devQuery.docs.forEach((doc)=>{
+    devDocsList.push(doc.id);
+  });
+
+  const userQuery = await db.collection("users")
+      .where("coros_user_id", "==", webhookBody.sportDataList[0].openId)
+      .get();
+
+  userQuery.docs.forEach((doc)=>{
+    // exclude devs that are not managed by this webhook subscription
+    if (devDocsList.includes(doc.data()["devId"])) {
+      userDocsList.push(doc);
+    }
+  });
+
+  if (userDocsList.length == 0) {
+    // there is an issue if there are no users with a userId in the DB.
+    console.log("error: zero users registered to coros webhook: " + webhookBody.sportDataList[0].openId);
+    throw Error("zero users registered to coros webhook owner_id "+webhookBody.user.id);
+  }
+
+  // now we have a list of user Id's that are interested in this
+  //  data
+  // 1) sanatise and 2) send
+  let sanitisedActivities = [];
+  let currentActivity;
+  // return a list of sanitisedActivities
+  for (let i = 0; i<webhookBody.sportDataList.length; i++) {
+    currentActivity = filters.corosSanatise(webhookBody.sportDataList[i]);
+    sanitisedActivities = sanitisedActivities.concat(currentActivity);
+  }
+  // save raw and sanitised activites as a backup for each user
+  for (const userDoc of userDocsList) {
+    for (let i = 0; i<sanitisedActivities.length; i++) {
+      saveAndSendActivity(userDoc,
+          sanitisedActivities[i],
+          webhookBody);
+    }
   }
   return;
 }
@@ -1610,25 +1877,26 @@ async function processPolarWebhook(webhookDoc) {
     const contents = fitFile.rawBody;
     // storing FIT file in bucket under activityId.fit
     const storageRef = storage.bucket();
-    // TODO: shouldn't this be the default bucket without an argument?
-    // then live will use live storage and test will use test storage?
+    // live will use live storage and test will use test storage?
     await storageRef.file("public/"+webhookBody.entity_id+".fit").save(contents);
     // create signed URL for developer to download file.
     const urlOptions = {
       version: "v4",
       action: "read",
-      expires: Date.now() + 24*60*60*1000, // 1 days till expiry
+      expires: Date.now() + (7*24*60*60*1000)-1000, // 7 days in milleseconds till expiry
     };
     const downloadURL = await storageRef.file("public/"+webhookBody.entity_id+".fit").getSignedUrl(urlOptions);
 
     const sanitisedActivity = filters.polarSanatise(activity);
     // add fit file URL to the sanitised activity
-    sanitisedActivity["file"] = {"url": downloadURL[0]};
+    sanitisedActivity["file"] = downloadURL[0];
+    // TODO: put back in when sanitisation of fit files is needed
+    // const samples = await getDetailedActivity(userDocsList[0].data(), activity, "polar").samples;
+    // sanitisedActivity["samples"] = samples;
     // write sanitised information and raw information to each user and then
     // send to developer
     for (const userDoc of userDocsList) {
-      sanitisedActivity["userId"] = userDoc.data()["userId"];
-      saveAndSendActivity(userDoc, sanitisedActivity, activity);
+      await saveAndSendActivity(userDoc, sanitisedActivity, activity);
     }
   } else {
     throw Error("Polar activity type "+webhookBody.event+" not supported");
@@ -1659,72 +1927,123 @@ async function saveAndSendActivity(userDoc,
   const doc = await activityDoc.get();
 
   if (!doc.exists) {
-    activityDoc.set({"sanitised": localSanitisedActivity, "raw": activity});
-    const triesSoFar = 0; // this is our first try to write to developer
-    sendToDeveloper(userDoc, localSanitisedActivity, activity, activityDoc, triesSoFar);
+    await activityDoc.set({"sanitised": localSanitisedActivity, "raw": activity});
   } else {
     console.log("duplicate activity - not written or sent");
   }
 }
 
-async function sendToDeveloper(userDoc,
-    sanitisedActivity,
-    activity,
-    activityDoc,
-    triesSoFar) {
-  const MaxRetries = 3;
-  const devId = userDoc.data()["devId"];
-  const datastring = {"sanitised": sanitisedActivity, "raw": activity};
-  const developerDoc = await db.collection("developers").doc(devId).get();
-  // if the developer or the user document have the "suppress_webhook" field
-  // set to "true" then return without sending the activity.
-  if (developerDoc.data()["suppress_webhook"]) {
-    // the developer does not want webhook data to be sent
-    activityDoc
-        .set({status: "suppressed", timestamp: new Date().toISOString()},
-            {merge: true});
-  } else {
-    const endpoint = developerDoc.data()["endpoint"];
-    const userData = userDoc.data();
-    // check if the user is from notion.
-    if (userData["userId"] == "notion") {
-      notion.sendToNotionEndpoint(endpoint, developerDoc, sanitisedActivity);
-    } else {
-      if (endpoint == undefined || endpoint == null) {
-      // cannot send to developer as endpoint does not exist
-        console.log("Cannot send webhook payload to "+devId+" endpoint not provided");
-        return;
-      }
-      const options = {
-        method: "POST",
-        url: endpoint,
-        headers: {
-          "Accept": "application/json",
-          "Content-type": "application/json",
-        },
-        body: JSON.stringify(datastring),
-      };
-      const response = await got.post(options);
-      if (response.statusCode == 200) {
-      // the developer accepted the information
-        activityDoc
-            .set({status: "sent", timestamp: new Date().toISOString()},
-                {merge: true});
-      } else {
-      // call the retry functionality and increment the retry counter
-        if (triesSoFar <= MaxRetries) {
-          console.log("retrying sending to developer");
-          wait(waitTime[triesSoFar]);
-          sendToDeveloper(userDoc, sanitisedActivity, activity, activityDoc, triesSoFar+1);
+exports.sendToDeveloper = functions
+    .runWith({failurePolicy: true})
+    .firestore
+    .document("users/{userDocId}/activities/{activityId}")
+    .onCreate(async (activitySnap, context) => {
+      const userDocId = context.params.userDocId;
+      const activityDocId = context.params.activityId;
+      const activityDoc = await db
+          .collection("users")
+          .doc(userDocId)
+          .collection("activities")
+          .doc(activityDocId)
+          .get();
+      // return without processing if the configuration is set to
+      // switch the process off
+      if (configurations.InBoxRealTimeCheck == true) {
+        const sendToDevConfig = await db
+            .collection("realTimeConfigs")
+            .doc("sendToDeveloper")
+            .get();
+        if (sendToDevConfig.exists) {
+          if (sendToDevConfig.data()["off"]) {
+            return; // no processing should be done
+          }
         } else {
-        // max retries email developer
-          console.log("max retries on sending to developer reached - fail");
+          // if the realTimeConfigs is not set up then carry
+          // on as normal
         }
       }
-    }
-  }
-  return;
-}
+      if (!activityDoc.exists || activityDoc.data()["status"] == "sent") {
+        console.log("activity "+activityDocId+" for user "+userDocId+" has been deleted or has already been sent not sending again");
+        return;
+      }
+      const MaxRetries = 3;
+      let triesSoFar = activityDoc.data()["triesSoFar"] || 0;
+      if (triesSoFar <= MaxRetries) {
+        triesSoFar = triesSoFar+1;
+        console.log("sending to developer - try number: "+triesSoFar);
+        await activityDoc.ref
+            .set({status: "sending try number.. "+triesSoFar,
+              timestamp: new Date().toISOString(),
+              triesSoFar: triesSoFar,
+            },
+            {merge: true});
+      } else {
+        // max retries email developer
+        await activityDoc.ref
+            .set({status: "error: failed to send - max retries reached.  Fix issue before trying again",
+              timestamp: new Date().toISOString(),
+            },
+            {merge: true});
+        console.log("max retries on sending activity for userDoc: "+userDocId+" - Activity "+activityDocId+" - fail");
+        return;
+      }
+      const userDoc = await db
+          .collection("users")
+          .doc(userDocId)
+          .get();
+
+      const devId = userDoc.data()["devId"];
+      const datastring = {"sanitised": activityDoc.data()["sanitisedActivity"], "raw": activityDoc.data()["raw"]};
+      const developerDoc = await db.collection("developers").doc(devId).get();
+      // if the developer document has the "suppress_webhook" field
+      // set to "true" then return without sending the activity.
+      if (developerDoc.data()["suppress_webhook"]) {
+        // the developer does not want webhook data to be sent
+        await activityDoc.ref
+            .set({status: "suppressed", timestamp: new Date().toISOString()},
+                {merge: true});
+        return;
+      }
+
+      const endpoint = developerDoc.data()["endpoint"];
+      const userData = userDoc.data();
+      // check if the user is from notion.
+      if (userData["userId"] == "notion") {
+        notion.sendToNotionEndpoint(endpoint, developerDoc, activityDoc.data()["sanitisedActivity"]);
+      } else {
+        if (endpoint == undefined || endpoint == null) {
+        // cannot send to developer as endpoint does not exist
+          console.log("Cannot send webhook payload to "+devId+" endpoint not provided");
+          return;
+        }
+        const options = {
+          method: "POST",
+          url: endpoint,
+          headers: {
+            "Accept": "application/json",
+            "Content-type": "application/json",
+          },
+          body: JSON.stringify(datastring),
+        };
+
+        try {
+          const response = await got.post(options);
+          if (response.statusCode == 200) {
+          // the developer accepted the information
+            await activityDoc.ref
+                .set({status: "sent", timestamp: new Date().toISOString()},
+                    {merge: true});
+          } else {
+            const error = new Error("developer sent back wrong code: "+response.statusCode);
+            console.log("retrying sending to developer");
+            return Promise.reject(error);
+          }
+        } catch (err) {
+          console.log("retrying sending to developer: "+err.message);
+          return Promise.reject(err);
+        }
+      }
+    });
 
 exports.polarWebhookSetup = functions.https.onRequest(async (req, res) => {
   // get the devId and DevKey
@@ -1759,147 +2078,70 @@ exports.polarWebhookSetup = functions.https.onRequest(async (req, res) => {
 });
 
 async function getStravaDetailedActivity(userDoc, activityDoc) {
-  const stravaActivityId = await activityDoc["raw"]["id"];
+  const stravaActivityId = await activityDoc["id"];
   const devId = await userDoc["devId"];
   const secretLookup = await db.collection("developers").doc(devId).get();
   const lookup = await secretLookup.data()["secret_lookup"];
-  let streamResponse;
   stravaApi.config({
     "client_id": configurations[lookup]["stravaClientId"],
     "client_secret": configurations[lookup]["stravaClientSecret"],
     "redirect_uri": callbackBaseUrl+"/stravaCallback",
   });
-  // delete activities
-  // check if this is the last user with this stravaId and this is not a call from the webhook
+
   let accessToken = userDoc["strava_access_token"];
-  const userQueryList = await db.collection("users").
-      where("strava_id", "==", userDoc["strava_id"])
-      .get();
-  if ( userQueryList.docs.length == 1) {
-    if (await checkStravaTokens(userDoc["devId"]+userDoc["userId"], db) == true) {
-      // token out of date, make request for new ones.
-      const payload = await stravaApi.oauth.refreshToken(userDoc["strava_refresh_token"]);
-      await stravaTokenStorage(userDoc["devId"]+userDoc["userId"], payload, db);
-      accessToken = payload["access_token"];
-    }
-    streamResponse = await stravaApi.streams.activity({"access_token": accessToken, "id": stravaActivityId, "types": ["time", "distance", "latlng", "altitude", "velocity_smooth", "heartrate", "cadence", "watts", "temp", "moving", "grade_smooth"], "key_by_type": true});
+  if (await checkStravaTokens(userDoc["devId"]+userDoc["userId"], db) == true) {
+    // token out of date, make request for new ones.
+    const payload = await stravaApi.oauth.refreshToken(userDoc["strava_refresh_token"]);
+    await stravaTokenStorage(userDoc["devId"]+userDoc["userId"], payload, db);
+    accessToken = payload["access_token"];
   }
+  const streamResponse = await stravaApi.streams.activity({"access_token": accessToken, "id": stravaActivityId, "types": ["time", "distance", "latlng", "altitude", "velocity_smooth", "heartrate", "cadence", "watts", "temp", "moving", "grade_smooth"], "key_by_type": true});
+  return streamResponse;
 }
 
 async function getPolarDetailedActivity(userDoc, activityDoc) {
-  const polarId = userDoc["polar_user_id"];
-  const exerciseDate = activityDoc["raw"]["start_time"];
-  let exerciseId;
+  const exerciseId = activityDoc["id"];
   const accessToken = userDoc["polar_access_token"];
-  let transactionId;
+  let sanitised = {};
   const headers = {
-    "Accept": "application/json", "Authorization": "Bearer " + accessToken,
+    "Accept": "*/*", "Authorization": "Bearer " + accessToken,
   };
 
   try {
-    // Create transaction
-    const transactionOptions = {
-      url: "https://www.polaraccesslink.com/v3/users/"+polarId+"/exercise-transactions",
-      method: "POST",
-      headers: headers,
-    };
-    const transactionResponse = await got.post(transactionOptions);
-    if (transactionResponse.statusCode == 201) {
-      const transactionResponseObject = JSON.parse(transactionResponse.body);
-      transactionId = String(transactionResponseObject["transaction-id"]);
-    } else if (transactionResponse.statusCode == 204) {
-      const message = "No activities in the last 30 days";
-      console.log(message);
-      const options = {
-        url: "https://www.polaraccesslink.com/v3/users/"+polarId+"/exercise-transactions/"+transactionId,
-        method: "PUT",
-        headers: headers,
-      };
-      const res = await got.put(options);
-      console.log("Comit transaction response: " + res.statusCode);
-      return message;
-    }
-
-    // Get available sessions
-    const sessionsOptions = {
-      url: "https://www.polaraccesslink.com/v3/users/"+polarId+"/exercise-transactions/" + transactionId,
+    const options = {
+      url: "https://www.polaraccesslink.com/v3/exercises/" + exerciseId + "/fit",
       method: "GET",
       headers: headers,
     };
-    const sessionsResponse = await got.get(sessionsOptions);
-    if (sessionsResponse.statusCode == 200) {
-      const sessionsResponseObject = JSON.parse(sessionsResponse.body);
-      const sessionURLs = sessionsResponseObject["exercises"];
-      // Get session summaries
-      for (let i=0; i<sessionURLs.length; i++) {
-        const options = {
-          url: sessionURLs[i],
-          method: "GET",
-          headers: headers,
-        };
-        const res = await got.get(options);
-        const session = JSON.parse(res.body);
-        if (session["start-time"] == exerciseDate) {
-          exerciseId = session["id"];
-          break;
-        }
-      }
-
-      // Get available samples
-      const fitOptions = {
-        url: "https://www.polaraccesslink.com/v3/users/"+polarId+"/exercise-transactions/"+transactionId+"/exercises/"+exerciseId+"/fit",
-        method: "GET",
-        headers: {
-          "Accept": "*/*", "Authorization": "Bearer " + accessToken,
-        },
+    const fitFile = await got.get(options);
+    if (fitFile.statusCode == 200) {
+      const contents = fitFile.rawBody;
+      // storing FIT file in bucket under polar-exerciseId.fit
+      const storageRef = storage.bucket();
+      // live will use live storage and test will use test storage?
+      await storageRef.file("public/polar"+exerciseId+".fit").save(contents);
+      // create signed URL for developer to download file.
+      const urlOptions = {
+        version: "v4",
+        action: "read",
+        expires: Date.now() + (1*24*60*60*1000), // 1 days in milleseconds till expiry
       };
-      const fitFile = await got.get(fitOptions);
-      if (fitFile.statusCode == 200) {
-        const buffer = fitFile.rawBody.buffer;
-        const jsonRaw = fitDecoder.fit2json(buffer);
-        const json = fitDecoder.parseRecords(jsonRaw);
-        const records = json.records;
-        const sanitised = jsonSanitise(records);
-        // Comit transaction
-        const options = {
-          url: "https://www.polaraccesslink.com/v3/users/"+polarId+"/exercise-transactions/"+transactionId,
-          method: "PUT",
-          headers: headers,
-        };
-        const res = await got.put(options);
-        return sanitised;
-      } else {
-        const message = "No activities in the last 30 days";
-        console.log(message);
-        const options = {
-          url: "https://www.polaraccesslink.com/v3/users/"+polarId+"/exercise-transactions/"+transactionId,
-          method: "PUT",
-          headers: headers,
-        };
-        const res = await got.put(options);
-        console.log("Comit transaction response: " + res.statusCode);
-        return message;
-      }
-    } else if (sessionsResponse.statusCode == 204) {
-      const message = "No activities in the last 30 days";
-      console.log(message);
-      return message;
+      const downloadURL = await storageRef
+          .file("public/polar"+exerciseId+".fit")
+          .getSignedUrl(urlOptions);
+      // add fit file URL to the sanitised activity
+      sanitised["file"] = downloadURL[0];
+      const fitParser = new FitParser();
+      fitParser.parse(fitFile.rawBody, (error, jsonRaw)=>{
+        // Handle result of parse method
+        if (error) {
+          console.log(error);
+          sanitised = error;
+        } else {
+          sanitised["samples"] = sanitisePolarFitFile(jsonRaw);
+        }
+      });
     }
-  } catch (error) {
-    console.log(error);
-    return error;
-  }
-}
-
-async function getWahooDetailedActivity(userDoc, activityDoc) {
-  try { // or 'https' for https:// URLs
-    const fileLocation = activityDoc["raw"]["file"]["url"];
-    const fitFile = await got.get(fileLocation);
-    const buffer = fitFile.rawBody.buffer;
-    const jsonRaw = fitDecoder.fit2json(buffer);
-    const json = fitDecoder.parseRecords(jsonRaw);
-    const records = json.records;
-    const sanitised = jsonSanitise(records);
     return sanitised;
   } catch (error) {
     console.log(error);
@@ -1907,7 +2149,225 @@ async function getWahooDetailedActivity(userDoc, activityDoc) {
   }
 }
 
-function jsonSanitise(jsonRecords) {
+function sanitisePolarFitFile(fitFile) {
+  const session = fitFile.sessions[0];
+  let cadence;
+  if (session.sport == "running") {
+    cadence = "running_cadence";
+  } else if (session.sport == "CYCLING") {
+    cadence = "cadence";
+  }
+  const records = fitFile.records;
+  const timerSamples = [];
+  const timestampSamples = [];
+  const temperatureSamples = [];
+  const distanceSamples = [];
+  const powerSamples = [];
+  const heartRateSamples = [];
+  const speedSamples = [];
+  const altitudeSamples = [];
+  const positionSamples = [];
+  const gradientSamples = [];
+  const calorieSamples = [];
+  const cadenceSamples = [];
+  const acentSamples = [];
+  const decentSamples = [];
+  records.forEach((record) => {
+    timestampSamples.push((record.timestamp).toISOString());
+    temperatureSamples.push(record.temperature);
+    distanceSamples.push(record.distance);
+    powerSamples.push(record.power);
+    heartRateSamples.push(record.heart_rate);
+    speedSamples.push(record.speed);
+    altitudeSamples.push(record.altitude);
+    positionSamples.push({"latitude": record.position_lat, "longitute": record.position_long});
+    gradientSamples.push(null);
+    calorieSamples.push(null);
+    cadenceSamples.push(record[cadence]);
+    acentSamples.push(null);
+    decentSamples.push(null);
+  });
+  const sanitisedSamples= {
+    "timestampSamples": timestampSamples,
+    "distanceSamples": distanceSamples,
+    "powerSamples": powerSamples,
+    "heartRateSamples": heartRateSamples,
+    "speedSamples": speedSamples,
+    "altitudeSamples": altitudeSamples,
+    "positionSamples": positionSamples,
+    "gradientSamples": gradientSamples,
+    "calorieSamples": calorieSamples,
+    "cadenceSamples": cadenceSamples,
+    "acentSamples": acentSamples,
+    "decentSamples": decentSamples,
+    "timerSamples": timerSamples,
+  };
+  for (const prop in sanitisedSamples) {
+    if (Object.prototype.hasOwnProperty.call(sanitisedSamples, prop)) {
+      for (let i=0; i<sanitisedSamples[prop].length; i++) {
+        if (sanitisedSamples[prop][i] == undefined) {
+          sanitisedSamples[prop][i] = null;
+        } if (prop == "positionSamples") {
+          if (sanitisedSamples[prop][i][0] == undefined) {
+            sanitisedSamples[prop][i] = [null, null];
+          }
+        }
+      }
+    }
+  }
+  return sanitisedSamples;
+}
+
+async function getWahooDetailedActivity(userDoc, activityDoc) {
+  try { // or 'https' for https:// URLs
+    const fileLocation = activityDoc["file"];
+    const fitFile = await got.get(fileLocation);
+    const buffer = fitFile.rawBody.buffer;
+    const jsonRaw = fitDecoder.fit2json(buffer);
+    const json = fitDecoder.parseRecords(jsonRaw);
+    const records = json.records;
+    const sanitised = jsonFitSanitise(records);
+    return sanitised;
+  } catch (error) {
+    console.log(error);
+    return error;
+  }
+}
+
+async function getGarminDetailedActivity(userDoc, activityDoc) {
+  try {
+    const url = "https://apis.garmin.com/wellness-api/rest/activityDetails";
+    const devId = userDoc["devId"];
+    const secretLookup = await db.collection("developers").doc(devId).get();
+    const lookup = await secretLookup.data()["secret_lookup"];
+    const consumerSecret = configurations[lookup]["consumerSecret"];
+    const oAuthConsumerSecret = configurations[lookup]["oauth_consumer_key"];
+    let startTime = activityDoc["startTimeInSeconds"];
+    const endTime = startTime + 7*24*60*60;
+    const activityId = activityDoc["activityId"];
+    startTime += activityDoc["durationInSeconds"];
+    let activity;
+    while (activity == undefined && startTime < endTime) {
+      const options = await encodeparams.garminCallOptions(url, "GET", consumerSecret, oAuthConsumerSecret, userDoc["garmin_access_token"], userDoc["garmin_access_token_secret"], {from: startTime, to: startTime+24*60*60});
+      const response = await got.get(options);
+      const activityList = JSON.parse(response.body);
+      for (const _activity in activityList) {
+        if (activityList[_activity]["activityId"] == activityId) {
+          activity = garminDetailedSanitise(activityList[_activity]);
+          return activity;
+        }
+      }
+      startTime += 24*60*60;
+    }
+    // let currentActivityList = await got.get(options);
+  } catch (error) {
+    console.log(error);
+    return error;
+  }
+}
+
+function garminDetailedSanitise(activity) {
+  const type = activity["summary"]["activityType"];
+  let cadence;
+  let aveCadence;
+  if (type == "RUNNING") {
+    cadence = "stepsPerMinute";
+    aveCadence = "averageRunCadenceInStepsPerMinute";
+  } else if (type == "CYCLING") {
+    cadence = "bikeCadenceInRPM";
+    aveCadence ="averageBikeCadenceInRPM";
+  }
+  const timerSamples = [];
+  const timestampSamples = [];
+  const temperatureSamples = [];
+  const distanceSamples = [];
+  const powerSamples = [];
+  const heartRateSamples = [];
+  const speedSamples = [];
+  const altitudeSamples = [];
+  const positionSamples = [];
+  const gradientSamples = [];
+  const calorieSamples = [];
+  const cadenceSamples = [];
+  const acentSamples = [];
+  const decentSamples = [];
+  activity["samples"].forEach((sample) => {
+    timestampSamples.push((new Date(sample["startTimeInSeconds"]*1000)).toISOString());
+    timerSamples.push(sample["timerDurationInSeconds"]);
+    temperatureSamples.push(sample["airTemperatureCelcius"]);
+    distanceSamples.push(sample["totalDistanceInMeters"]);
+    powerSamples.push(sample["powerInWatts"]);
+    heartRateSamples.push(sample["heartRate"]);
+    speedSamples.push(sample["speedMetersPerSecond"]);
+    altitudeSamples.push(sample["elevationInMeters"]);
+    positionSamples.push({"latitude": sample["latitudeInDegree"], "longitude": sample["longitudeInDegree"]});
+    gradientSamples.push(sample["grade"]);
+    calorieSamples.push(sample["calories"]);
+    cadenceSamples.push(sample[cadence]);
+    acentSamples.push(sample["acent"]);
+    decentSamples.push(sample["decent"]);
+  });
+  const sanitisedData = {
+    "summary": {
+      "start_time": (new Date(activity["summary"]["startTimeInSeconds"]*1000)).toISOString(),
+      "total_elapsed_time": null,
+      "activity_duration": activity["summary"]["durationInSeconds"],
+      "avg_speed": activity["summary"]["averageSpeedInMetersPerSecond"],
+      "max_speed": activity["summary"]["maxSpeedInMetersPerSecond"],
+      "distance": activity["summary"]["distanceInMeters"],
+      "min_heart_rate": null,
+      "avg_heart_rate": activity["summary"]["averageHeartRateInBeatsPerMinute"],
+      "max_heart_rate": activity["summary"]["maxHeartRateInBeatsPerMinute"],
+      "min_altitude": null,
+      "avg_altitude": null,
+      "max_altitude": null,
+      "max_neg_grade": null,
+      "avg_grade": null,
+      "max_pos_grade": null,
+      "active_calories": activity["summary"]["activeKilocalories"],
+      "avg_temperature": null,
+      "max_temperature": null,
+      "elevation_gain": activity["summary"]["totalElevationGainInMeters"],
+      "elevation_loss": activity["summary"]["totalElevationLossInMeters"],
+      "activity_type": activity["summary"]["activityType"],
+      "num_laps": null,
+      "threshold_power": null,
+    },
+    "samples": {
+      "timestampSamples": timestampSamples,
+      "distanceSamples": distanceSamples,
+      "powerSamples": powerSamples,
+      "heartRateSamples": heartRateSamples,
+      "speedSamples": speedSamples,
+      "altitudeSamples": altitudeSamples,
+      "positionSamples": positionSamples,
+      "gradientSamples": gradientSamples,
+      "calorieSamples": calorieSamples,
+      "cadenceSamples": cadenceSamples,
+      "acentSamples": acentSamples,
+      "decentSamples": decentSamples,
+      "timerSamples": timerSamples,
+    },
+  };
+  for (const prop in sanitisedData["samples"]) {
+    if (Object.prototype.hasOwnProperty.call(sanitisedData["samples"], prop)) {
+      /* let initValue = sanitisedData["samples"][prop].find((element) => element != undefined && element != [undefined, undefined]);
+      if (initValue == undefined) {
+        initValue = null;
+      } */
+      for (let i=0; i<sanitisedData["samples"][prop].length; i++) {
+        if (sanitisedData["samples"][prop][i] == undefined) {
+          sanitisedData["samples"][prop][i] = null;
+        } if (sanitisedData["samples"][prop][i] == [undefined, undefined]) {
+          sanitisedData["samples"][prop][i] = [null, null];
+        }
+      }
+    }
+  }
+  return sanitisedData;
+}
+
+function jsonFitSanitise(jsonRecords) {
   const records = jsonRecords.filter((element) => element["type"] == "record");
   let summary = jsonRecords.filter((element) => element["type"] == "session");
   const events = jsonRecords.filter((element) => element["data"]["event"] == "timer");
@@ -1927,42 +2387,41 @@ function jsonSanitise(jsonRecords) {
   const decentSamples = [];
   const sanitisedData = {
     "summary": {
-      "start_time": null,
-      "total_elapsed_time": null,
-      "total_timer_time": null,
-      "avg_speed": null,
-      "max_speed": null,
-      "total_distance": null,
-      "min_heart_rate": null,
-      "avg_heart_rate": null,
-      "max_heart_rate": null,
-      "min_altitude": null,
-      "avg_altitude": null,
-      "max_altitude": null,
-      "max_neg_grade": null,
-      "avg_grade": null,
-      "max_pos_grade": null,
-      "total_calories": null,
-      "avg_temperature": null,
-      "max_temperature": null,
-      "total_ascent": null,
-      "total_descent": null,
-      "sport": null,
-      "num_laps": null,
-      "threshold_power": null,
-      "workout_type": null,
+      "start_time": (summary["start_time"]).toISOString(),
+      "total_elapsed_time": summary["total_elapsed_time"],
+      "activity_duration": summary["total_timer_time"],
+      "avg_speed": summary["avg_speed"],
+      "max_speed": summary["max_speed"],
+      "distance": summary["total_distance"],
+      "min_heart_rate": summary["min_heart_rate"],
+      "avg_heart_rate": summary["avg_heart_rate"],
+      "max_heart_rate": summary["max_heart_rate"],
+      "min_altitude": summary["min_altitude"],
+      "avg_altitude": summary["avg_altitude"],
+      "max_altitude": summary["max_altitude"],
+      "max_negative_grade": summary["max_neg_grade"],
+      "avg_grade": summary["avg_grade"],
+      "max_positive_grade": summary["max_pos_grade"],
+      "active_calories": summary["total_calories"],
+      "avg_temperature": summary["avg_temperature"],
+      "max_temperature": summary["max_temperature"],
+      "elevation_gain": summary["total_ascent"],
+      "elevation_loss": summary["total_descent"],
+      "activity_type": summary["sport"],
+      "num_laps": summary["num_laps"],
+      "threshold_power": summary["threshold_power"],
     },
   };
   // assign arrays
   records.forEach((_record) => {
     const record = _record["data"];
-    timestampSamples.push(record["timestamp"]);
+    timestampSamples.push((record["timestamp"]).toISOString());
     distanceSamples.push(record["distance"]);
     powerSamples.push(record["power"]);
     heartRateSamples.push(record["heart_rate"]);
     speedSamples.push(record["speed"]);
     altitudeSamples.push(record["altitude"]);
-    positionSamples.push([record["position_lat"], record["position_long"]]);
+    positionSamples.push({"latitude": record["position_lat"], "longitude": record["position_long"]});
     gradientSamples.push(record["grade"]);
     calorieSamples.push(record["calories"]);
     cadenceSamples.push(record["cadence"]);
@@ -1987,15 +2446,21 @@ function jsonSanitise(jsonRecords) {
   // remove undefined samples
   for (const prop in sanitisedData["samples"]) {
     if (Object.prototype.hasOwnProperty.call(sanitisedData["samples"], prop)) {
-      let initValue = sanitisedData["samples"][prop].find((element) => element != undefined);
+      /* let initValue = sanitisedData["samples"][prop].find((element) => element != undefined);
       if (initValue == undefined) {
         initValue = null;
-      }
+      } */
       for (let i=0; i<sanitisedData["samples"][prop].length; i++) {
-        if (sanitisedData["samples"][prop][i] != undefined) {
-          break;
+        if (sanitisedData["samples"][prop][i] == undefined) {
+          sanitisedData["samples"][prop][i] = null;
+        } if (prop == "positionSamples") {
+          if (sanitisedData["samples"][prop][i]["latitude"] == undefined) {
+            sanitisedData["samples"][prop][i]["latitude"] = null;
+          }
+          if (sanitisedData["samples"][prop][i]["longitude"] == undefined) {
+            sanitisedData["samples"][prop][i]["longitude"] = null;
+          }
         }
-        sanitisedData["samples"][prop][i] = initValue;
       }
     }
   }
@@ -2020,100 +2485,23 @@ function jsonSanitise(jsonRecords) {
       index += 1;
     }
   }
-  sanitisedData["samples"]["timerSamples"] = timerSamples;
-  // assign summary data
-  for (const prop in sanitisedData["summary"]) {
-    if (Object.prototype.hasOwnProperty.call(sanitisedData["summary"], prop)) {
-      sanitisedData["summary"][prop] = summary[prop];
-    }
-  }
   return sanitisedData;
 }
 
-exports.getDetailedActivity = functions.https.onRequest(async (req, res) => {
-  const devId = req.body["devId"];
-  const devKey = req.body["devKey"];
-  const userId = req.body["userId"];
-  const activityId = req.body["activityId"];
-  const userPath = db.collection("users").doc(userId);
-  let userDoc;
-  let activityDoc;
+async function getDetailedActivity(userDoc, activityDoc, source) {
+  // activityDoc is just the raw doc
   let sanitisedDetailedActivity;
-
-  // firt, checking the devId and devKey
-  if (devId != null) {
-    await db.collection("developers").doc(devId).get()
-        .then((docSnapshot) => {
-          if (docSnapshot.exists) {
-            if (docSnapshot.data().devKey != devKey || devKey == null) {
-              res.status(400);
-              res.send("error: the developerId was badly formatted, missing or not authorised");
-              return;
-            }
-          } else {
-            res.status(400);
-            res.send("error: the developerId was badly formatted, missing or not authorised");
-            return;
-          }
-        });
-  } else {
-    res.status(400);
-    res.send("error: the developerId parameter is missing");
-    return;
+  if (source == "strava") {
+    sanitisedDetailedActivity = await getStravaDetailedActivity(userDoc, activityDoc);
+  } else if (source == "polar") {
+    sanitisedDetailedActivity = await getPolarDetailedActivity(userDoc, activityDoc);
+  } else if (source == "wahoo") {
+    sanitisedDetailedActivity = await getWahooDetailedActivity(userDoc, activityDoc);
+  } else if (source == "garmin") {
+    sanitisedDetailedActivity = await getGarminDetailedActivity(userDoc, activityDoc);
   }
-
-  // checking the userId is valid and matches the devId
-  if (userId != null) {
-    await userPath.get()
-        .then((docSnapshot) => {
-          if (docSnapshot.exists) {
-            if (docSnapshot.data().devId != devId) {
-              res.status(400);
-              res.send("error: the userId was badly formatted, missing or nor authorised");
-              return;
-            }
-            userDoc = docSnapshot.data();
-          } else {
-            res.status(400);
-            res.send("error: the userId was badly formatted, missing or nor authorised");
-            return;
-          }
-        });
-  } else {
-    res.status(400);
-    res.send("error: the userId parameter is missing");
-    return;
-  }
-
-  // now check activity exist and get the detailed activity
-  if (activityId != null) {
-    await userPath.collection("activities").doc(activityId).get()
-        .then(async (docSnapshot) => {
-          if (docSnapshot.exists) {
-            activityDoc = docSnapshot.data();
-            const source = activityDoc["sanitised"]["provider"];
-            if (source == "strava") {
-              sanitisedDetailedActivity = await getStravaDetailedActivity(userDoc, activityDoc);
-            } else if (source == "polar") {
-              sanitisedDetailedActivity = await getPolarDetailedActivity(userDoc, activityDoc);
-            } else if (source == "wahoo") {
-              sanitisedDetailedActivity = await getWahooDetailedActivity(userDoc, activityDoc);
-            }
-            // based on source, get detailed activity
-          } else {
-            res.status(400);
-            res.send("error: the activity requested does not exist");
-          }
-        });
-  } else {
-    res.status(400);
-    res.send("error: the activityId parameter is missing");
-    return;
-  }
-  res.status(200);
-  res.send("Complete");
   return sanitisedDetailedActivity;
-});
+}
 
 exports.createNotionLink = functions.https.onRequest(async (req, res) => {
   const databaseId = (Url.parse(req.url, true).query)["databaseId"];
@@ -2138,6 +2526,57 @@ exports.createNotionLink = functions.https.onRequest(async (req, res) => {
   // redirect the user to connectService with new dev and user credentials.
   res.redirect("/connectService?userId=notion"+"&devId="+databaseId+"&provider="+provider+"&devKey="+key);
 });
+exports.processGetHistoryInBox = functions.firestore
+    .document("getHistoryInBox/{docId}")
+    .onCreate(async (snap, context) => {
+      console.log("processing getHistory inbox written to... with doc: "+snap.id);
+      const provider = snap.data()["provider"];
+      const userDocId = snap.data()["userDocId"];
+      const providersConnected = {};
+      providersConnected[provider] = true;
+      const start = new Date(Date.now());
+      const end = new Date(Date.now() - 30*24*60*60*1000);
+      // return without processing if the configuration is set to
+      // switch the process off
+      if (configurations.InBoxRealTimeCheck == true) {
+        const historyInBoxConfig = await db
+            .collection("realTimeConfigs")
+            .doc("historyInBox")
+            .get();
+        if (historyInBoxConfig.exists) {
+          if (historyInBoxConfig.data()["off"]) {
+            return; // no processing should be done
+          }
+        } else {
+          // if the realTimeConfigs is not set up then carry
+          // on as normal
+        }
+      }
+      try {
+        const userDoc = await db.collection("users")
+            .doc(userDocId)
+            .get();
+        if (!userDoc.exists) {
+          throw Error("userDocument does not exist when trying to get "+provider+" History!");
+        }
+        const payload =
+          await requestForDateRange(
+              providersConnected,
+              userDoc,
+              start,
+              end);
+        // write the docs into the database and send to the developer.
+        for (let i = 0; i < payload.length; i++) {
+          await saveAndSendActivity(userDoc,
+              payload[i].sanitised,
+              payload[i].raw);
+        }
+        getHistoryInBox.delete(snap.ref);
+      } catch (error) {
+        getHistoryInBox.writeError(snap.ref, error);
+      }
+      return;
+    });
 
 async function polarWebhookUtility(devId, action, webhookId) {
   const secretLookup = await db.collection("developers").doc(devId).get();
@@ -2236,7 +2675,6 @@ async function oauthCallbackHandlerGarmin(oAuthCallback, transactionData) {
       "garmin_user_id": garminUserId,
     };
     await db.collection("users").doc(userDocId).set(firestoreParameters, {merge: true});
-
     return true;
   }
 }
@@ -2260,6 +2698,8 @@ async function stravaTokenStorage(userDocId, data, db) {
     "strava_connected": true,
   };
   await db.collection("users").doc(userDocId).set(parameters, {merge: true});
+  // TODO the access token needs to update all users with the old access code
+  // and strava user id
 }
 async function getGarminUserId(consumerSecret, oauthConsumerKey, garminAccessToken, garminAccessTokenSecret) {
   let garminUserId = "";

@@ -76,6 +76,7 @@ describe('ROVE full integration test scripts', () => {
     require ('./test-modules/webhooks-Strava.test.js');
     require ('./test-modules/webhooks-Garmin.test.js');
     require ('./test-modules/webhooks-Polar.test.js');
+    require ('./test-modules/sendActivityToDeveloper.test');
     require ('./test-modules/utility.test.js');
     require ('./test-modules/disconnectServiceFailure.test.js');
     require ('./test-modules/wahooDisconnect.test.js');
@@ -84,5 +85,9 @@ describe('ROVE full integration test scripts', () => {
     require ('./test-modules/garminDisconnect.test.js');
     require ('./test-modules/notion.test.js');
     require ('./test-modules/getActivityList.test.js');
-    require ('./test-modules/getDetailedActivity.test.js')
+    // add this back in when detailed activity option is needed
+    // require ('./test-modules/getDetailedActivity.test.js');
+    require ('./test-modules/corosCallback.test');
+    require ('./test-modules/webhooks-Coros.test');
+    require ('./test-modules/corosDisconnect.test');
 });

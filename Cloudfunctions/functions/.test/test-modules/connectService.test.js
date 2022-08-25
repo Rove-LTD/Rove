@@ -29,6 +29,8 @@ const myFunctions = require('../../index.js');
 // name as in the function we are testing
 const got = require('got');
 const { doesNotMatch } = require('assert');
+const { deleteBlock } = require('@notionhq/client/build/src/api-endpoints');
+const { database } = require('firebase-functions/v1/firestore');
 // ------------------------END OF STUB FUNCTIONS----------------------------//
 
 // --------------START CONNECTSERVICE TESTS----------------------------------//
@@ -139,7 +141,7 @@ describe("Testing that the developer can call API to connectService() and receiv
       await myFunctions.connectService(req, res);
       // check the stubbed function was called with the correct arguments
       calledWith = stubbedcall.args[0].toString();
-      assert.include(calledWith, "https://connectapi.garmin.com/oauth-service/oauth/request_token?oauth_consumer_key=eb0a9a22-db68-4188-a913-77ee997924a8&oauth_nonce=" );
+      assert.include(calledWith, "https://connectapi.garmin.com/oauth-service/oauth/request_token?oauth_consumer_key=d3dd1cc9-06b2-4b3e-9eb4-8a40cbd8e53f&oauth_nonce=" );
       assert.include(calledWith, "&oauth_signature_method=HMAC-SHA1&oauth_timestamp=");
       assert.include(calledWith, "&oauth_signature=");
       assert.include(calledWith, "&oauth_version=1.0");
@@ -162,6 +164,20 @@ describe("Testing that the developer can call API to connectService() and receiv
       await myFunctions.connectService(req, res);
 
   })
+  it('should get a properly formatted Coros redirect url...', async () => {
+    // set the request object with the correct provider, developerId and userId
+    const req = {url: 'https://us-central1-rovetest-beea7.cloudfunctions.net/connectService?devId='+testDev+'&userId='+testUser+'&devKey=test-key&provider=coros&isRedirect=true'};
+    // set the assertions for the expected response object
+    const res = {
+      redirect: (url) => {
+            assert.include(url, "https://open.coros.com/oauth2/authorize?client_id=e8925760066a490b9d26187f731020f8&response_type=code&redirect_uri=https://us-central1-rovetest-beea7.cloudfunctions.net/corosCallback&state=");
+            recievedPolarUrl = url;
+        },
+    }
+
+    await myFunctions.connectService(req, res);
+
+}),
 
   it('should get a properly formatted wahoo redirect url...', async () => {
       // set the request object with the correct provider, developerId and userId
@@ -202,6 +218,6 @@ describe("Testing that the developer can call API to connectService() and receiv
     const req = {url: 'https://rovetest-beea7.web.app?transactionId=testTransactionId&devId='+testDev+'&devKey=test-key&provider=wahoo'};
     // set the assertions for the expected response object
     const response = await got(req);
-    assert.equal(response.body, htmlPage);
+    assert.equal(response.body, htmlPage.toString());
   });
 });
