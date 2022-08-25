@@ -18,7 +18,7 @@ const got = require("got");
 const request = require("request");
 const stravaApi = require("strava-v3");
 const OauthWahoo = require("./oauthWahoo");
-const OauthFitbit = require("./oauthFitbit");
+const oauthFitbit = require("./oauthFitbit");
 const contentsOfDotEnvFile = require("./config.json");
 const filters = require("./data-filter");
 const fs = require("fs");
@@ -97,7 +97,7 @@ exports.connectService = functions.https.onRequest(async (req, res) => {
     res.send(url);
     return;
   }
-  const providers = ["strava", "garmin", "polar", "wahoo", "coros"];
+  const providers = ["strava", "garmin", "polar", "wahoo", "coros", "fitbit"];
   if (providers.includes(parameters.provider) == false) {
     url = "error: the provider was badly formatted, missing or not supported";
     res.status(400);
@@ -125,6 +125,8 @@ exports.connectService = functions.https.onRequest(async (req, res) => {
     url = await polarOauth(parameters, transactionId);
   } else if (parameters.provider == "wahoo") {
     url = await wahooOauth(parameters, transactionId);
+  } else if (parameters.provider == "fitbit") {
+    url = await fitbitOauth(parameters, transactionId);
   } else if (parameters.provider == "coros") {
     url = await corosOauth(parameters, transactionId);
   } else {
@@ -220,11 +222,12 @@ exports.getActivityList = functions.https.onRequest(async (req, res) => {
     return;
   }
   // now we need to make a request to the user's authenticated services.
-  const providersConnected = {"polar": false, "garmin": false, "strava": false, "wahoo": false};
+  const providersConnected = {"polar": false, "garmin": false, "strava": false, "wahoo": false, "fibit": false};
   providersConnected["polar"] = userDoc.data().hasOwnProperty("polar_user_id");
   providersConnected["garmin"] = userDoc.data().hasOwnProperty("garmin_access_token");
   providersConnected["wahoo"] = userDoc.data().hasOwnProperty("wahoo_user_id");
   providersConnected["strava"] = userDoc.data().hasOwnProperty("strava_id");
+  providersConnected["fitbit"] = userDoc.data().hasOwnProperty("fibit_user_id");
   // make the request for the services which are authenticated by the user
   try {
     const payload = await requestForDateRange(providersConnected, userDoc, start, end);
@@ -267,6 +270,10 @@ async function requestForDateRange(providers, userDoc, start, end) {
     numOfProviders ++;
     activtyList = activtyList.concat(getPolarActivityList(start, end, userDoc));
   }
+  if (providers["fitbit"]) {
+    numOfProviders ++;
+    activtyList = activtyList.concat(getFitbitActivityList(start, end, userDoc));
+  }
   try {
     let returnList = await Promise.all(activtyList);
     returnList = returnList.flat();
@@ -275,6 +282,35 @@ async function requestForDateRange(providers, userDoc, start, end) {
     throw err;
   }
 }
+
+async function getFitbitActivityList(start, end, userDoc) {
+  try {
+    const accessToken = await oauthFitbit.getUserToken(userDoc);
+    const options = oauthFitbit.registerUserOptions(userDoc);
+    const paramStart = new Date(1000 * start);
+    const paramEnd = new Date(1000 * end);
+    options["url"] += "?afterDate="+start.getFullYear()+"-"+start.getMonth()+"-"+start.getUTCDate()+"&beforeDate="+end.getFullYear()+"-"+end.getMonth()+"-"+end.getUTCDate()+"&sort=asc&limit=100&offset=0";
+    let activityList =await got.get(options);
+    activityList = JSON.parse(activityList.body);
+    if (activityList.hasOwnProperty("activities")) {
+      // sanitise
+      const sanitisedList = [];
+      for (let i = 0; i<activityList.activities.length; i++) {
+        // check activity is not auto detected garbage
+        if (!(activityList.workouts[i]["logType"]=="auto_detected")) {
+          sanitisedList.push({"raw": activityList.workouts[i], "sanitised": filters.fitbitSanitise(activityList.workouts[i])});
+        }
+      }
+      return sanitisedList;
+    }
+  } catch (error) {
+    if (error == 401) { // unauthorised
+      // consider refreshing the access code and trying again
+    }
+    return 400;
+  }
+}
+
 async function getWahooActivityList(start, end, userDoc) {
   try {
     const accessToken = await oauthWahoo.getUserToken(userDoc);
@@ -1419,6 +1455,31 @@ async function polarStoreTokens(userId, devId, data, db) {
   // write resultant message to dev endpoint.
   return;
 }
+
+async function fitbitOauth(transactionData, transactionId) {
+  const userId= transactionData.userId;
+  const devId = transactionData.devId;
+
+  await oauthFitbit.setDevUser(transactionData, transactionId);
+  return oauthFitbit.redirectUrl;
+}
+
+exports.fitbitCallback = functions.https.onRequest(async (req, res) => {
+  // recreate the oauth object that is managing the Oauth flow
+  const transactionId = (Url.parse(req.url, true).query)["state"];
+  const transactionData = await getParametersFromTransactionId(transactionId);
+  const data = Url.parse(req.url, true).query;
+  await oauthFitbit.fromCallbackData(data, transactionData);
+  if (oauthFitbit.status.gotCode) {
+    await oauthFitbit.getAndSaveAccessCodes();
+  }
+  if (!oauthFitbit.error) {
+    const urlString = await successDevCallback(transactionData);
+    res.redirect(urlString);
+  } else {
+    res.send(oauthFitbit.errorMessage);
+  }
+});
 
 async function wahooOauth(transactionData, transactionId) {
   const userId = transactionData.userId;

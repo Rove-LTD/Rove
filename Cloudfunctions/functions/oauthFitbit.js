@@ -263,15 +263,17 @@ class OauthFitbit {
     };
   }
   /**
+   *
+   * @param {FirebaseDocument} userDoc
    * @return {Object}
    */
-  get registerUserOptions() {
+  registerUserOptions(userDoc) {
     return {
-      url: "https://api.fitbit.com/1/user",
+      url: "https://api.fitbit.com/1/user/"+userDoc.data()["fitbit_user_id"]+"/activities/list.json",
       method: "GET",
       headers: {
         "Accept": "application/json",
-        "Authorization": "Bearer "+this.accessCodeResponse["access_token"],
+        "Authorization": "Bearer "+this.getUserToken(userDoc),
       },
     };
   }

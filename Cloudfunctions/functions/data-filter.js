@@ -40,7 +40,21 @@ class standard_format {
     let provider = null;
   }
 }
-
+  exports.fitbitSanitise = function(a) {
+    summaryActivity = {
+      // standard fields
+      "activity_id": a["activityTypeId"],
+      "activity_name": "Fibit " + a["activityName"],
+      "activity_type": "Run",
+      "distance_in_meters": a["distance"],
+      "active_calories": a["calories"],
+      "start_time": new Date(a["startTime"]).toISOString(),
+      "provider": "fitbit",
+      "average_pace_in_meters_per_second": (60*60*a["speed"])/1000,
+      "activity_duration_in_seconds": a["duration"],
+      "file": {"url": a["tcxLink"]}
+    }
+  }
   exports.corosSanatise = function (a) {
     summaryActivity = {
       // standard fields
