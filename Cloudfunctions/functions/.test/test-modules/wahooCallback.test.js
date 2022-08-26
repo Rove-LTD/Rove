@@ -119,7 +119,7 @@ describe("Testing that the Wahoo callbacks work: ", () => {
       .get();
       // check called with the right arguments
       accessCodeOptions =  {
-          url: 'https://api.wahooligan.com/oauth/token?code=testcode&client_id=iA2JRS_dBkikcb0uEnHPtb6IDt1vDYNbityEEhp801I&client_secret=w4FvDllcO0zYrnV1-VKR-T2gJ4mYUOiFJuwx-8C-C2I&grant_type=authorization_code&redirect_uri=https://us-central1-rovetest-beea7.cloudfunctions.net/wahooCallback?state=wahooTestTransaction',
+          url: 'https://api.wahooligan.com/oauth/token?code=testcode&client_id=qxclu_dyEMRbBE1Wh9C2OhWQKmU_5NQe0SajXAwRDmw&client_secret=JGnTbc52jW13a3Xey92Tot3ZxnPPB1ckrhrt_R8nS5g&grant_type=authorization_code&redirect_uri=https://us-central1-rovetest-beea7.cloudfunctions.net/wahooCallback?state=wahooTestTransaction',
           method: 'POST',
           headers: {
             "Content-Type": 'application/json',

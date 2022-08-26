@@ -7,8 +7,8 @@
       "oauth_consumer_key": "d3dd1cc9-06b2-4b3e-9eb4-8a40cbd8e53f",
       "polarClientId": "654623e7-7191-4cfe-aab5-0bc24785fdee",
       "polarSecret": "f797c0e1-a39d-4b48-a2d9-89c2baea9005",
-      "whaooClientId": "iA2JRS_dBkikcb0uEnHPtb6IDt1vDYNbityEEhp801I",
-      "wahooSecret": "w4FvDllcO0zYrnV1-VKR-T2gJ4mYUOiFJuwx-8C-C2I",
+      "whaooClientId": "qxclu_dyEMRbBE1Wh9C2OhWQKmU_5NQe0SajXAwRDmw",
+      "wahooSecret": "JGnTbc52jW13a3Xey92Tot3ZxnPPB1ckrhrt_R8nS5g",
       "corosClientId": "e8925760066a490b9d26187f731020f8",
       "corosSecret": "3fec831e956045db9ec000d2083fa056"
     },
@@ -21,6 +21,10 @@
       "polarSecret": "42b1eed7-108c-4ab6-b090-b21e42f1dca1",
       "corosClientId": "e8925760066a490b9d26187f731020f8",
       "corosSecret": "3fec831e956045db9ec000d2083fa056"
+    },
+    "rovePreproductionSecrets": {
+      "whaooClientId": "iA2JRS_dBkikcb0uEnHPtb6IDt1vDYNbityEEhp801I",
+      "wahooSecret": "w4FvDllcO0zYrnV1-VKR-T2gJ4mYUOiFJuwx-8C-C2I"
     },
     "stravaSubscriptions": {
       "217520": {
@@ -38,11 +42,14 @@
       }
     },
     "wahooWebhookTokens": {
+      "396ff7e3-ece2-4f99-ad3b-97277fe7fe6f": {
+        "secret_lookup": "roveLiveSecrets"
+      },
       "348a6fe2-3719-4647-a233-933b8c404d6b": {
         "secret_lookup": "roveTestSecrets"
       },
       "97661c16-6359-4854-9498-a49c07b6ec11": {
-        "secret_lookup": "roveLiveSecrets"
+        "secret_lookup": "rovePreproductionSecrets"
       }
     }
   }
