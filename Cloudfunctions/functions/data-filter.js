@@ -56,7 +56,7 @@ class standard_format {
           (1/(a["avgSpeed"])*1000) :
           0),
       "activity_duration_in_seconds": a["duration"],
-      "file": a["fitUrl"]
+      "file": {"url": a["fitUrl"] ?? null}
     }
     for (const property in summaryActivity) {
       if (typeof summaryActivity[property] == "undefined") {
@@ -377,7 +377,7 @@ exports.wahooSanitise = function (activity) {
     "created_at": activity.workout_summary.created_at,
     "updated_at": activity.workout_summary.updated_at,
     "power_avg": activity.workout_summary.power_avg,
-    "file": activity.workout_summary.file ?? "",
+    "file": {"url": activity.workout_summary.file ?? ""},
     "version": "1.0",
     };
   } else if (activity.hasOwnProperty("workout_summary")) {
@@ -406,7 +406,7 @@ exports.wahooSanitise = function (activity) {
       "created_at": activity.workout_summary.created_at,
       "updated_at": activity.workout_summary.updated_at,
       "power_avg": activity.workout_summary.power_avg,
-      "file": activity.workout_summary.files[0].url ?? "",
+      "file": {"url": activity.workout_summary.files[0].url ?? ""},
       "version": "1.0",
       };}
   } else {
