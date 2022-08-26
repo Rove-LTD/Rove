@@ -80,6 +80,7 @@ const webhookInBox = require('../../webhookInBox');
     // check the got function was called with the correct options
     // check the wahoo fields were deleted from the database
     // check the wahoo activities were deleted from the database only for this user
+    const args = stubbedWebhookInBox.getCall(0);
     assert(stubbedWebhookInBox.calledWithExactly(req, "strava","roveLiveSecrets"), "wrong arguments in call");
 
     sinon.restore();

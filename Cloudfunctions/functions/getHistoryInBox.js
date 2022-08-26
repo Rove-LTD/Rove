@@ -8,6 +8,7 @@ const getHistoryInBox = {
     const webhookDoc = db.collection("getHistoryInBox").doc();
     /* await webhookDoc
         .set({
+          timestamp: new Date().toISOString(),
           provider: provider,
           userDocId: userDocId,
         }); */

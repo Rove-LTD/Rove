@@ -1453,7 +1453,7 @@ exports.wahooCallback = functions.https.onRequest(async (req, res) => {
 });
 
 exports.corosWebhook = functions.https.onRequest(async (request, response) => {
-  const webhookDoc = await webhookInBox.push(request, "wahoo", "roveLiveSecrets");
+  const webhookDoc = await webhookInBox.push(request, "coros", "roveLiveSecrets");
   response.status(200);
   response.send();
 });
