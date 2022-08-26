@@ -35,7 +35,7 @@ const corosPush = JSON.stringify(require("./coros.json"));
 const got = require('got');
 const webhookInBox = require('../../webhookInBox');
 //-------------TEST --- webhooks-------
-describe("Testing that the Coros Webhooks work: ", () => {
+describe.only("Testing that the Coros Webhooks work: ", () => {
     before ('set up the userIds in the test User doc', async () => {
       await admin.firestore()
       .collection("users")
@@ -103,7 +103,7 @@ describe("Testing that the Coros Webhooks work: ", () => {
     assert(stubbedWebhookInBox.calledOnceWith(req, "coros", "roveTestSecrets"),
             "webhookInBox called with wrong args: "+args);*/
     });
-    it('read webhookInBox event and process it successfully...', async () => {
+    it.only('read webhookInBox event and process it successfully...', async () => {
 
         const snapshot = test.firestore.makeDocumentSnapshot(successfulWebhookMessage, "webhookInBox/"+successfulWebhookMessageDoc);
 
@@ -146,7 +146,7 @@ describe("Testing that the Coros Webhooks work: ", () => {
                 "activity_type": 1,
                 "average_pace_in_meters_per_second": 0,
                 "distance_in_meters": 22000,
-                "file": null,
+                "file": {"url": null},
                 "provider": "coros",
                 "start_time": "2018-04-01T09:49:38.000Z",
                 "userId": testParameters.testUser,
