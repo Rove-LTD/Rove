@@ -32,9 +32,11 @@ const stravaApi = require("strava-v3");
 const webhookInBox = require('../../webhookInBox');
 //-------------TEST 2--- Test Callbacks from Strava-------
  describe("Check the Strava Disconnect Service works: ", () => {
+  const now = new Date()/1000;
+  const tokenFutureExpiryDate = now+1000;
+  const tokenPastExpiryDate = now-1000;
   beforeEach(async () => {
     nowInSeconds = new Date()/1000
-    notExpiredDate = nowInSeconds+1000;
     await admin.firestore()
         .collection("users")
         .doc(testDev+testUser)
@@ -45,7 +47,7 @@ const webhookInBox = require('../../webhookInBox');
             "strava_connected": true,
             "strava_access_token": "4c68a65e19eb899b8f68aa21e760b074bf035a95",
             "strava_refresh_token": "78ba71c103106141ea7030ce60ff1ee3d599b7ba",
-            "strava_token_expires_at": notExpiredDate,
+            "strava_token_expires_at": tokenFutureExpiryDate,
             "strava_id": 12972711});
 
     await admin.firestore()
@@ -191,6 +193,80 @@ const webhookInBox = require('../../webhookInBox');
 
     sinon.restore();
   })
+  describe("test with the token expiry date in the past", ()=>{
+    beforeEach(async ()=> {
+      // set the expiry date for the token in the past
+      await admin.firestore()
+      .collection("users")
+      .doc(testDev+testUser)
+      .set({
+        "strava_token_expires_at": tokenPastExpiryDate
+        },
+        {merge: true});
+    });
+    it('Check that service succeeds if user authorised already and refresh code needed', async () => {
+
+      req = {
+        debug: true,
+        url: "https://ourDomain.com?devId="+testDev+"&userId="+testUser+"&provider=strava&devKey=test-key",
+      };
+      res = {
+        status: (code) => {
+          assert.equal(code, 200);
+        },
+        send: (message) => {
+          assert.equal(message, '')
+        }
+      }
+
+      // set up stubbed functions
+    // set up stubbed functions
+    testResponse = {
+      access_token: "test-strava-refreshed-access-token"
+    };
+    testResponseRefresh = {
+      access_token: 'test-strava-refreshed-access-token',
+      refresh_token: 'test-strava-new-refresh-token',
+      expires_at: tokenFutureExpiryDate,
+      expires_in: 7200
+    }
+
+      const stubbedGot = sinon.stub(stravaApi.oauth, "deauthorize");
+      const stubbedRefresh = sinon.stub(stravaApi.oauth, "refreshToken");
+      stubbedGot.onFirstCall().returns(testResponse);
+      stubbedRefresh.onFirstCall().returns(testResponseRefresh);
+      
+      await myFunctions.disconnectService(req, res);
+      // check the got function was called with the correct options
+      // check the wahoo fields were deleted from the database
+      // check the wahoo activities were deleted from the database only for this user
+      // got function call checks
+      //stubbedDelete.calledOnceWith("deleteArgs");
+      //stubbedPost.calledOnceWith("postArgs");
+      const userDoc = await admin.firestore()
+          .collection("users")
+          .doc(testDev+testUser)
+          .get();
+        
+      const activities = await admin.firestore()
+          .collection("users")
+          .doc(testDev+testUser)
+          .collection("activities")
+          .where("sanitised.provider","==","strava")
+          .get();
+      
+      const expectedUserResults = {
+        "devId": testDev,
+        "userId": testUser,
+        "email": "paul.userTest@gmail.com",
+      };
+      
+      assert.deepEqual(userDoc.data(), expectedUserResults);
+      assert.equal(activities.docs.length, 0);
+
+      sinon.restore();
+    });
+  });
   // etc...
 
 });//End TEST 2--- Test Callbacks for Strava--------------

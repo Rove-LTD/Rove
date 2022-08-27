@@ -57,7 +57,7 @@ class standard_format {
             (1/(a["avgSpeed"])*1000) :
             0),
         "activity_duration_in_seconds": a["duration"],
-        "file": a["fitUrl"]
+        "file": {"url": a["fitUrl"] ?? null}
       }
     } catch (err) {
       throw new Error("Cant sanitise message: "+err.message);

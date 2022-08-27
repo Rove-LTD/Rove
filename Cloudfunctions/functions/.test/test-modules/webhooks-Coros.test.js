@@ -146,7 +146,7 @@ describe("Testing that the Coros Webhooks work: ", () => {
                 "activity_type": 1,
                 "average_pace_in_meters_per_second": 0,
                 "distance_in_meters": 22000,
-                "file": null,
+                "file": {"url": null},
                 "provider": "coros",
                 "start_time": "2018-04-01T09:49:38.000Z",
                 "userId": testParameters.testUser,
