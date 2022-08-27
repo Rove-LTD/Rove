@@ -60,7 +60,7 @@ describe("Testing that the Coros Webhooks work: ", () => {
             provider: "coros",
             body: corosPush,
             method: "POST",
-            secret_lookup: "roveLiveSecrets",
+            secret_lookups: ["roveLiveSecrets"],
             status: "added before the tests to be successful",
         }
 
@@ -68,7 +68,7 @@ describe("Testing that the Coros Webhooks work: ", () => {
             provider: "coros",
             body: corosPush,
             method: "POST",
-            secret_lookup: "roveLiveSecrets",
+            secret_lookups: ["roveLiveSecrets"],
             status: "added before the tests to be unsuccessful",
         }
 

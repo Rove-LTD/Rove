@@ -80,7 +80,7 @@ const webhookInBox = require('../../webhookInBox');
     // check the got function was called with the correct options
     // check the wahoo fields were deleted from the database
     // check the wahoo activities were deleted from the database only for this user
-    assert(stubbedWebhookInBox.calledWithExactly(req, "strava","roveLiveSecrets"), "wrong arguments in call");
+    assert(stubbedWebhookInBox.calledWithExactly(req, "strava",["roveLiveSecrets","roveLiveSecretsGroup2"]), "wrong arguments in call");
 
     sinon.restore();
   })
@@ -102,7 +102,7 @@ const webhookInBox = require('../../webhookInBox');
       provider: "strava",
           status: "new",
           method: "POST",
-          secret_lookup: "roveLiveSecrets",
+          secret_lookups: ["roveLiveSecrets"],
           body: JSON.stringify({"owner_id":12972711,"object_type":"athlete","aspect_type":"update","subscription_id":217520,"object_id":12972711,"updates":{"authorized":"false"},"event_time":1656517720})
     };
     const snapshot = test.firestore.makeDocumentSnapshot(inboxData, "webhookInBox/testWebhookMessageDocId");

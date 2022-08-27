@@ -1060,8 +1060,8 @@ exports.garminWebhook = functions.https.onRequest(async (request, response) => {
   }
   if (request.method === "POST") {
     // check the webhook token is correct
-    const valid = true;
-    if (!valid) { // TODO put in validation function
+    const lookups = configurations["garminWebhookService"]["secret_lookups"];
+    if (lookups == undefined) { // TODO put in validation function
       console.log("Garmin Webhook event recieved that did not have the correct validation");
       response.status(401);
       response.send("NOT AUTHORISED");
@@ -1069,7 +1069,7 @@ exports.garminWebhook = functions.https.onRequest(async (request, response) => {
     }
     // save the webhook message and asynchronously process
     try {
-      const webhookDoc = await webhookInBox.push(request, "garmin");
+      const webhookDoc = await webhookInBox.push(request, "garmin", lookups);
       response.sendStatus(200);
       // now we have saved the request and returned ok to the provider
       // the message will trigger an asynchronous process
@@ -1453,7 +1453,14 @@ exports.wahooCallback = functions.https.onRequest(async (req, res) => {
 });
 
 exports.corosWebhook = functions.https.onRequest(async (request, response) => {
-  const webhookDoc = await webhookInBox.push(request, "wahoo", "roveLiveSecrets");
+  const lookups = configurations.corosWebhookService.secret_lookups;
+  if (lookups == undefined) { // TODO put in validation function
+    console.log("Coros Webhook event recieved that did not have the correct validation");
+    response.status(401);
+    response.send("NOT AUTHORISED");
+    return;
+  }
+  const webhookDoc = await webhookInBox.push(request, "coros", lookups);
   response.status(200);
   response.send();
 });
@@ -1499,7 +1506,7 @@ exports.stravaWebhook = functions.https.onRequest(async (request, response) => {
     // save the webhook message and asynchronously process
     try {
       const webhookDoc = await webhookInBox
-          .push(request, "strava", stravaWebhook["secret_lookup"]);
+          .push(request, "strava", stravaWebhook["secret_lookups"]);
       response.sendStatus(200);
       // now we have saved the request and returned ok to the provider
       // the message will trigger an asynchronous process
@@ -1515,13 +1522,13 @@ exports.stravaWebhook = functions.https.onRequest(async (request, response) => {
 
 async function processStravaWebhook(webhookDoc) {
   const webhookBody = JSON.parse(webhookDoc.data()["body"]);
-  const lookup = webhookDoc.data()["secret_lookup"];
+  const lookups = webhookDoc.data()["secret_lookups"];
   const userDocsList = [];
   const devDocsList = [];
 
   stravaApi.config({
-    "client_id": configurations[lookup]["stravaClientId"],
-    "client_secret": configurations[lookup]["stravaClientSecret"],
+    "client_id": configurations[lookups[0]]["stravaClientId"],
+    "client_secret": configurations[lookups[0]]["stravaClientSecret"],
     "redirect_uri": callbackBaseUrl+"/stravaCallback",
   });
   // get userbased on userid. (.where("id" == request.body.owner_id)).
@@ -1530,7 +1537,7 @@ async function processStravaWebhook(webhookDoc) {
     return; // TODO: put in delete logic
   }
   const devQuery = await db.collection("developers")
-      .where("secret_lookup", "==", lookup)
+      .where("secret_lookup", "in", lookups)
       .get();
   devQuery.docs.forEach((doc)=>{
     devDocsList.push(doc.id);
@@ -1621,7 +1628,7 @@ exports.wahooWebhook = functions.https.onRequest(async (request, response) => {
     // save the webhook message and asynchronously process
     try {
       const webhookDoc = await webhookInBox
-          .push(request, "wahoo", wahooWebhook["secret_lookup"]);
+          .push(request, "wahoo", wahooWebhook["secret_lookups"]);
       response.sendStatus(200);
       // now we have saved the request and returned ok to the provider
       // the message will trigger an asynchronous process
@@ -1684,12 +1691,12 @@ exports.processWebhookInBox = functions.firestore
     });
 async function processWahooWebhook(webhookDoc) {
   const webhookBody = JSON.parse(webhookDoc.data()["body"]);
-  const lookup = webhookDoc.data()["secret_lookup"];
+  const lookups = webhookDoc.data()["secret_lookups"];
   const userDocsList = [];
   const devDocsList = [];
 
   const devQuery = await db.collection("developers")
-      .where("secret_lookup", "==", lookup)
+      .where("secret_lookup", "in", lookups)
       .get();
   devQuery.docs.forEach((doc)=>{
     devDocsList.push(doc.id);
@@ -1731,12 +1738,12 @@ async function processWahooWebhook(webhookDoc) {
 
 async function processCorosWebhook(webhookDoc) {
   const webhookBody = JSON.parse(webhookDoc.data()["body"]);
-  const lookup = webhookDoc.data()["secret_lookup"];
+  const lookups = webhookDoc.data()["secret_lookups"];
   const userDocsList = [];
   const devDocsList = [];
 
   const devQuery = await db.collection("developers")
-      .where("secret_lookup", "==", lookup)
+      .where("secret_lookup", "in", lookups)
       .get();
   devQuery.docs.forEach((doc)=>{
     devDocsList.push(doc.id);
@@ -1790,12 +1797,12 @@ exports.polarWebhook = functions.https.onRequest(async (request, response) => {
   if (request.method === "POST") {
     // check the webhook token is correct
     const signature = request.headers["polar-webhook-signature"];
-    const lookup = encodeparams
+    const lookups = encodeparams
         .getLookupFromPolarSignature(
             request.rawBody,
             configurations.polarWebhookSecrets,
             signature);
-    if (lookup == "error") { // TODO put in validation function
+    if (lookups == "error") { // TODO put in validation function
       console.log("Polar Webhook event recieved that did not have a valid signature");
       response.status(401);
       response.send("NOT AUTHORISED");
@@ -1803,7 +1810,7 @@ exports.polarWebhook = functions.https.onRequest(async (request, response) => {
     }
     // save the webhook message and asynchronously process
     try {
-      const webhookDoc = await webhookInBox.push(request, "polar", lookup);
+      const webhookDoc = await webhookInBox.push(request, "polar", lookups);
       response.sendStatus(200);
       // now we have saved the request and returned ok to the provider
       // the message will trigger an asynchronous process
@@ -1823,7 +1830,7 @@ exports.polarWebhook = functions.https.onRequest(async (request, response) => {
 
 async function processPolarWebhook(webhookDoc) {
   const webhookBody = JSON.parse(webhookDoc.data()["body"]);
-  const lookup = webhookDoc.data()["secret_lookup"];
+  const lookups = webhookDoc.data()["secret_lookups"];
   if (webhookBody.event === "PING") {
     console.log("polar webhook message event = PING, do nothing");
     return;
@@ -1832,7 +1839,7 @@ async function processPolarWebhook(webhookDoc) {
   const devDocsList = [];
 
   const devQuery = await db.collection("developers")
-      .where("secret_lookup", "==", lookup)
+      .where("secret_lookup", "in", lookups)
       .get();
   devQuery.docs.forEach((doc)=>{
     devDocsList.push(doc.id);

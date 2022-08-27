@@ -114,18 +114,18 @@ module.exports = {
    */
   getLookupFromPolarSignature: function(rawBody, polarKeys, signature) {
     // eslint-disable-next-line require-jsdoc
-    let lookup = "";
+    let lookups;
     Object.keys(polarKeys).forEach(function(key) {
       const calculatedSignature = crypto
           .createHmac("sha256", key)
           .update(rawBody)
           .digest("hex");
       if (calculatedSignature == signature) {
-        lookup = polarKeys[key]["secret_lookup"];
+        lookups = polarKeys[key]["secret_lookups"];
         console.log("managed to match the polar signature");
       }
     });
-    if (lookup == "") {
+    if (lookups == undefined) {
       // default depending on the google project if
       // test use the test keys if live use the live keys
       // this is a temporary fix while we wait for Polar to explain exactly
@@ -133,16 +133,16 @@ module.exports = {
       console.log("polar signatures did not match - using defaults based on project");
       switch (process.env.GCLOUD_PROJECT) {
         case "rovetest-beea7":
-          lookup = "roveTestSecrets";
+          lookups = ["roveTestSecrets"];
           break;
         case "rove-26":
-          lookup = "roveLivesecrets";
+          lookups = ["roveLiveSecrets", "roveLiveSecretsGroup2"];
           break;
         default:
-          lookup = "error";
+          lookups = "error";
           break;
       }
     }
-    return lookup;
+    return lookups;
   },
 };

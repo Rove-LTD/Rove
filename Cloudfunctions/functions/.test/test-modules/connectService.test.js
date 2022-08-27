@@ -186,7 +186,7 @@ describe("Testing that the developer can call API to connectService() and receiv
       const res = {
         redirect: (url) => {
               assert.include(url, "https://api.wahooligan.com/oauth/authorize?");
-              assert.include(url, "client_id=qxclu_dyEMRbBE1Wh9C2OhWQKmU_5NQe0SajXAwRDmw");
+              assert.include(url, "client_id=iA2JRS_dBkikcb0uEnHPtb6IDt1vDYNbityEEhp801I");
               assert.include(url, "&redirect_uri=https://us-central1-rovetest-beea7.cloudfunctions.net/wahooCallback?state=");
           },
       }
