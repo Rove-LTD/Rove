@@ -568,7 +568,7 @@ async function deleteStravaActivity(userDoc, webhookCall) {
       if (await checkStravaTokens(userDoc.id, db) == true) {
         // token out of date, make request for new ones.
         const payload = await stravaApi.oauth.refreshToken(userDoc.data()["strava_refresh_token"]);
-        await stravaTokenStorage(userDoc.id, payload, db);
+        await stravaTokenStorage(userDoc.id, payload, accessToken, userDoc.data()["strava_id"]);
         accessToken = payload["access_token"];
       }
       const deAuthResponse = await stravaApi.oauth.deauthorize({"access_token": accessToken});
@@ -1569,7 +1569,7 @@ async function processStravaWebhook(webhookDoc) {
   if (await checkStravaTokens(userDocRef.id, db) == true) {
     // token out of date, make request for new ones.
     const payload = await stravaApi.oauth.refreshToken(userDocRef.data()["strava_refresh_token"]);
-    await stravaTokenStorage(userDocRef.id, payload, db);
+    await stravaTokenStorage(userDocRef.id, payload, stravaAccessToken, webhookBody.owner_id);
     const payloadAccessToken = payload["access_token"];
     if (webhookBody.aspect_type == "update") {
       // TODO process updates
@@ -2099,7 +2099,7 @@ async function getStravaDetailedActivity(userDoc, activityDoc) {
   if (await checkStravaTokens(userDoc["devId"]+userDoc["userId"], db) == true) {
     // token out of date, make request for new ones.
     const payload = await stravaApi.oauth.refreshToken(userDoc["strava_refresh_token"]);
-    await stravaTokenStorage(userDoc["devId"]+userDoc["userId"], payload, db);
+    await stravaTokenStorage(userDoc["devId"]+userDoc["userId"], payload, accessToken, userDoc["strava_id"]);
     accessToken = payload["access_token"];
   }
   const streamResponse = await stravaApi.streams.activity({"access_token": accessToken, "id": stravaActivityId, "types": ["time", "distance", "latlng", "altitude", "velocity_smooth", "heartrate", "cadence", "watts", "temp", "moving", "grade_smooth"], "key_by_type": true});
@@ -2696,7 +2696,7 @@ async function checkStravaTokens(userDocId, db) {
     return false;
   }
 }
-async function stravaTokenStorage(userDocId, data, db) {
+async function stravaTokenStorage(userDocId, data, originalAccessToken, usersStravaId) {
   const parameters = {
     "strava_access_token": data["access_token"],
     "strava_refresh_token": data["refresh_token"],
@@ -2704,6 +2704,11 @@ async function stravaTokenStorage(userDocId, data, db) {
     "strava_token_expires_in": data["expires_in"],
     "strava_connected": true,
   };
+  const usedDocs = await db.collection("users")
+      .where("strava_access_token", "==", originalAccessToken)
+      .where("strava_id", "==", usersStravaId)
+      .get();
+
   await db.collection("users").doc(userDocId).set(parameters, {merge: true});
   // TODO the access token needs to update all users with the old access code
   // and strava user id
