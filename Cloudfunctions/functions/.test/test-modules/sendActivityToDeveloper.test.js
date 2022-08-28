@@ -165,10 +165,8 @@ describe("Testing that sending webhook messages to developers work: ", () => {
        // expected results
        activityDoc1.status = "sent";
        activityDoc1.timestamp = "not tested";
-       activityDoc1.triesSoFar = "not tested";
+       activityDoc1.triesSoFar = 1;
 
-      sanatisedActivity.timestamp = "not tested";
-      sanatisedActivity.triesSoFar = "not tested";
       assert.deepEqual(sanatisedActivity, activityDoc1);
       sinon.restore();
     })

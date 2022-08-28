@@ -43,20 +43,24 @@ class standard_format {
 }
 
   exports.corosSanatise = function (a) {
-    summaryActivity = {
-      // standard fields
-      "activity_id": a["labelId"],
-      "activity_name": "Coros " + corosSportLookup[a.mode][0],
-      "activity_type": corosSportLookup[a.mode][1],
-      "distance_in_meters": a["distance"],
-      "active_calories": a["calorie"],
-      "start_time": new Date(a["startTime"]*1000).toISOString(),
-      "provider": "coros",
-      "average_pace_in_meters_per_second": (a["avgSpeed"]>0 ? 
-          (1/(a["avgSpeed"])*1000) :
-          0),
-      "activity_duration_in_seconds": a["duration"],
-      "file": {"url": a["fitUrl"] ?? null}
+    try{
+      summaryActivity = {
+        // standard fields
+        "activity_id": a["labelId"],
+        "activity_name": "Coros " + corosSportLookup[a.mode][0],
+        "activity_type": corosSportLookup[a.mode][1],
+        "distance_in_meters": a["distance"],
+        "active_calories": a["calorie"],
+        "start_time": new Date(a["startTime"]*1000).toISOString(),
+        "provider": "coros",
+        "average_pace_in_meters_per_second": (a["avgSpeed"]>0 ? 
+            (1/(a["avgSpeed"])*1000) :
+            0),
+        "activity_duration_in_seconds": a["duration"],
+        "file": {"url": a["fitUrl"] ?? null}
+      }
+    } catch (err) {
+      throw new Error("Cant sanitise message: "+err.message);
     }
     for (const property in summaryActivity) {
       if (typeof summaryActivity[property] == "undefined") {

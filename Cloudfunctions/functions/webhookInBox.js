@@ -6,6 +6,7 @@ const webhookInBox = {
     const webhookDoc = db.collection("webhookInBox").doc();
     await webhookDoc
         .set({
+          timestamp: new Date().toISOString(),
           provider: provider,
           status: "new",
           method: request.method,
