@@ -175,6 +175,7 @@ class OauthWahoo {
     const wahooUserId = wahooUserDoc.data()["wahoo_user_id"];
     const userQuery = await this.db.collection("users")
         .where("wahoo_user_id", "==", wahooUserId)
+        .where("wahoo_client_id", "==", this.config[this.lookup]["whaooClientId"])
         .get();
     userQuery.docs.forEach(async (doc)=>{
       await doc.ref.set(this.tokenData, {merge: true});
@@ -222,6 +223,7 @@ class OauthWahoo {
     }
     const updates = {
       "wahoo_user_id": response["id"],
+      "wahoo_client_id": this.config[this.lookup]["whaooClientId"],
     };
     const userRef = this.db.collection("users").doc(this.userDocId);
     await userRef.set(updates, {merge: true});

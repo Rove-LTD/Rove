@@ -75,6 +75,7 @@ describe("Testing that the Coros callbacks work: ", () => {
           userId: testUser,
           email: devUserData.email,
           "coros_access_token": "rg2-6ee918c0c7d3347aeaa1eae04a78d926",
+          "coros_client_id": "e8925760066a490b9d26187f731020f8",
           "coros_id": "4211cf484d264f75935047b0d709d76c",
           "coros_refresh_token": "rg2-b725c123e2494d58e8576642fdef6833",
           "coros_expires_in": 2592000,

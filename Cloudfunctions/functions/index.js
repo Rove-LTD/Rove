@@ -938,6 +938,7 @@ exports.corosCallback = functions.https.onRequest(async (req, res) => {
       "devId": transactionData.devId,
       "userId": transactionData.userId,
       "coros_access_token": jsonTokens["access_token"],
+      "coros_client_id": configurations[lookup]["corosClientId"],
       "coros_id": jsonTokens["openId"],
       "coros_refresh_token": jsonTokens["refresh_token"],
       "coros_expires_in": jsonTokens["expires_in"],
@@ -988,7 +989,7 @@ exports.stravaCallback = functions.https.onRequest(async (req, res) => {
   await request.post(options, async (error, response, body) => {
     if (!error && response.statusCode == 200) {
       // this is where the tokens come back.
-      stravaStoreTokens(userId, devId, JSON.parse(body), db);
+      stravaStoreTokens(userId, devId, JSON.parse(body), configurations[lookup]["stravaClientId"]);
       await getStravaAthleteId(userId, devId, JSON.parse(body));
       await getHistoryInBox.push("strava",
           transactionData.devId+transactionData.userId);
@@ -1122,10 +1123,11 @@ async function processGarminWebhook(webhookDoc) {
   return;
 }
 
-async function stravaStoreTokens(userId, devId, data, db) {
+async function stravaStoreTokens(userId, devId, data, stravaClientId) {
   const userDocId = devId+userId;
   const parameters = {
     "strava_access_token": data["access_token"],
+    "strava_client_id": stravaClientId,
     "strava_refresh_token": data["refresh_token"],
     "strava_token_expires_at": data["expires_at"],
     "strava_token_expires_in": data["expires_in"],
@@ -1359,7 +1361,7 @@ exports.polarCallback = functions.https.onRequest(async (req, res) => {
       // this is where the tokens come back.
       let message ="";
       message = await registerUserWithPolar(userId, devId, JSON.parse(body), db);
-      await polarStoreTokens(userId, devId, JSON.parse(body), db);
+      await polarStoreTokens(userId, devId, JSON.parse(body), configurations[lookup]["polarClientId"]);
       await getHistoryInBox.push("polar", devId + userId);
       const urlString = await successDevCallback(transactionData);
       res.redirect(urlString);
@@ -1403,11 +1405,12 @@ async function registerUserWithPolar(userId, devId, data, db) {
   return message;
 }
 
-async function polarStoreTokens(userId, devId, data, db) {
+async function polarStoreTokens(userId, devId, data, polarClientId) {
   const now = new Date();
   const userDocId = devId+userId;
   const parameters = {
     "polar_access_token": data["access_token"],
+    "polar_client_id": polarClientId,
     "polar_token_type": data["token_type"],
     "polar_token_expires_at": Math.round(now/1000)+data["expires_in"],
     // need to calculate from the expires in which is in seconds from now.
@@ -2677,6 +2680,7 @@ async function oauthCallbackHandlerGarmin(oAuthCallback, transactionData) {
       "devId": devId,
       "userId": userId,
       "garmin_access_token": garminAccessToken,
+      "garmin_client_id": oauthConsumerKey,
       "garmin_access_token_secret": garminAccessTokenSecret,
       "garmin_connected": true,
       "garmin_user_id": garminUserId,
