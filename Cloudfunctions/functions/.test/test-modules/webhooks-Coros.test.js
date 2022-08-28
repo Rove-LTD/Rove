@@ -100,7 +100,7 @@ describe("Testing that the Coros Webhooks work: ", () => {
     // check the webhookInBox was called correctly
     args = stubbedWebhookInBox.getCall(0).args; //this first call
     
-    assert(stubbedWebhookInBox.calledOnceWith(req, "coros", "roveLiveSecrets"),
+    assert(stubbedWebhookInBox.calledOnceWith(req, "coros", ["roveLiveSecrets","roveLiveSecretsGroup2","roveTestSecrets"]),
             "webhookInBox called with wrong args: "+args);
     });
     it('read webhookInBox event and process it successfully...', async () => {
