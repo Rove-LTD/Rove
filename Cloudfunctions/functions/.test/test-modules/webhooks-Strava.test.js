@@ -45,6 +45,7 @@ describe("Testing that the strava Webhooks work: ", () => {
           "userId": testUser,
           "strava_id" : testUser+"_test_strava_id",
           "strava_access_token": "test_strava_access_token",
+          "strava_client_id": "test client ID",
           "strava_refresh_token": "test_strava_refresh_token",
           "strava_token_expires_at": new Date().getTime()/1000 + 600,      }, {merge: true});
 

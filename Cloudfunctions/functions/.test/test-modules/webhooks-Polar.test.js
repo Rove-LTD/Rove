@@ -46,6 +46,7 @@ describe("Testing that the Polar Webhooks work: ", () => {
           "userId": testUser,
           "polar_user_id" : "polar_test_user",
           "polar_access_token": "test_polar_access_token",
+          "polar_client_id": "polar test client id",
         }, {merge: true});
 
       activityDocs = await admin.firestore()

@@ -581,6 +581,7 @@ async function deleteStravaActivity(userDoc, webhookCall) {
   // Delete Strava keys and activities.
   await userDoc.ref.update({
     strava_access_token: admin.firestore.FieldValue.delete(),
+    strava_client_id: admin.firestore.FieldValue.delete(),
     strava_connected: admin.firestore.FieldValue.delete(),
     strava_refresh_token: admin.firestore.FieldValue.delete(),
     strava_token_expires_at: admin.firestore.FieldValue.delete(),
@@ -624,6 +625,7 @@ async function deleteGarminActivity(userDoc, webhookCall) {
     // delete garmin keys and activities.
     await db.collection("users").doc(userDoc.id).update({
       garmin_access_token: admin.firestore.FieldValue.delete(),
+      garmin_client_id: admin.firestore.FieldValue.delete(),
       garmin_access_token_secret: admin.firestore.FieldValue.delete(),
       garmin_connected: admin.firestore.FieldValue.delete(),
       garmin_user_id: admin.firestore.FieldValue.delete(),
@@ -696,6 +698,7 @@ async function deletePolarActivity(userDoc, webhookCall) {
   try {
     await userDoc.ref.update({
       polar_access_token: admin.firestore.FieldValue.delete(),
+      polar_client_id: admin.firestore.FieldValue.delete(),
       polar_connected: admin.firestore.FieldValue.delete(),
       polar_refresh_token: admin.firestore.FieldValue.delete(),
       polar_token_expires_in: admin.firestore.FieldValue.delete(),
@@ -748,6 +751,7 @@ async function deleteWahooActivity(userDoc) {
     // delete wahoo keys and activities
     await db.collection("users").doc(userDoc.id).update({
       wahoo_access_token: admin.firestore.FieldValue.delete(),
+      wahoo_client_id: admin.firestore.FieldValue.delete(),
       wahoo_connected: admin.firestore.FieldValue.delete(),
       wahoo_refresh_token: admin.firestore.FieldValue.delete(),
       wahoo_token_expires_in: admin.firestore.FieldValue.delete(),
@@ -795,6 +799,7 @@ async function deleteCorosActivity(userDoc) {
     // delete wahoo keys and activities
     await db.collection("users").doc(userDoc.id).update({
       coros_access_token: admin.firestore.FieldValue.delete(),
+      coros_client_id: admin.firestore.FieldValue.delete(),
       coros_connected: admin.firestore.FieldValue.delete(),
       coros_refresh_token: admin.firestore.FieldValue.delete(),
       coros_token_expires_in: admin.firestore.FieldValue.delete(),
