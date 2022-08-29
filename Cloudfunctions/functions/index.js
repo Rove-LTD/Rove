@@ -1634,7 +1634,7 @@ exports.wahooWebhook = functions.https.onRequest(async (request, response) => {
     // save the webhook message and asynchronously process
     try {
       const webhookDoc = await webhookInBox
-          .push(request, "wahoo", secrets.tag);
+          .push(request, "wahoo", secrets.clientId);
       response.sendStatus(200);
       // now we have saved the request and returned ok to the provider
       // the message will trigger an asynchronous process
@@ -1698,7 +1698,7 @@ exports.processWebhookInBox = functions.firestore
 async function processWahooWebhook(webhookDoc) {
   const provider = "wahoo";
   const webhookBody = JSON.parse(webhookDoc.data()["body"]);
-  const secrets = getSecrets.fromTag(provider, webhookDoc.data()["secret_lookups"]);
+  const secrets = getSecrets.fromClientId(provider, webhookDoc.data()["secret_lookups"]);
   const userDocsList = [];
   const devDocsList = [];
 
