@@ -2,7 +2,7 @@ const admin = require("firebase-admin");
 const db = admin.firestore();
 
 const webhookInBox = {
-  push: async function(request, provider, lookup) {
+  push: async function(request, provider, lookups) {
     const webhookDoc = db.collection("webhookInBox").doc();
     await webhookDoc
         .set({
@@ -10,7 +10,7 @@ const webhookInBox = {
           provider: provider,
           status: "new",
           method: request.method,
-          secret_lookup: lookup || null,
+          secret_lookups: lookups || null,
           body: JSON.stringify(request.body),
         });
     return webhookDoc;

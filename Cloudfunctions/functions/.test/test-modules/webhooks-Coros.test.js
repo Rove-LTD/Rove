@@ -61,7 +61,7 @@ describe("Testing that the Coros Webhooks work: ", () => {
             provider: "coros",
             body: corosPush,
             method: "POST",
-            secret_lookup: "roveLiveSecrets",
+            secret_lookups: ["roveLiveSecrets"],
             status: "added before the tests to be successful",
         }
 
@@ -69,7 +69,7 @@ describe("Testing that the Coros Webhooks work: ", () => {
             provider: "coros",
             body: corosPushBad,
             method: "POST",
-            secret_lookup: "roveLiveSecrets",
+            secret_lookups: ["roveLiveSecrets"],
             status: "added before the tests to be unsuccessful",
         }
 
@@ -100,7 +100,7 @@ describe("Testing that the Coros Webhooks work: ", () => {
     // check the webhookInBox was called correctly
     args = stubbedWebhookInBox.getCall(0).args; //this first call
     
-    assert(stubbedWebhookInBox.calledOnceWith(req, "coros", "roveLiveSecrets"),
+    assert(stubbedWebhookInBox.calledOnceWith(req, "coros", ["roveLiveSecrets","roveLiveSecretsGroup2","roveTestSecrets"]),
             "webhookInBox called with wrong args: "+args);
     });
     it('read webhookInBox event and process it successfully...', async () => {

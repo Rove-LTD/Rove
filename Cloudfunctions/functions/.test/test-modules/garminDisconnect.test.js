@@ -43,6 +43,7 @@ describe("Check the garmin Disconnect Service works: ", () => {
             "email": "paul.userTest@gmail.com",
             "garmin_connected": true,
             "garmin_access_token": "test_access_token",
+            "garmin_client_id":  "d3dd1cc9-06b2-4b3e-9eb4-8a40cbd8e53f",
             "garmin_user_id": "test_user_id",
             "garmin_access_token_secret": "test_access_token_secret",
         });
@@ -56,6 +57,7 @@ describe("Check the garmin Disconnect Service works: ", () => {
           "email": "paul.userTest@gmail.com",
           "garmin_connected": true,
           "garmin_access_token": "test_access_token",
+          "garmin_client_id":  "d3dd1cc9-06b2-4b3e-9eb4-8a40cbd8e53f",
           "garmin_user_id": "test_user_id",
           "garmin_access_token_secret": "test_access_token_secret"
         });
@@ -185,6 +187,7 @@ describe("Check the garmin Disconnect Service works: ", () => {
       "email": "paul.userTest@gmail.com",
       "garmin_connected": true,
       "garmin_access_token": "test_access_token",
+      "garmin_client_id":  "d3dd1cc9-06b2-4b3e-9eb4-8a40cbd8e53f",
       "garmin_user_id": "test_user_id",
       "garmin_access_token_secret": "test_access_token_secret",
     };

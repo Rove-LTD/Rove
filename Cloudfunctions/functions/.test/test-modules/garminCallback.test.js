@@ -69,6 +69,7 @@ describe("Testing that the Garmin callbacks work: ", () => {
           userId: testUser,
           email: devUserData.email,
           garmin_access_token: "garmin-access-token",
+          garmin_client_id: "d3dd1cc9-06b2-4b3e-9eb4-8a40cbd8e53f",
           garmin_access_token_secret: "garmin-test-secret",
           garmin_user_id: "test-garmin-user-id",
           garmin_connected: true,

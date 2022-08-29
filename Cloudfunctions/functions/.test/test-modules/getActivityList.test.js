@@ -49,16 +49,20 @@ describe("Testing that the developer can call API to getActivityList() and recei
             "userId": testUser,
             "wahoo_user_id": "1510441",
             "wahoo_access_token": "8rrxrPBKmf38DVO5Obo7ul4xjUGqvVjwjxX3n9nyob0",
+            "wahoo_client_id":  "iA2JRS_dBkikcb0uEnHPtb6IDt1vDYNbityEEhp801I",
             "wahoo_refresh_token": "EoHcXrqpHpvRyT6EGNzzEk0ljVCMe2j7cVcruDxujEY",
             "wahoo_token_expires_at":new Date()/1000+36000,
             "wahoo_token_expires_in": "7200",
             "polar_user_id": "polar_test_user",
             "polar_access_token": "d717dd39d09b91939f835d66a640927d",
+            "polar_client_id":  "654623e7-7191-4cfe-aab5-0bc24785fdee",
             "strava_id" : "12972711",
             "strava_access_token": "6e6e55d80adfb1af30a7c5a372b107472b751173",
+            "strava_client_id":  "72486",
             "strava_refresh_token": "077e305b5af2ed1667fa5406aec491b31ba50b5d",
             "strava_token_expires_at": "1659274746",
             "garmin_access_token" :"58362aa6-f71c-499f-b0c6-a46371278298",
+            "garmin_client_id": "d3dd1cc9-06b2-4b3e-9eb4-8a40cbd8e53f",
             "garmin_access_token_secret": "HQ0o8k9gxNsULie2MknQDfY494fZ2Q5gh9T"
         }, {merge: true});
   
