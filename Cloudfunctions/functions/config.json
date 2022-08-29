@@ -40,20 +40,6 @@
         "webhook_id": "6y8wRGPQ"
       }
     },
-    "wahooWebhookTokens": {
-      "396ff7e3-ece2-4f99-ad3b-97277fe7fe6f": {
-        "secret_lookups": ["roveLiveSecretsGroup2"]
-      },
-      "348a6fe2-3719-4647-a233-933b8c404d6b": {
-        "secret_lookups": ["roveTestSecrets"]
-      },
-      "97661c16-6359-4854-9498-a49c07b6ec11": {
-        "secret_lookups": ["roveLiveSecrets"]
-      }
-    },
-    "corosWebhookService": {
-      "secret_lookups": ["roveLiveSecrets","roveLiveSecretsGroup2","roveTestSecrets"]
-    },
     "providerConfigs": {
       "wahoo": [{
         "tags": ["roveLiveSecrets"],
