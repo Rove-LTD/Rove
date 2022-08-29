@@ -91,7 +91,7 @@ class OauthWahoo {
    * @return {void}
    */
   getRedirect() {
-    this.clientId = this.config[this.lookup]["whaooClientId"];
+    this.clientId = this.config[this.lookup]["wahooClientId"];
     this.clientSecret = this.config[this.lookup]["wahooSecret"];
     this.scope = "email%20user_read%20workouts_read%20offline_data";
     this.state = this.transactionId;
@@ -175,7 +175,7 @@ class OauthWahoo {
     const wahooUserId = wahooUserDoc.data()["wahoo_user_id"];
     const userQuery = await this.db.collection("users")
         .where("wahoo_user_id", "==", wahooUserId)
-        .where("wahoo_client_id", "==", this.config[this.lookup]["whaooClientId"])
+        .where("wahoo_client_id", "==", this.config[this.lookup]["wahooClientId"])
         .get();
     userQuery.docs.forEach(async (doc)=>{
       await doc.ref.set(this.tokenData, {merge: true});
@@ -223,7 +223,7 @@ class OauthWahoo {
     }
     const updates = {
       "wahoo_user_id": response["id"],
-      "wahoo_client_id": this.config[this.lookup]["whaooClientId"],
+      "wahoo_client_id": this.config[this.lookup]["wahooClientId"],
     };
     const userRef = this.db.collection("users").doc(this.userDocId);
     await userRef.set(updates, {merge: true});
@@ -235,7 +235,7 @@ class OauthWahoo {
   get accessCodeOptions() {
     const _dataString = "code="+
     this.code+
-    "&client_id="+this.config[this.lookup]["whaooClientId"]+
+    "&client_id="+this.config[this.lookup]["wahooClientId"]+
     "&client_secret="+this.config[this.lookup]["wahooSecret"]+
     "&grant_type=authorization_code"+
     "&redirect_uri="+this.oauthCallbackUrl+"?state="+this.transactionId;
@@ -254,7 +254,7 @@ class OauthWahoo {
   get refreshCodeOptions() {
     const _dataString = "refresh_token="+
     this.refreshCode+
-    "&client_id="+this.config[this.lookup]["whaooClientId"]+
+    "&client_id="+this.config[this.lookup]["wahooClientId"]+
     "&client_secret="+this.config[this.lookup]["wahooSecret"]+
     "&grant_type=refresh_token";
     return {

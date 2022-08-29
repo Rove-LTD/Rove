@@ -804,7 +804,6 @@ async function deleteCorosActivity(userDoc) {
       coros_refresh_token: admin.firestore.FieldValue.delete(),
       coros_token_expires_in: admin.firestore.FieldValue.delete(),
       coros_token_expires_at: admin.firestore.FieldValue.delete(),
-      wahoo_created_at: admin.firestore.FieldValue.delete(),
       coros_id: admin.firestore.FieldValue.delete(),
     });
     // delete activities from provider.
@@ -946,9 +945,9 @@ exports.corosCallback = functions.https.onRequest(async (req, res) => {
       "coros_client_id": configurations[lookup]["corosClientId"],
       "coros_id": jsonTokens["openId"],
       "coros_refresh_token": jsonTokens["refresh_token"],
-      "coros_expires_in": jsonTokens["expires_in"],
+      "coros_token_expires_in": jsonTokens["expires_in"],
       "coros_connected": true,
-      "coros_expires_at": (Date.now()/1000) + jsonTokens["expires_in"],
+      "coros_token_expires_at": (Date.now()/1000) + jsonTokens["expires_in"],
     },
     {merge: true});
   }
