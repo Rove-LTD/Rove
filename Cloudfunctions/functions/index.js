@@ -775,8 +775,9 @@ async function deleteWahooActivity(userDoc) {
 }
 
 async function deleteCorosActivity(userDoc) {
-  const userQueryList = await db.collection("users").
-      where("coros_id", "==", userDoc.data()["coros_id"])
+  const userQueryList = await db.collection("users")
+      .where("coros_id", "==", userDoc.data()["coros_id"])
+      .where("coros_client_id", "==", userDoc.data()["coros_client_id"])
       .get();
   if (userQueryList.docs.length == 1) {
     try {
@@ -825,20 +826,20 @@ async function getCorosToken(userDoc) {
   const userToken = userDoc.data()["coros_access_token"];
   const devId = userDoc.data()["devId"];
   const userId = userDoc.data()["userId"];
+  const secrets = getSecrets
+      .fromClientId("coros", userDoc.data()["coros_client_id"]);
   if (userId == undefined || devId == undefined) {
     throw (new Error("error: userId or DevId not set"));
   }
   const expiresAt = userDoc.data()["coros_token_expires_at"];
   if (expiresAt < Date.now()/1000) {
     // out of date token can be refreshed by Coros.
-    const secretLookup = await db.collection("developers").doc(devId).get();
-    const lookup = await secretLookup.data()["secret_lookup"];
     const options = {
       "headers": {"Content-Type": "application/x-www-form-urlencoded"},
       "form": {
-        "client_id": configurations[lookup]["corosClientId"],
+        "client_id": secrets.clientId,
         "refresh_token": userDoc.data()["coros_refresh_token"],
-        "client_secret": configurations[lookup]["corosSecret"],
+        "client_secret": secrets.secret,
         "grant_type": "refresh_token"}};
     const accessCodeResponse = await got.post("https://open.coros.com/oauth2/refresh-token", options).json();
     if (accessCodeResponse.hasOwnProperty("access_token")) {
@@ -851,12 +852,10 @@ async function getCorosToken(userDoc) {
 }
 async function corosStoreTokens(tokens, userDoc) {
   await db.collection("users").doc(userDoc.id).set({
-    "coros_connected": true,
     "coros_access_token": tokens["access_token"],
     "coros_refresh_token": tokens["refresh_token"],
     "coros_token_expires_at": Date.now()/1000 + tokens["expires_in"],
     "coros_token_expires_in": tokens["expires_in"],
-    "coros_id": tokens["openId"],
   }, {merge: true});
   return tokens["access_token"];
 }
@@ -927,14 +926,15 @@ exports.corosCallback = functions.https.onRequest(async (req, res) => {
   const transactionData =
           await getParametersFromTransactionId(transactionId);
   const secretLookup = await db.collection("developers").doc(transactionData.devId).get();
-  const lookup = await secretLookup.data()["secret_lookup"];
+  const tag = await secretLookup.data()["secret_lookup"];
+  const secrets = getSecrets.fromTag("coros", tag);
   const options = {
     "headers": {"Content-Type": "application/x-www-form-urlencoded"},
     "form": {
-      "client_id": configurations[lookup]["corosClientId"],
+      "client_id": secrets.clientId,
       "redirect_uri": callbackBaseUrl+"/corosCallback",
       "code": code,
-      "client_secret": configurations[lookup]["corosSecret"],
+      "client_secret": secrets.secret,
       "grant_type": "authorization_code"}};
   const accessTokens = await got.post("https://open.coros.com/oauth2/accesstoken?", options);
   if (accessTokens.statusCode == 200) {
@@ -943,7 +943,7 @@ exports.corosCallback = functions.https.onRequest(async (req, res) => {
       "devId": transactionData.devId,
       "userId": transactionData.userId,
       "coros_access_token": jsonTokens["access_token"],
-      "coros_client_id": configurations[lookup]["corosClientId"],
+      "coros_client_id": secrets.clientId,
       "coros_id": jsonTokens["openId"],
       "coros_refresh_token": jsonTokens["refresh_token"],
       "coros_token_expires_in": jsonTokens["expires_in"],
@@ -1263,11 +1263,11 @@ async function garminOauth(transactionData, transactionId) {
 async function corosOauth(transactionData, transactionId) {
   const userId = transactionData.userId;
   const devId =transactionData.devId;
-  const secretLookup = await db.collection("developers").doc(devId).get();
-  const lookup = await secretLookup.data()["secret_lookup"];
+  const devDoc = await db.collection("developers").doc(devId).get();
+  const secrets = getSecrets.fromTag("coros", devDoc.data()["secret_lookup"]);
   // add parameters from user onto the callback redirect.
   const parameters = {
-    client_id: configurations[lookup]["corosClientId"],
+    client_id: secrets.clientId,
     response_type: "code",
     redirect_uri: callbackBaseUrl+"/corosCallback",
     state: transactionId,
@@ -1461,16 +1461,18 @@ exports.wahooCallback = functions.https.onRequest(async (req, res) => {
 });
 
 exports.corosWebhook = functions.https.onRequest(async (request, response) => {
-  const lookups = configurations.corosWebhookService.secret_lookups;
-  if (lookups == undefined) { // TODO put in validation function
+  const headers = request.headers;
+  const clientId = headers.client;
+  const secrets = getSecrets.fromClientId("coros", clientId);
+  if (secrets == undefined) { // TODO put in validation function
     console.log("Coros Webhook event recieved that did not have the correct validation");
     response.status(401);
     response.send("NOT AUTHORISED");
     return;
   }
-  const webhookDoc = await webhookInBox.push(request, "coros", lookups);
+  const webhookDoc = await webhookInBox.push(request, "coros", secrets.clientId);
   response.status(200);
-  response.send();
+  response.send({"message": "ok", "result": "0000"});
 });
 
 exports.corosStatus = functions.https.onRequest(async (request, response) => {
@@ -1737,26 +1739,16 @@ async function processWahooWebhook(webhookDoc) {
 
 async function processCorosWebhook(webhookDoc) {
   const webhookBody = JSON.parse(webhookDoc.data()["body"]);
-  const lookups = webhookDoc.data()["secret_lookups"];
+  const clientId = webhookDoc.data()["secret_lookups"];
   const userDocsList = [];
-  const devDocsList = [];
-
-  const devQuery = await db.collection("developers")
-      .where("secret_lookup", "in", lookups)
-      .get();
-  devQuery.docs.forEach((doc)=>{
-    devDocsList.push(doc.id);
-  });
 
   const userQuery = await db.collection("users")
       .where("coros_user_id", "==", webhookBody.sportDataList[0].openId)
+      .where("coros_client_id", "==", clientId)
       .get();
 
   userQuery.docs.forEach((doc)=>{
-    // exclude devs that are not managed by this webhook subscription
-    if (devDocsList.includes(doc.data()["devId"])) {
-      userDocsList.push(doc);
-    }
+    userDocsList.push(doc);
   });
 
   if (userDocsList.length == 0) {

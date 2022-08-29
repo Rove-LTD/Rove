@@ -37,7 +37,7 @@ const fs = require('fs').promises;
 const got = require('got');
 const webhookInBox = require('../../webhookInBox');
 //-------------TEST --- webhooks-------
-describe.only("Testing that the Wahoo Webhooks work: ", () => {
+describe("Testing that the Wahoo Webhooks work: ", () => {
     before ('set up the userIds in the test User doc', async () => {
       await admin.firestore()
       .collection("users")

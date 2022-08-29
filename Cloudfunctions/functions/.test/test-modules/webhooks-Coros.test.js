@@ -45,6 +45,7 @@ describe("Testing that the Coros Webhooks work: ", () => {
           "devId": testDev,
           "userId": testUser,
           "coros_user_id": "42dbb958c5a146f29ce9f89e05e5195a",
+          "coros_client_id": "e8925760066a490b9d26187f731020f8",
       }, {merge: true});
 
       activityDocs = await admin.firestore()
@@ -61,7 +62,7 @@ describe("Testing that the Coros Webhooks work: ", () => {
             provider: "coros",
             body: corosPush,
             method: "POST",
-            secret_lookups: ["roveLiveSecrets"],
+            secret_lookups: "e8925760066a490b9d26187f731020f8",
             status: "added before the tests to be successful",
         }
 
@@ -69,7 +70,7 @@ describe("Testing that the Coros Webhooks work: ", () => {
             provider: "coros",
             body: corosPushBad,
             method: "POST",
-            secret_lookups: ["roveLiveSecrets"],
+            secret_lookups: "e8925760066a490b9d26187f731020f8",
             status: "added before the tests to be unsuccessful",
         }
 
@@ -82,11 +83,15 @@ describe("Testing that the Coros Webhooks work: ", () => {
       const req = {
           url: "https://us-central1-rovetest-beea7.cloudfunctions.net/corosWebhook",
           method: "POST",
+          headers: {
+            "client": "e8925760066a490b9d26187f731020f8",
+            "secret": "3fec831e956045db9ec000d2083fa056"
+          },
           body: corosPush
     };
     res = {
         status: (code)=>{assert.equal(code, 200);},
-        send: (text)=>{assert.equal(text, undefined)},
+        send: (text)=>{assert.deepEqual(text, {"message": "ok", "result": "0000"})},
     }
     // set up stubs so that WebhookInBox is not written to
     // this would trigger the function in the online environment
@@ -100,7 +105,7 @@ describe("Testing that the Coros Webhooks work: ", () => {
     // check the webhookInBox was called correctly
     args = stubbedWebhookInBox.getCall(0).args; //this first call
     
-    assert(stubbedWebhookInBox.calledOnceWith(req, "coros", ["roveLiveSecrets","roveLiveSecretsGroup2","roveTestSecrets"]),
+    assert(stubbedWebhookInBox.calledOnceWith(req, "coros", "e8925760066a490b9d26187f731020f8"),
             "webhookInBox called with wrong args: "+args);
     });
     it('read webhookInBox event and process it successfully...', async () => {
