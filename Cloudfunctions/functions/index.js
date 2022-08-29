@@ -1624,9 +1624,8 @@ exports.wahooWebhook = functions.https.onRequest(async (request, response) => {
   // then process asynchronously
   if (request.method === "POST") {
     // check the webhook token is correct
-    const wahooWebhook =
-        configurations["wahooWebhookTokens"][request.body.webhook_token];
-    if (wahooWebhook == undefined) {
+    const secrets = getSecrets.fromWebhookId("wahoo", request.body.webhook_token);
+    if (secrets == undefined) {
       console.log("Wahoo Webhook event recieved that did not have the correct webhook token");
       response.status(401);
       response.send("NOT AUTHORISED");
@@ -1635,7 +1634,7 @@ exports.wahooWebhook = functions.https.onRequest(async (request, response) => {
     // save the webhook message and asynchronously process
     try {
       const webhookDoc = await webhookInBox
-          .push(request, "wahoo", wahooWebhook["secret_lookups"]);
+          .push(request, "wahoo", secrets.tag);
       response.sendStatus(200);
       // now we have saved the request and returned ok to the provider
       // the message will trigger an asynchronous process
@@ -1697,27 +1696,19 @@ exports.processWebhookInBox = functions.firestore
       return;
     });
 async function processWahooWebhook(webhookDoc) {
+  const provider = "wahoo";
   const webhookBody = JSON.parse(webhookDoc.data()["body"]);
-  const lookups = webhookDoc.data()["secret_lookups"];
+  const secrets = getSecrets.fromTag(provider, webhookDoc.data()["secret_lookups"]);
   const userDocsList = [];
   const devDocsList = [];
 
-  const devQuery = await db.collection("developers")
-      .where("secret_lookup", "in", lookups)
-      .get();
-  devQuery.docs.forEach((doc)=>{
-    devDocsList.push(doc.id);
-  });
-
   const userQuery = await db.collection("users")
       .where("wahoo_user_id", "==", webhookBody.user.id)
+      .where("wahoo_client_id", "==", secrets.clientId)
       .get();
 
   userQuery.docs.forEach((doc)=>{
-    // exclude devs that are not managed by this webhook subscription
-    if (devDocsList.includes(doc.data()["devId"])) {
-      userDocsList.push(doc);
-    }
+    userDocsList.push(doc);
   });
 
   if (userDocsList.length == 0) {
@@ -2777,4 +2768,24 @@ async function createTransactionWithParameters(parameters) {
 const waitTime = {0: 0, 1: 1, 2: 10, 3: 60}; // time in minutes
 const wait = (mins) => new Promise((resolve) => setTimeout(resolve, mins*60*1000));
 
+const getSecrets = {
+  fromClientId: (provider, clientId)=>{
+    const secrets = configurations.providerConfigs[provider].find((client)=>{
+      return client.clientId == clientId;
+    });
+    return secrets;
+  },
+  fromWebhookId: (provider, webhookId)=>{
+    const secrets = configurations.providerConfigs[provider].find((client)=>{
+      return client.webhookId == webhookId;
+    });
+    return secrets;
+  },
+  fromTag: function(provider, tag) {
+    const secrets = configurations.providerConfigs[provider].find((client)=>{
+      return client.tag == tag;
+    });
+    return secrets;
+  },
+};
 

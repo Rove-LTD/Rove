@@ -37,7 +37,7 @@ const fs = require('fs').promises;
 const got = require('got');
 const webhookInBox = require('../../webhookInBox');
 //-------------TEST --- webhooks-------
-describe("Testing that the Wahoo Webhooks work: ", () => {
+describe.only("Testing that the Wahoo Webhooks work: ", () => {
     before ('set up the userIds in the test User doc', async () => {
       await admin.firestore()
       .collection("users")
@@ -46,6 +46,7 @@ describe("Testing that the Wahoo Webhooks work: ", () => {
           "devId": testDev,
           "userId": testUser,
           "wahoo_user_id": "wahoo_test_user",
+          "wahoo_client_id": "IGQW1vInhei9CE_tEyoso2V4COhNOn53AfYGsTx96oA",
       }, {merge: true});
 
     activityDocs = await admin.firestore()
@@ -62,14 +63,14 @@ describe("Testing that the Wahoo Webhooks work: ", () => {
         provider: "wahoo",
         body: '{"user":{"id":"wahoo_test_user"},"event_type":"workout_summary","workout_summary":{"duration_active_accum":"9.0","workout":{"name":"Cycling","workout_token":"ELEMNT AE48:274","workout_type_id":0,"id":147564736,"updated_at":"2022-06-13T16:39:08.000Z","plan_id":null,"minutes":0,"starts":"2022-06-13T16:38:51.000Z","created_at":"2022-06-13T16:39:08.000Z"},"speed_avg":"0.0","duration_total_accum":"9.0","cadence_avg":"0.0","id":140473420,"work_accum":"0.0","power_bike_tss_last":null,"ascent_accum":"0.0","power_bike_np_last":null,"duration_paused_accum":"0.0","created_at":"2022-06-13T16:39:09.000Z","updated_at":"2022-06-13T16:39:09.000Z","power_avg":"0.0","file":{"url":"https://cdn.wahooligan.com/wahoo-cloud/production/uploads/workout_file/file/WpHvKL3irWsv2vHzGzGF_Q/2022-06-13-163851-ELEMNT_AE48-274-0.fit"},"distance_accum":"0.0","heart_rate_avg":"0.0","calories_accum":"0.0"},"webhook_token":"348a6fe2-3719-4647-a233-933b8c404d6b"}',
         method: "POST",
-        secret_lookups: ["roveLiveSecrets"],
+        secret_lookups: "IGQW1vInhei9CE_tEyoso2V4COhNOn53AfYGsTx96oA",
         status: "added before the tests to be successful",
       }
       successfulWebhookMessage2 = {
             provider: "wahoo",
             body: '{"user":{"id":"wahoo_test_user"},"event_type":"workout_summary","workout_summary":{"duration_active_accum":"9.0","workout":{"name":"Cycling","workout_token":"ELEMNT AE48:274","workout_type_id":0,"id":147564736,"updated_at":"2022-06-13T16:39:08.000Z","plan_id":null,"minutes":0,"starts":"2022-06-13T16:38:51.000Z","created_at":"2022-06-13T16:39:08.000Z"},"speed_avg":"0.0","duration_total_accum":"9.0","cadence_avg":"0.0","id":1234,"work_accum":"0.0","power_bike_tss_last":null,"ascent_accum":"0.0","power_bike_np_last":null,"duration_paused_accum":"0.0","created_at":"2022-06-13T16:39:09.000Z","updated_at":"2022-06-13T16:39:09.000Z","power_avg":"0.0","file":{"url":"https://cdn.wahooligan.com/wahoo-cloud/production/uploads/workout_file/file/WpHvKL3irWsv2vHzGzGF_Q/2022-06-13-163851-ELEMNT_AE48-274-0.fit"},"distance_accum":"0.0","heart_rate_avg":"0.0","calories_accum":"0.0"},"webhook_token":"348a6fe2-3719-4647-a233-933b8c404d6b"}',
             method: "POST",
-            secret_lookups: ["roveLiveSecrets"],
+            secret_lookups: "IGQW1vInhei9CE_tEyoso2V4COhNOn53AfYGsTx96oA",
             status: "added before the tests to be successful",
       }
 
@@ -77,7 +78,7 @@ describe("Testing that the Wahoo Webhooks work: ", () => {
             provider: "wahoo",
             body: '{"user":{"id":"wahoo_test_user"},"event_type":"incorrect","workout_summar_nothere":{"duration_active_accum":"9.0","workout":{"name":"Cycling","workout_token":"ELEMNT AE48:274","workout_type_id":"incorrect","id":147564736,"updated_at":"2022-06-13T16:39:08.000Z","plan_id":null,"minutes":0,"starts":"2022-06-13T16:38:51.000Z","created_at":"2022-06-13T16:39:08.000Z"},"speed_avg":"0.0","duration_total_accum":"9.0","cadence_avg":"0.0","id":140473420,"work_accum":"0.0","power_bike_tss_last":null,"ascent_accum":"0.0","power_bike_np_last":null,"duration_paused_accum":"0.0","created_at":"2022-06-13T16:39:09.000Z","updated_at":"2022-06-13T16:39:09.000Z","power_avg":"0.0","file":{"url":"https://cdn.wahooligan.com/wahoo-cloud/production/uploads/workout_file/file/WpHvKL3irWsv2vHzGzGF_Q/2022-06-13-163851-ELEMNT_AE48-274-0.fit"},"distance_accum":"0.0","heart_rate_avg":"0.0","calories_accum":"0.0"},"webhook_token":"348a6fe2-3719-4647-a233-933b8c404d6b"}',
             method: "POST",
-            secret_lookups: ["roveLiveSecrets"],
+            secret_lookups: "IGQW1vInhei9CE_tEyoso2V4COhNOn53AfYGsTx96oA",
             status: "added before the tests to be unsuccessful",
       }
 
@@ -112,7 +113,7 @@ describe("Testing that the Wahoo Webhooks work: ", () => {
     await wait(1000);
     // check the webhookInBox was called correctly
     args = stubbedWebhookInBox.getCall(0).args; //this first call
-    assert(stubbedWebhookInBox.calledOnceWithExactly(req, "wahoo", configuration.wahooWebhookTokens[req.body.webhook_token].secret_lookups),
+    assert(stubbedWebhookInBox.calledOnceWithExactly(req, "wahoo",  "IGQW1vInhei9CE_tEyoso2V4COhNOn53AfYGsTx96oA"),
             "webhookInBox called with wrong args: "+args);
 
     });
