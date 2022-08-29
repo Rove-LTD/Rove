@@ -33,6 +33,7 @@ const storage = admin.storage();
 
 const webhookInBox = require("./webhookInBox");
 const getHistoryInBox = require("./getHistoryInBox");
+const getSecrets = require("./getSecrets");
 const oauthWahoo = new OauthWahoo(configurations, db);
 const callbackBaseUrl = "https://us-central1-"+process.env.GCLOUD_PROJECT+".cloudfunctions.net";
 const redirectPageUrl = "https://"+process.env.GCLOUD_PROJECT+".web.app";
@@ -2768,24 +2769,4 @@ async function createTransactionWithParameters(parameters) {
 const waitTime = {0: 0, 1: 1, 2: 10, 3: 60}; // time in minutes
 const wait = (mins) => new Promise((resolve) => setTimeout(resolve, mins*60*1000));
 
-const getSecrets = {
-  fromClientId: (provider, clientId)=>{
-    const secrets = configurations.providerConfigs[provider].find((client)=>{
-      return client.clientId == clientId;
-    });
-    return secrets;
-  },
-  fromWebhookId: (provider, webhookId)=>{
-    const secrets = configurations.providerConfigs[provider].find((client)=>{
-      return client.webhookId == webhookId;
-    });
-    return secrets;
-  },
-  fromTag: function(provider, tag) {
-    const secrets = configurations.providerConfigs[provider].find((client)=>{
-      return client.tag == tag;
-    });
-    return secrets;
-  },
-};
 

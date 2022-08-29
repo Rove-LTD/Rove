@@ -1,5 +1,6 @@
 /* eslint-disable max-len */
 const got = require("got");
+const getSecrets = require("./getSecrets");
 /**
 * Oauth is a class to help manage the communication with the various
 * fitness activity providers
@@ -251,10 +252,7 @@ class OauthWahoo {
    *
    */
   get secrets() {
-    const tag = this.lookup;
-    return this.config.providerConfigs.wahoo.find(function(client) {
-      return client.tag == tag;
-    });
+    return getSecrets.fromTag("wahoo", this.lookup);
   }
   /**
    *
