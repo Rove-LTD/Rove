@@ -1,23 +1,5 @@
 {"config": {
     "InBoxRealTimeCheck": false,
-    "roveLiveSecrets": {
-      "stravaClientId": 72486,
-      "stravaClientSecret": "b0d500111e3d1774903da1f067b5b7adf38ca726"
-    },
-    "roveLiveSecretsGroup2": {
-      "stravaClientId": 72486,
-      "stravaClientSecret": "b0d500111e3d1774903da1f067b5b7adf38ca726"
-    },
-    "roveTestSecrets": {
-    },
-    "garminWebhookService": {
-      "secret_lookups": ["roveLiveSecrets","roveLiveSecretsGroup2","roveTestSecrets"]
-    },
-    "stravaSubscriptions": {
-      "217520": {
-        "secret_lookups": ["roveLiveSecrets","roveLiveSecretsGroup2"]
-      }
-    },
     "providerConfigs": {
       "wahoo": [
         {
@@ -77,7 +59,8 @@
                 "roveLiveSecretsGroup2",
                 "roveTestSecrets"],
           "clientId": 72486,
-          "secret": "b0d500111e3d1774903da1f067b5b7adf38ca726"
+          "secret": "b0d500111e3d1774903da1f067b5b7adf38ca726",
+          "webhookId": 217520
         }
       ],
       "fitBit": [

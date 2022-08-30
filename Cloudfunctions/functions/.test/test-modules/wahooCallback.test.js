@@ -110,6 +110,9 @@ describe("Testing that the Wahoo callbacks work: ", () => {
           },
       }
       await myFunctions.wahooCallback(req, res);
+      // wait a sec for database to complete writes
+      const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+      await wait(1000);
       //check the getHistoryInBox was called with the correct parameters
       //assert(stubbedgetHistory
       //    .calledOnceWithExactly("wahoo", testDev+testUser));

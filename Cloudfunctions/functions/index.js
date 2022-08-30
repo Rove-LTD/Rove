@@ -385,10 +385,11 @@ async function getStravaActivityList(start, end, userDoc) {
   const devId = userDocData["devId"];
   const accessToken = userDocData["strava_access_token"];
   const secretLookup = await db.collection("developers").doc(devId).get();
-  const lookup = await secretLookup.data()["secret_lookup"];
+  const tag = await secretLookup.data()["secret_lookup"];
+  const secrets = getSecrets.fromTag("strava", tag);
   stravaApi.config({
-    "client_id": configurations[lookup]["stravaClientId"],
-    "client_secret": configurations[lookup]["stravaClientSecret"],
+    "client_id": secrets.clientId,
+    "client_secret": secrets.secret,
     "redirect_uri": callbackBaseUrl+"/stravaCallback",
   });
   const result = await stravaApi.athlete.listActivities({"before": Math.round(end.getTime() / 1000), "after": Math.round(start.getTime() / 1000), "access_token": accessToken});
@@ -553,10 +554,11 @@ exports.disconnectService = functions.https.onRequest(async (req, res) => {
 async function deleteStravaActivity(userDoc, webhookCall) {
   const devId = await userDoc.data()["devId"];
   const secretLookup = await db.collection("developers").doc(devId).get();
-  const lookup = await secretLookup.data()["secret_lookup"];
+  const tag = await secretLookup.data()["secret_lookup"];
+  const secrets = getSecrets.fromTag("strava", tag);
   stravaApi.config({
-    "client_id": configurations[lookup]["stravaClientId"],
-    "client_secret": configurations[lookup]["stravaClientSecret"],
+    "client_id": secrets.clientId,
+    "client_secret": secrets.secret,
     "redirect_uri": callbackBaseUrl+"/stravaCallback",
   });
   // delete activities
@@ -978,11 +980,12 @@ exports.stravaCallback = functions.https.onRequest(async (req, res) => {
     return;
   }
   const secretLookup = await db.collection("developers").doc(devId).get();
-  const lookup = await secretLookup.data()["secret_lookup"];
+  const tag = await secretLookup.data()["secret_lookup"];
+  const secrets = getSecrets.fromTag("strava", tag);
   const dataString = "client_id="+
-     configurations[lookup]["stravaClientId"]+
+    secrets.clientId+
      "&client_secret="+
-     configurations[lookup]["stravaClientSecret"]+
+     secrets.secret+
      "&code="+
      code+
      "&grant_type=authorization_code";
@@ -996,7 +999,7 @@ exports.stravaCallback = functions.https.onRequest(async (req, res) => {
   await request.post(options, async (error, response, body) => {
     if (!error && response.statusCode == 200) {
       // this is where the tokens come back.
-      stravaStoreTokens(userId, devId, JSON.parse(body), configurations[lookup]["stravaClientId"]);
+      stravaStoreTokens(userId, devId, JSON.parse(body), secrets.clientId);
       await getStravaAthleteId(userId, devId, JSON.parse(body));
       await getHistoryInBox.push("strava",
           transactionData.devId+transactionData.userId);
@@ -1153,10 +1156,11 @@ async function stravaStoreTokens(userId, devId, data, stravaClientId) {
 async function getStravaAthleteId(userId, devId, data) {
   // get athlete id from strava.
   const secretLookup = await db.collection("developers").doc(devId).get();
-  const lookup = await secretLookup.data()["secret_lookup"];
+  const tag = await secretLookup.data()["secret_lookup"];
+  const secrets = getSecrets.fromTag("strava", tag);
   stravaApi.config({
-    "client_id": configurations[lookup]["stravaClientId"],
-    "client_secret": configurations[lookup]["stravaClientSecret"],
+    "client_id": secrets.clientId,
+    "client_secret": secrets.secret,
     "redirect_uri": callbackBaseUrl+"/stravaCallback",
   });
   const parameters = {
@@ -1175,9 +1179,10 @@ async function stravaOauth(transactionData, transactionId) {
   const devId = transactionData.devId;
   // add parameters from user onto the callback redirect.
   const secretLookup = await db.collection("developers").doc(devId).get();
-  const lookup = await secretLookup.data()["secret_lookup"];
+  const tag = await secretLookup.data()["secret_lookup"];
+  const secrets = getSecrets.fromTag("strava", tag);
   const parameters = {
-    client_id: configurations[lookup]["stravaClientId"],
+    client_id: secrets.clientId,
     response_type: "code",
     redirect_uri: callbackBaseUrl+
       "/stravaCallback?transactionId="+
@@ -1509,10 +1514,10 @@ exports.stravaWebhook = functions.https.onRequest(async (request, response) => {
       response.sendStatus(403);
     }
   } else if (request.method === "POST") {
-    const stravaWebhook =
-        configurations["stravaSubscriptions"][request.body.subscription_id];
+    const secrets = getSecrets
+        .fromWebhookId("strava", request.body.subscription_id);
     // check the webhook token is correct
-    if (stravaWebhook == undefined) {
+    if (secrets == undefined) {
       console.log("Strava Webhook event recieved that did not have the correct subscription Id");
       response.status(401);
       response.send("NOT AUTHORISED");
@@ -1521,7 +1526,7 @@ exports.stravaWebhook = functions.https.onRequest(async (request, response) => {
     // save the webhook message and asynchronously process
     try {
       const webhookDoc = await webhookInBox
-          .push(request, "strava", stravaWebhook["secret_lookups"]);
+          .push(request, "strava", secrets.clientId);
       response.sendStatus(200);
       // now we have saved the request and returned ok to the provider
       // the message will trigger an asynchronous process
@@ -1537,13 +1542,13 @@ exports.stravaWebhook = functions.https.onRequest(async (request, response) => {
 
 async function processStravaWebhook(webhookDoc) {
   const webhookBody = JSON.parse(webhookDoc.data()["body"]);
-  const lookups = webhookDoc.data()["secret_lookups"];
+  const clientId = webhookDoc.data()["secret_lookups"];
+  const secrets = getSecrets.fromClientId("strava", clientId);
   const userDocsList = [];
-  const devDocsList = [];
 
   stravaApi.config({
-    "client_id": configurations[lookups[0]]["stravaClientId"],
-    "client_secret": configurations[lookups[0]]["stravaClientSecret"],
+    "client_id": secrets.clientId,
+    "client_secret": secrets.secret,
     "redirect_uri": callbackBaseUrl+"/stravaCallback",
   });
   // get userbased on userid. (.where("id" == request.body.owner_id)).
@@ -1551,22 +1556,14 @@ async function processStravaWebhook(webhookDoc) {
   if (webhookBody.aspect_type == "delete") {
     return; // TODO: put in delete logic
   }
-  const devQuery = await db.collection("developers")
-      .where("secret_lookup", "in", lookups)
-      .get();
-  devQuery.docs.forEach((doc)=>{
-    devDocsList.push(doc.id);
-  });
 
   const userQuery = await db.collection("users")
       .where("strava_id", "==", webhookBody.owner_id)
+      .where("strava_client_id", "==", clientId)
       .get();
 
   userQuery.docs.forEach((doc)=>{
-  // exclude devs that are not managed by this webhook subscription
-    if (devDocsList.includes(doc.data()["devId"])) {
-      userDocsList.push(doc);
-    }
+    userDocsList.push(doc);
   });
 
   if (userDocsList.length == 0) {
@@ -1616,7 +1613,7 @@ async function processStravaWebhook(webhookDoc) {
     // sanitisedActivity[0]["samples"] = samples;
   }
   for (const userDoc of userDocsList) {
-    saveAndSendActivity(userDoc,
+    await saveAndSendActivity(userDoc,
         sanitisedActivity[0],
         activity);
   }
@@ -2074,10 +2071,11 @@ async function getStravaDetailedActivity(userDoc, activityDoc) {
   const stravaActivityId = await activityDoc["id"];
   const devId = await userDoc["devId"];
   const secretLookup = await db.collection("developers").doc(devId).get();
-  const lookup = await secretLookup.data()["secret_lookup"];
+  const tag = await secretLookup.data()["secret_lookup"];
+  const secrets = getSecrets.fromTag("strava", tag);
   stravaApi.config({
-    "client_id": configurations[lookup]["stravaClientId"],
-    "client_secret": configurations[lookup]["stravaClientSecret"],
+    "client_id": secrets.clientId,
+    "client_secret": secrets.secret,
     "redirect_uri": callbackBaseUrl+"/stravaCallback",
   });
 

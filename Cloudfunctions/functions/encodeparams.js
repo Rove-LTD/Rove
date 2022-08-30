@@ -103,52 +103,9 @@ module.exports = {
     return options;
   },
   /**
-   * creates a signature that should match the polar signature
-   * available in the polar webhook messages using the available keys,
-   * the matching key is used to return the secret_lookup for that key.
-   * If non match an string containing "error" is returned.
-   * @param {String} rawBody
-   * @param {String} polarKeys
-   * @param {String} signature
-   * @return {String} secret_lookup as a string
-   */
-  getLookupFromPolarSignature: function(rawBody, polarKeys, signature) {
-    // eslint-disable-next-line require-jsdoc
-    let lookups;
-    Object.keys(polarKeys).forEach(function(key) {
-      const calculatedSignature = crypto
-          .createHmac("sha256", key)
-          .update(rawBody)
-          .digest("hex");
-      if (calculatedSignature == signature) {
-        lookups = polarKeys[key]["secret_lookups"];
-        console.log("managed to match the polar signature");
-      }
-    });
-    if (lookups == undefined) {
-      // default depending on the google project if
-      // test use the test keys if live use the live keys
-      // this is a temporary fix while we wait for Polar to explain exactly
-      // how the signature should be calculated
-      console.log("polar signatures did not match - using defaults based on project");
-      switch (process.env.GCLOUD_PROJECT) {
-        case "rovetest-beea7":
-          lookups = ["roveTestSecrets"];
-          break;
-        case "rove-26":
-          lookups = ["roveLiveSecrets", "roveLiveSecretsGroup2"];
-          break;
-        default:
-          lookups = "error";
-          break;
-      }
-    }
-    return lookups;
-  },
-  /**
  * creates a signature that should match the polar signature
  * available in the polar webhook messages using the available keys,
- * the matching key is used to return the secret_lookup for that key.
+ * the matching key is used to return the secrets for that key.
  * If non match an string containing "error" is returned.
  * @param {String} rawBody
  * @param {Array<String>} polarSecrets
