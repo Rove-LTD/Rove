@@ -356,9 +356,10 @@ async function getGarminActivityList(start, end, userDoc) {
   const userDocData = await userDoc.data();
   const devId = userDocData["devId"];
   const secretLookup = await db.collection("developers").doc(devId).get();
-  const lookup = await secretLookup.data()["secret_lookup"];
-  const consumerSecret = configurations[lookup]["consumerSecret"];
-  const oAuthConsumerSecret = configurations[lookup]["oauth_consumer_key"];
+  const tag = await secretLookup.data()["secret_lookup"];
+  const secrets = getSecrets.fromTag("garmin", tag);
+  const consumerSecret = secrets.secret;
+  const oAuthConsumerSecret = secrets.clientId;
   let activityList = [];
   let requestEndTime;
   // we have to run the API call for each day in the call.
@@ -646,12 +647,13 @@ async function deleteGarminActivity(userDoc, webhookCall) {
 async function deleteGarminUser(userDoc) {
   // console.log(oauth_timestamp);
   const devDoc = await db.collection("developers").doc(userDoc.data()["devId"]).get();
-  const lookup = devDoc.data()["secret_lookup"];
+  const tag = devDoc.data()["secret_lookup"];
+  const secrets = getSecrets.fromTag("garmin", tag);
   const options = encodeparams.garminCallOptions(
       "https://apis.garmin.com/wellness-api/rest/user/registration",
       "DELETE",
-      configurations[lookup]["consumerSecret"],
-      configurations[lookup]["oauth_consumer_key"],
+      secrets.secret,
+      secrets.clientId,
       userDoc.data()["garmin_access_token"],
       userDoc.data()["garmin_access_token_secret"],
   );
@@ -1066,8 +1068,8 @@ exports.garminWebhook = functions.https.onRequest(async (request, response) => {
   }
   if (request.method === "POST") {
     // check the webhook token is correct
-    const lookups = configurations["garminWebhookService"]["secret_lookups"];
-    if (lookups == undefined) { // TODO put in validation function
+    const secrets = configurations.providerConfigs.garmin[0];
+    if (secrets == undefined) { // TODO put in validation function
       console.log("Garmin Webhook event recieved that did not have the correct validation");
       response.status(401);
       response.send("NOT AUTHORISED");
@@ -1075,7 +1077,7 @@ exports.garminWebhook = functions.https.onRequest(async (request, response) => {
     }
     // save the webhook message and asynchronously process
     try {
-      const webhookDoc = await webhookInBox.push(request, "garmin", lookups);
+      const webhookDoc = await webhookInBox.push(request, "garmin", secrets.clientId);
       response.sendStatus(200);
       // now we have saved the request and returned ok to the provider
       // the message will trigger an asynchronous process
@@ -1208,11 +1210,12 @@ async function garminOauth(transactionData, transactionId) {
   const oauthTimestamp = Math.round(new Date().getTime()/1000);
   // console.log(oauth_timestamp);
   const secretLookup = await db.collection("developers").doc(devId).get();
-  const lookup = await secretLookup.data()["secret_lookup"];
-  const consumerSecret = configurations[lookup]["consumerSecret"];
+  const tag = await secretLookup.data()["secret_lookup"];
+  const secrets = getSecrets.fromTag("garmin", tag);
+  const consumerSecret = secrets.secret;
   const parameters = {
     oauth_nonce: oauthNonce,
-    oauth_consumer_key: configurations[lookup]["oauth_consumer_key"],
+    oauth_consumer_key: secrets.clientId,
     oauth_timestamp: oauthTimestamp,
     oauth_signature_method: "HMAC-SHA1",
     oauth_version: "1.0",
@@ -1228,7 +1231,7 @@ async function garminOauth(transactionData, transactionId) {
   const encodedSignature = encodeURIComponent(signature);
   const url =
      "https://connectapi.garmin.com/oauth-service/oauth/request_token?oauth_consumer_key="+
-     configurations[lookup]["oauth_consumer_key"]+
+     secrets.clientId+
      "&oauth_nonce="+
      oauthNonce.toString()+
      "&oauth_signature_method=HMAC-SHA1&oauth_timestamp="+
@@ -1295,10 +1298,11 @@ async function polarOauth(transactionData, transactionId) {
   const userId = transactionData.userId;
   const devId =transactionData.devId;
   const secretLookup = await db.collection("developers").doc(devId).get();
-  const lookup = await secretLookup.data()["secret_lookup"];
+  const tag = await secretLookup.data()["secret_lookup"];
+  const secrets = getSecrets.fromTag("polar", tag);
   // add parameters from user onto the callback redirect.
   const parameters = {
-    client_id: configurations[lookup]["polarClientId"],
+    client_id: secrets.clientId,
     response_type: "code",
     redirect_uri: callbackBaseUrl+"/polarCallback",
     scope: "accesslink.read_all",
@@ -1340,8 +1344,9 @@ exports.polarCallback = functions.https.onRequest(async (req, res) => {
     return;
   }
   const secretLookup = await db.collection("developers").doc(devId).get();
-  const lookup = await secretLookup.data()["secret_lookup"];
-  const clientIdClientSecret = configurations[lookup]["polarClientId"]+":"+configurations[lookup]["polarSecret"];
+  const tag = await secretLookup.data()["secret_lookup"];
+  const secrets = getSecrets.fromTag("polar", tag);
+  const clientIdClientSecret = secrets.clientId+":"+secrets.secret;
    const buffer = new Buffer.from(clientIdClientSecret); // eslint-disable-line
   const base64String = buffer.toString("base64");
 
@@ -1366,7 +1371,7 @@ exports.polarCallback = functions.https.onRequest(async (req, res) => {
       // this is where the tokens come back.
       let message ="";
       message = await registerUserWithPolar(userId, devId, JSON.parse(body), db);
-      await polarStoreTokens(userId, devId, JSON.parse(body), configurations[lookup]["polarClientId"]);
+      await polarStoreTokens(userId, devId, JSON.parse(body), secrets.clientId);
       await getHistoryInBox.push("polar", devId + userId);
       const urlString = await successDevCallback(transactionData);
       res.redirect(urlString);
@@ -1788,12 +1793,12 @@ exports.polarWebhook = functions.https.onRequest(async (request, response) => {
   if (request.method === "POST") {
     // check the webhook token is correct
     const signature = request.headers["polar-webhook-signature"];
-    const lookups = encodeparams
-        .getLookupFromPolarSignature(
+    const secrets = encodeparams
+        .getSecretsFromPolarSignature(
             request.rawBody,
-            configurations.polarWebhookSecrets,
+            configurations.providerConfigs.polar,
             signature);
-    if (lookups == "error") { // TODO put in validation function
+    if (secrets == "error") { // TODO put in validation function
       console.log("Polar Webhook event recieved that did not have a valid signature");
       response.status(401);
       response.send("NOT AUTHORISED");
@@ -1801,7 +1806,7 @@ exports.polarWebhook = functions.https.onRequest(async (request, response) => {
     }
     // save the webhook message and asynchronously process
     try {
-      const webhookDoc = await webhookInBox.push(request, "polar", lookups);
+      const webhookDoc = await webhookInBox.push(request, "polar", secrets.clientId);
       response.sendStatus(200);
       // now we have saved the request and returned ok to the provider
       // the message will trigger an asynchronous process
@@ -1821,30 +1826,20 @@ exports.polarWebhook = functions.https.onRequest(async (request, response) => {
 
 async function processPolarWebhook(webhookDoc) {
   const webhookBody = JSON.parse(webhookDoc.data()["body"]);
-  const lookups = webhookDoc.data()["secret_lookups"];
+  const clientId = webhookDoc.data()["secret_lookups"];
   if (webhookBody.event === "PING") {
     console.log("polar webhook message event = PING, do nothing");
     return;
   }
   const userDocsList = [];
-  const devDocsList = [];
-
-  const devQuery = await db.collection("developers")
-      .where("secret_lookup", "in", lookups)
-      .get();
-  devQuery.docs.forEach((doc)=>{
-    devDocsList.push(doc.id);
-  });
 
   const userQuery = await db.collection("users")
       .where("polar_user_id", "==", webhookBody.user_id)
+      .where("polar_client_id", "==", clientId)
       .get();
 
   userQuery.docs.forEach((doc)=>{
-    // exclude devs that are not managed by this webhook subscription
-    if (devDocsList.includes(doc.data()["devId"])) {
-      userDocsList.push(doc);
-    }
+    userDocsList.push(doc);
   });
 
   if (userDocsList.length == 0) {
@@ -2237,9 +2232,10 @@ async function getGarminDetailedActivity(userDoc, activityDoc) {
     const url = "https://apis.garmin.com/wellness-api/rest/activityDetails";
     const devId = userDoc["devId"];
     const secretLookup = await db.collection("developers").doc(devId).get();
-    const lookup = await secretLookup.data()["secret_lookup"];
-    const consumerSecret = configurations[lookup]["consumerSecret"];
-    const oAuthConsumerSecret = configurations[lookup]["oauth_consumer_key"];
+    const tag = await secretLookup.data()["secret_lookup"];
+    const secrets = getSecrets.fromTag("garmin", tag);
+    const consumerSecret = secrets.secret;
+    const oAuthConsumerSecret = secrets.clientId;
     let startTime = activityDoc["startTimeInSeconds"];
     const endTime = startTime + 7*24*60*60;
     const activityId = activityDoc["activityId"];
@@ -2578,8 +2574,9 @@ exports.processGetHistoryInBox = functions.firestore
 
 async function polarWebhookUtility(devId, action, webhookId) {
   const secretLookup = await db.collection("developers").doc(devId).get();
-  const lookup = await secretLookup.data()["secret_lookup"];
-  const clientIdClientSecret = configurations[lookup]["polarClientId"]+":"+configurations[lookup]["polarSecret"];
+  const tag = await secretLookup.data()["secret_lookup"];
+  const secrets = getSecrets.fromTag("polar", tag);
+  const clientIdClientSecret = secrets.clientId+":"+secrets.secret;
    const buffer = new Buffer.from(clientIdClientSecret); // eslint-disable-line
   const base64String = buffer.toString("base64");
   const _headers = {
@@ -2634,9 +2631,10 @@ async function oauthCallbackHandlerGarmin(oAuthCallback, transactionData) {
   const userId = transactionData.userId;
   const devId = transactionData.devId;
   const secretLookup = await db.collection("developers").doc(devId).get();
-  const lookup = await secretLookup.data()["secret_lookup"];
-  const consumerSecret = configurations[lookup]["consumerSecret"];
-  const oauthConsumerKey = configurations[lookup]["oauth_consumer_key"];
+  const tag = await secretLookup.data()["secret_lookup"];
+  const secrets = getSecrets.fromTag("garmin", tag);
+  const consumerSecret = secrets.secret;
+  const oauthConsumerKey = secrets.clientId;
   oauthTokenSecret = oauthTokenSecret[0];
   const parameters = {
     oauth_nonce: oauthNonce,

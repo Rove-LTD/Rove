@@ -145,4 +145,34 @@ module.exports = {
     }
     return lookups;
   },
+  /**
+ * creates a signature that should match the polar signature
+ * available in the polar webhook messages using the available keys,
+ * the matching key is used to return the secret_lookup for that key.
+ * If non match an string containing "error" is returned.
+ * @param {String} rawBody
+ * @param {Array<String>} polarSecrets
+ * @param {String} signature
+ * @return {String} secret_lookup as a string
+ */
+  getSecretsFromPolarSignature: function(rawBody, polarSecrets, signature) {
+    // eslint-disable-next-line require-jsdoc
+    let secrets;
+    for (const config of polarSecrets) {
+      const key = config.webhookSecret;
+      const calculatedSignature = crypto
+          .createHmac("sha256", key)
+          .update(rawBody)
+          .digest("hex");
+      if (calculatedSignature == signature) {
+        secrets = config;
+        console.log("managed to match the polar signature");
+      }
+    }
+    if (secrets == undefined) {
+      console.log("polar signatures did not match - using defaults based on project");
+      secrets = "error";
+    }
+    return secrets;
+  },
 };
