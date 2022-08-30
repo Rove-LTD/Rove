@@ -115,7 +115,8 @@ describe("Check the coros Disconnect Service works: ", () => {
     
     await myFunctions.disconnectService(req, res);
     // check the got function was called with the correct options
-    // check the wahoo fields were deleted from the database
+    assert(stubbedGot.notCalled);
+    // check the coros fields were deleted from the database
     // check the wahoo activities were deleted from the database only for this user
     const userDoc = await admin.firestore()
         .collection("users")
@@ -172,6 +173,7 @@ describe("Check the coros Disconnect Service works: ", () => {
     
     await myFunctions.disconnectService(req, res);
     // check the got function was called with the correct options
+    assert(stubbedGot.calledOnce);
     // check the wahoo fields were deleted from the database
     // check the wahoo activities were deleted from the database only for this user
     const userDoc = await admin.firestore()
@@ -204,7 +206,7 @@ describe("Check the coros Disconnect Service works: ", () => {
 
     sinon.restore();
   });
-  it('Check that service succeeds if user authorised already', async () => {
+  it('Check that service succeeds if user authorised already and not the last user authorised', async () => {
     req = {
       url: "https://us-central1-rovetest-beea7.cloudfunctions.net/disconnectService?devId="+testDev+"&userId="+testUser+"&provider=coros&devKey=test-key",
     };
@@ -229,6 +231,7 @@ describe("Check the coros Disconnect Service works: ", () => {
     
     await myFunctions.disconnectService(req, res);
     // check the got function was called with the correct options
+    assert(stubbedGot.notCalled, "user deauthorisation was called and shouldnt have been");
     // check the wahoo fields were deleted from the database
     // check the wahoo activities were deleted from the database only for this user
     const userDoc = await admin.firestore()
@@ -250,6 +253,89 @@ describe("Check the coros Disconnect Service works: ", () => {
     };
     
     assert.deepEqual(userDoc.data(), expectedUserResults);
+    assert.equal(activities.docs.length, 0);
+
+    sinon.restore();
+  });
+  it('Check that service succeeds if user authorised already and the last user authorized', async () => {
+    // set the second user to a different client ID 
+    // second user so there is only one left with the original clientID
+    await admin.firestore()
+    .collection("users")
+    .doc(testDev+"secondTestUser")
+    .set({
+        "coros_client_id":  "different client Id",
+    }, {"merge": true});
+
+    req = {
+      url: "https://us-central1-rovetest-beea7.cloudfunctions.net/disconnectService?devId="+testDev+"&userId="+testUser+"&provider=coros&devKey=test-key",
+    };
+    res = {
+      status: (code) => {
+        assert.equal(code, 200);
+      },
+      send: (message) => {
+        assert.equal(message, '{"status":"disconnected"}')
+      }
+    }
+
+    // set up stubbed functions
+    testResponse = {
+      json: ()=>{
+        return {"result": "0000","message": "OK"};
+      }
+    }
+
+   const stubbedGot = sinon.stub(got, "post");
+   stubbedGot.onFirstCall().returns(testResponse);
+    
+    await myFunctions.disconnectService(req, res);
+    // check the got function was called with the correct options
+    options = {
+      url: "https://open.coros.com/oauth2/deauthorize?token=" + "rg2-6ee918c0c7d3347aeaa1eae04a78d926",
+      method: "POST",
+    }
+    args = stubbedGot.getCall(0).args;
+    assert.deepEqual(args[0], options, "arguments on the deauthorize call incorrect");
+
+    // check the wahoo fields were deleted from the database
+    // check the wahoo activities were deleted from the database only for this user
+    const userDoc1 = await admin.firestore()
+        .collection("users")
+        .doc(testDev+testUser)
+        .get();
+      
+        const userDoc2 = await admin.firestore()
+        .collection("users")
+        .doc(testDev+"secondTestUser")
+        .get();
+
+    const activities = await admin.firestore()
+        .collection("users")
+        .doc(testDev+testUser)
+        .collection("activities")
+        .where("sanitised.provider","==","coros")
+        .get();
+    
+    const expectedUserResults1 = {
+      "devId": testDev,
+      "userId": testUser,
+      "email": "paul.userTest@gmail.com",
+    };
+    const expectedUserResults2 = {
+      "devId": testDev,
+      "userId": "secondTestUser",
+      "email": "paul.userTest@gmail.com",
+      "coros_connected": true,
+      "coros_access_token": "rg2-6ee918c0c7d3347aeaa1eae04a78d926",
+      "coros_client_id":  "different client Id",
+      "coros_refresh_token": "rg2-b725c123e2494d58e8576642fdef6833",
+      "coros_token_expires_at": tokenFutureExpiryDate,
+      "coros_token_expires_in": 7200,
+      "coros_id": "4211cf484d264f75935047b0d709d76c"
+    };
+    assert.deepEqual(userDoc1.data(), expectedUserResults1);
+    assert.deepEqual(userDoc2.data(), expectedUserResults2);
     assert.equal(activities.docs.length, 0);
 
     sinon.restore();
@@ -292,8 +378,8 @@ describe("Check the coros Disconnect Service works: ", () => {
           "refresh_token":"test-coros-refresh",
           "access_token":"test-coros-access",
           "openId":"test-coros-id"
-      }
-      }
+          }
+        }
       }
 
       const stubbedPost = sinon.stub(got, "post");
@@ -301,7 +387,29 @@ describe("Check the coros Disconnect Service works: ", () => {
       stubbedPost.onSecondCall().returns(testResponseDelete);
       
       await myFunctions.disconnectService(req, res);
-
+      // check the calls to got were called with the right
+      // arguments
+      expectedCallArgs = [[
+        "https://open.coros.com/oauth2/refresh-token",
+        {
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+          },
+          form: {
+            client_id: "e8925760066a490b9d26187f731020f8",
+            refresh_token: "rg2-b725c123e2494d58e8576642fdef6833",
+            client_secret: "w4FvDllcO0zYrnV1-VKR-T2gJ4mYUOiFJuwx-8C-C2I",
+            grant_type: "refresh_token",
+          },
+        }],
+        [{
+          url: "https://open.coros.com/oauth2/deauthorize?token=test-coros-access",
+          method: "POST",
+        }]];
+      const calls = stubbedPost.getCalls();
+      assert.deepEqual(calls[0].args, expectedCallArgs[0], "arguments on the refresh call incorrect");
+      assert.deepEqual(calls[1].args, expectedCallArgs[1], "arguments on the deauthorize call incorrect");
+  
       const userDoc = await admin.firestore()
           .collection("users")
           .doc(testDev+testUser)

@@ -103,6 +103,7 @@ describe("Testing that the Coros callbacks work: ", () => {
       //check the getHistoryInBox was called with the correct parameters
       //assert(stubbedgetHistory
       //  .calledOnceWithExactly("coros", testDev+testUser));
+
       const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
       await wait(1000);
 
