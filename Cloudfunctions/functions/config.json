@@ -1,5 +1,5 @@
 {"config": {
-    "InBoxRealTimeCheck": false,
+    "InBoxRealTimeCheck": true,
     "providerConfigs": {
       "wahoo": [
         {
@@ -17,7 +17,7 @@
         {
           "tags": ["roveTestSecrets"],
           "clientId": "IGQW1vInhei9CE_tEyoso2V4COhNOn53AfYGsTx96oA",
-          "secret": "3fec831e956045db9ec000d2083fa056",
+          "secret": "-TQHcASsAk-cTUN3485_oyY6lUqsKhFLLpoKoWrCnHs",
           "webhookId": "348a6fe2-3719-4647-a233-933b8c404d6b"
         }
       ],
@@ -25,7 +25,7 @@
         {
           "tags": ["roveLiveSecrets","roveTestSecrets","roveLiveSecretsGroup2"],
           "clientId": "e8925760066a490b9d26187f731020f8",
-          "secret": "w4FvDllcO0zYrnV1-VKR-T2gJ4mYUOiFJuwx-8C-C2I"
+          "secret": "3fec831e956045db9ec000d2083fa056"
         }
       ],
       "polar": [
