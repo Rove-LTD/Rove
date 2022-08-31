@@ -398,7 +398,7 @@ describe("Check the coros Disconnect Service works: ", () => {
           form: {
             client_id: "e8925760066a490b9d26187f731020f8",
             refresh_token: "rg2-b725c123e2494d58e8576642fdef6833",
-            client_secret: "w4FvDllcO0zYrnV1-VKR-T2gJ4mYUOiFJuwx-8C-C2I",
+            client_secret: "3fec831e956045db9ec000d2083fa056",
             grant_type: "refresh_token",
           },
         }],
