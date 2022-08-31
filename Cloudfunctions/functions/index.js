@@ -19,7 +19,6 @@ const request = require("request");
 const stravaApi = require("strava-v3");
 const OauthWahoo = require("./oauthWahoo");
 const contentsOfDotEnvFile = require("./config.json");
-const filters = require("./data-filter");
 const fs = require("fs");
 const notion = require("./notion");
 const fitDecoder = require("fit-decoder");
@@ -31,6 +30,7 @@ admin.initializeApp();
 const db = admin.firestore();
 const storage = admin.storage();
 
+const filters = require("./data-filter");
 const webhookInBox = require("./webhookInBox");
 const getHistoryInBox = require("./getHistoryInBox");
 const getSecrets = require("./getSecrets");
@@ -1898,7 +1898,7 @@ async function saveAndSendActivity(userDocList,
   // create a version of the sanitised activity that compresses
   // the "samples" array by replacing it with a reference to a file
   // in storage.
-  const compressedSanitisedActivity = filters.compressSanitisedActivity(sanitisedActivity);
+  const compressedSanitisedActivity = await filters.compressSanitisedActivity(sanitisedActivity);
   for (const userDoc of userDocList) {
     // TODO: change this functoin to receive a list
     // of userDocs and put a for loop in here to save
@@ -1995,10 +1995,12 @@ exports.sendToDeveloper = functions
                 {merge: true});
         return;
       }
+      // now before we send get the sessions field from
+      // storage if it exists
       const uncompressSanitisedActivity =
-          filters
+          await filters
               .uncompressSanitisedActivity(activityDoc
-                  .data()["sanitisedActivity"]);
+                  .data()["sanitised"]);
       const datastring = {"sanitised": uncompressSanitisedActivity, "raw": activityDoc.data()["raw"]};
       const endpoint = developerDoc.data()["endpoint"];
       const userData = userDoc.data();

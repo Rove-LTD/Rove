@@ -5,6 +5,9 @@
 // 15/06/2022
 /* eslint-disable max-len */
 /* eslint-disable */
+const admin = require("firebase-admin");
+const db = admin.firestore();
+const storage = admin.storage();
 /**
  * Sanatise Error class is used to throw an error message from the
  * sanatise functions
@@ -33,6 +36,8 @@ class standardFormat {
     let elevation_gain = null;
     let elevation_loss = null;
     let provider = null;
+    let userId = null;
+    let sessions = null;
     let version = "1.0";
   }
 }
@@ -304,23 +309,45 @@ exports.wahooSanitise = function (activity) {
     // we dont recognise this event type yet
     throw new SanatiseError("don't recognise the wahoo event_type: "+activity.event_type);
   }
-
   return summaryActivity;
 }
 /**
  * @param {Map} sanitisedActivity
- * @return {Map} compressedSanitisedActivity
+ * @return {Future<Map>} compressedSanitisedActivity
  */
-exports.compressSanitisedActivity = function(sanitisedActivity) {
+exports.compressSanitisedActivity = async function(sanitisedActivity) {
   const compressedSanitisedActivity = sanitisedActivity;
+  if (compressedSanitisedActivity.sessions != undefined) {
+    // save session in a storage file and replace
+    // the concents with a reference to the file
+    const bucket = storage.bucket();
+    const file = bucket.file("sessions/"+
+        compressedSanitisedActivity.activity_id+
+        compressedSanitisedActivity.provider);
+    const options = {
+      resumable: false,
+    }
+    await file.save(JSON.stringify(compressedSanitisedActivity.sessions), options);
+    compressedSanitisedActivity.sessions = { "file": file.name}
+  }
   return compressedSanitisedActivity;
 }
 /**
  * @param {Map} compressedSanitisedActivity
- * @return {Map} sanitisedActivity
+ * @return {Future<Map>} sanitisedActivity
  */
- exports.uncompressSanitisedActivity = function(compressedSanitisedActivity) {
+ exports.uncompressSanitisedActivity = async function(compressedSanitisedActivity) {
   const sanitisedActivity = compressedSanitisedActivity;
+  if (sanitisedActivity.sessions != undefined) {
+    if (sanitisedActivity.sessions.hasOwnProperty("file")) {
+      // get the session data from storage file and replace
+      // into the sessions property
+      const bucket = storage.bucket();
+      const file = bucket.file(sanitisedActivity.sessions.file);
+      sessionData = await file.download();
+      sanitisedActivity.sessions = JSON.parse(sessionData);
+    }
+  }
   return sanitisedActivity;
 }
 const wahooWorkoutType = { 
