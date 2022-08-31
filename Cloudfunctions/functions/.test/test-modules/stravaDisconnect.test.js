@@ -46,7 +46,7 @@ const webhookInBox = require('../../webhookInBox');
             "email": "paul.userTest@gmail.com",
             "strava_connected": true,
             "strava_access_token": "4c68a65e19eb899b8f68aa21e760b074bf035a95",
-            "strava_client_id": "test client ID",
+            "strava_client_id": 72486,
             "strava_refresh_token": "78ba71c103106141ea7030ce60ff1ee3d599b7ba",
             "strava_token_expires_at": tokenFutureExpiryDate,
             "strava_id": 12972711});
@@ -83,7 +83,7 @@ const webhookInBox = require('../../webhookInBox');
     // check the got function was called with the correct options
     // check the wahoo fields were deleted from the database
     // check the wahoo activities were deleted from the database only for this user
-    assert(stubbedWebhookInBox.calledWithExactly(req, "strava",["roveLiveSecrets","roveLiveSecretsGroup2"]), "wrong arguments in call");
+    assert(stubbedWebhookInBox.calledWithExactly(req, "strava", 72486), "wrong arguments in call");
 
     sinon.restore();
   })
@@ -105,7 +105,7 @@ const webhookInBox = require('../../webhookInBox');
       provider: "strava",
           status: "new",
           method: "POST",
-          secret_lookups: ["roveLiveSecrets"],
+          secret_lookups: 72486,
           body: JSON.stringify({"owner_id":12972711,"object_type":"athlete","aspect_type":"update","subscription_id":217520,"object_id":12972711,"updates":{"authorized":"false"},"event_time":1656517720})
     };
     const snapshot = test.firestore.makeDocumentSnapshot(inboxData, "webhookInBox/testWebhookMessageDocId");

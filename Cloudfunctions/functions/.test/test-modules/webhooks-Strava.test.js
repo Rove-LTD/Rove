@@ -45,7 +45,7 @@ describe("Testing that the strava Webhooks work: ", () => {
           "userId": testUser,
           "strava_id" : testUser+"_test_strava_id",
           "strava_access_token": "test_strava_access_token",
-          "strava_client_id": "test client ID",
+          "strava_client_id": 72486,
           "strava_refresh_token": "test_strava_refresh_token",
           "strava_token_expires_at": new Date().getTime()/1000 + 600,      }, {merge: true});
 
@@ -62,7 +62,7 @@ describe("Testing that the strava Webhooks work: ", () => {
       successfulWebhookMessage = {
             provider: "strava",
             method: "POST",
-            secret_lookups: ["roveLiveSecrets"],
+            secret_lookups: 72486,
             body: '{"updates":{},"object_type":"activity","object_id":7345142595,"owner_id":"'+testUser+'_test_strava_id","subscription_id":217520,"aspect_type":"create","event_time":1655824005}',
             status: "added before the tests to be successful",
         }
@@ -70,7 +70,7 @@ describe("Testing that the strava Webhooks work: ", () => {
             unsuccessfulWebhookMessage = {
                 provider: "strava",
                 method: "POST",
-                secret_lookups: ["roveLiveSecrets"],
+                secret_lookups: 72486,
                 body: '{"updates":{},"object_type":"activity","object_id":7345142595,"owner_id":"incorrect_strava_id","subscription_id":217520,"aspect_type":"create","event_time":1655824005}',
                 status: "added before the tests to be successful",
             }
@@ -99,7 +99,7 @@ describe("Testing that the strava Webhooks work: ", () => {
         await myFunctions.stravaWebhook(req, res);
 
         // check the webhookInBox was called correctly
-        assert(stubbedWebhookInBox.calledOnceWithExactly(req, "strava",  ["roveLiveSecrets","roveLiveSecretsGroup2"]),
+        assert(stubbedWebhookInBox.calledOnceWithExactly(req, "strava", 72486),
                 "webhookInBox called with wrong args");
         sinon.restore();
 

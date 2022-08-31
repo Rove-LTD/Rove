@@ -136,7 +136,7 @@ describe("Testing that the garmin Webhooks work: ", () => {
         await myFunctions.garminWebhook(req, res);
 
         // check the webhookInBox was called correctly
-        assert(stubbedWebhookInBox.calledOnceWithExactly(req, "garmin", ["roveLiveSecrets","roveLiveSecretsGroup2","roveTestSecrets"]),
+        assert(stubbedWebhookInBox.calledOnceWithExactly(req, "garmin", "d3dd1cc9-06b2-4b3e-9eb4-8a40cbd8e53f"),
                 "webhookInBox called with wrong args");
         sinon.restore();
 

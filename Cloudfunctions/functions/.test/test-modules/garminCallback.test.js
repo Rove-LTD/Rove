@@ -75,10 +75,10 @@ describe("Testing that the Garmin callbacks work: ", () => {
           garmin_connected: true,
       }
 
-      const stubbedcall = sinon.stub(got, "post");
+      const stubbedPostcall = sinon.stub(got, "post");
       //const stubbedgetHistory = sinon.stub(getHistoryInBox, "push");
-      stubbedcall.onFirstCall().returns(responseObject1);
-      sinon.stub(got, "get").returns(responseObject2);
+      stubbedPostcall.onFirstCall().returns(responseObject1);
+      const stubbedGetCall = sinon.stub(got, "get").returns(responseObject2);
 
       // set the request object with the correct provider, developerId and userId
       const req = {url: "https://us-central1-rovetest-beea7.cloudfunctions.net/oauthCallbackHandlerGarmin?oauth_token_secret=testcode-transactionId=garminTestTransaction&oauth_verifier=test-verifyer&oauth_token=test-token",
@@ -97,6 +97,29 @@ describe("Testing that the Garmin callbacks work: ", () => {
       //check the getHistoryInBox was called with the correct parameters
       //assert(stubbedgetHistory
       //  .calledOnceWithExactly("garmin", testDev+testUser));
+      // check the got.post used the right parameters
+      const postArgs = stubbedPostcall.getCall(0).args;
+
+      assert.include(postArgs[0], "https://connectapi.garmin.com/oauth-service/oauth/access_token?oauth_consumer_key=d3dd1cc9-06b2-4b3e-9eb4-8a40cbd8e53f&oauth_nonce=");
+      assert.include(postArgs[0], "&oauth_signature_method=HMAC-SHA1&oauth_timestamp=");
+      assert.include(postArgs[0], "&oauth_signature=");
+      assert.include(postArgs[0], "&oauth_verifier=test-verifyer&oauth_token=test-token&oauth_version=1.0");
+      const getArgs = stubbedGetCall.getCall(0).args;
+
+      assert.equal(getArgs[0].url,"https://apis.garmin.com/wellness-api/rest/user/id");
+      assert.equal(getArgs[0].method,"GET");
+      assert.include(getArgs[0].headers.Authorization, "OAuth oauth_consumer_key=\"d3dd1cc9-06b2-4b3e-9eb4-8a40cbd8e53f\",oauth_nonce=");
+      assert.include(getArgs[0].headers.Authorization, ",oauth_signature=");
+      assert.include(getArgs[0].headers.Authorization, "oauth_signature_method=\"HMAC-SHA1\",oauth_timestamp=\"");
+      assert.include(getArgs[0].headers.Authorization, "oauth_token=\"garmin-access-token\",oauth_version=\"1.0\"");
+
+      //now check the database was updated correctly
+      testUserDoc = await admin.firestore()
+      .collection("users")
+      .doc(testDev+testUser)
+      .get();
+
+
       //now check the database was updated correctly
       testUserDoc = await admin.firestore()
       .collection("users")

@@ -33,6 +33,7 @@ const storage = admin.storage();
 
 const webhookInBox = require("./webhookInBox");
 const getHistoryInBox = require("./getHistoryInBox");
+const getSecrets = require("./getSecrets");
 const oauthWahoo = new OauthWahoo(configurations, db);
 const callbackBaseUrl = "https://us-central1-"+process.env.GCLOUD_PROJECT+".cloudfunctions.net";
 const redirectPageUrl = "https://"+process.env.GCLOUD_PROJECT+".web.app";
@@ -355,9 +356,10 @@ async function getGarminActivityList(start, end, userDoc) {
   const userDocData = await userDoc.data();
   const devId = userDocData["devId"];
   const secretLookup = await db.collection("developers").doc(devId).get();
-  const lookup = await secretLookup.data()["secret_lookup"];
-  const consumerSecret = configurations[lookup]["consumerSecret"];
-  const oAuthConsumerSecret = configurations[lookup]["oauth_consumer_key"];
+  const tag = await secretLookup.data()["secret_lookup"];
+  const secrets = getSecrets.fromTag("garmin", tag);
+  const consumerSecret = secrets.secret;
+  const oAuthConsumerSecret = secrets.clientId;
   let activityList = [];
   let requestEndTime;
   // we have to run the API call for each day in the call.
@@ -383,10 +385,11 @@ async function getStravaActivityList(start, end, userDoc) {
   const devId = userDocData["devId"];
   const accessToken = userDocData["strava_access_token"];
   const secretLookup = await db.collection("developers").doc(devId).get();
-  const lookup = await secretLookup.data()["secret_lookup"];
+  const tag = await secretLookup.data()["secret_lookup"];
+  const secrets = getSecrets.fromTag("strava", tag);
   stravaApi.config({
-    "client_id": configurations[lookup]["stravaClientId"],
-    "client_secret": configurations[lookup]["stravaClientSecret"],
+    "client_id": secrets.clientId,
+    "client_secret": secrets.secret,
     "redirect_uri": callbackBaseUrl+"/stravaCallback",
   });
   const result = await stravaApi.athlete.listActivities({"before": Math.round(end.getTime() / 1000), "after": Math.round(start.getTime() / 1000), "access_token": accessToken});
@@ -551,10 +554,11 @@ exports.disconnectService = functions.https.onRequest(async (req, res) => {
 async function deleteStravaActivity(userDoc, webhookCall) {
   const devId = await userDoc.data()["devId"];
   const secretLookup = await db.collection("developers").doc(devId).get();
-  const lookup = await secretLookup.data()["secret_lookup"];
+  const tag = await secretLookup.data()["secret_lookup"];
+  const secrets = getSecrets.fromTag("strava", tag);
   stravaApi.config({
-    "client_id": configurations[lookup]["stravaClientId"],
-    "client_secret": configurations[lookup]["stravaClientSecret"],
+    "client_id": secrets.clientId,
+    "client_secret": secrets.secret,
     "redirect_uri": callbackBaseUrl+"/stravaCallback",
   });
   // delete activities
@@ -645,12 +649,13 @@ async function deleteGarminActivity(userDoc, webhookCall) {
 async function deleteGarminUser(userDoc) {
   // console.log(oauth_timestamp);
   const devDoc = await db.collection("developers").doc(userDoc.data()["devId"]).get();
-  const lookup = devDoc.data()["secret_lookup"];
+  const tag = devDoc.data()["secret_lookup"];
+  const secrets = getSecrets.fromTag("garmin", tag);
   const options = encodeparams.garminCallOptions(
       "https://apis.garmin.com/wellness-api/rest/user/registration",
       "DELETE",
-      configurations[lookup]["consumerSecret"],
-      configurations[lookup]["oauth_consumer_key"],
+      secrets.secret,
+      secrets.clientId,
       userDoc.data()["garmin_access_token"],
       userDoc.data()["garmin_access_token_secret"],
   );
@@ -774,8 +779,9 @@ async function deleteWahooActivity(userDoc) {
 }
 
 async function deleteCorosActivity(userDoc) {
-  const userQueryList = await db.collection("users").
-      where("coros_id", "==", userDoc.data()["coros_id"])
+  const userQueryList = await db.collection("users")
+      .where("coros_id", "==", userDoc.data()["coros_id"])
+      .where("coros_client_id", "==", userDoc.data()["coros_client_id"])
       .get();
   if (userQueryList.docs.length == 1) {
     try {
@@ -824,20 +830,20 @@ async function getCorosToken(userDoc) {
   const userToken = userDoc.data()["coros_access_token"];
   const devId = userDoc.data()["devId"];
   const userId = userDoc.data()["userId"];
+  const secrets = getSecrets
+      .fromClientId("coros", userDoc.data()["coros_client_id"]);
   if (userId == undefined || devId == undefined) {
     throw (new Error("error: userId or DevId not set"));
   }
   const expiresAt = userDoc.data()["coros_token_expires_at"];
   if (expiresAt < Date.now()/1000) {
     // out of date token can be refreshed by Coros.
-    const secretLookup = await db.collection("developers").doc(devId).get();
-    const lookup = await secretLookup.data()["secret_lookup"];
     const options = {
       "headers": {"Content-Type": "application/x-www-form-urlencoded"},
       "form": {
-        "client_id": configurations[lookup]["corosClientId"],
+        "client_id": secrets.clientId,
         "refresh_token": userDoc.data()["coros_refresh_token"],
-        "client_secret": configurations[lookup]["corosSecret"],
+        "client_secret": secrets.secret,
         "grant_type": "refresh_token"}};
     const accessCodeResponse = await got.post("https://open.coros.com/oauth2/refresh-token", options).json();
     if (accessCodeResponse.hasOwnProperty("access_token")) {
@@ -850,12 +856,10 @@ async function getCorosToken(userDoc) {
 }
 async function corosStoreTokens(tokens, userDoc) {
   await db.collection("users").doc(userDoc.id).set({
-    "coros_connected": true,
     "coros_access_token": tokens["access_token"],
     "coros_refresh_token": tokens["refresh_token"],
     "coros_token_expires_at": Date.now()/1000 + tokens["expires_in"],
     "coros_token_expires_in": tokens["expires_in"],
-    "coros_id": tokens["openId"],
   }, {merge: true});
   return tokens["access_token"];
 }
@@ -926,14 +930,15 @@ exports.corosCallback = functions.https.onRequest(async (req, res) => {
   const transactionData =
           await getParametersFromTransactionId(transactionId);
   const secretLookup = await db.collection("developers").doc(transactionData.devId).get();
-  const lookup = await secretLookup.data()["secret_lookup"];
+  const tag = await secretLookup.data()["secret_lookup"];
+  const secrets = getSecrets.fromTag("coros", tag);
   const options = {
     "headers": {"Content-Type": "application/x-www-form-urlencoded"},
     "form": {
-      "client_id": configurations[lookup]["corosClientId"],
+      "client_id": secrets.clientId,
       "redirect_uri": callbackBaseUrl+"/corosCallback",
       "code": code,
-      "client_secret": configurations[lookup]["corosSecret"],
+      "client_secret": secrets.secret,
       "grant_type": "authorization_code"}};
   const accessTokens = await got.post("https://open.coros.com/oauth2/accesstoken?", options);
   if (accessTokens.statusCode == 200) {
@@ -942,7 +947,7 @@ exports.corosCallback = functions.https.onRequest(async (req, res) => {
       "devId": transactionData.devId,
       "userId": transactionData.userId,
       "coros_access_token": jsonTokens["access_token"],
-      "coros_client_id": configurations[lookup]["corosClientId"],
+      "coros_client_id": secrets.clientId,
       "coros_id": jsonTokens["openId"],
       "coros_refresh_token": jsonTokens["refresh_token"],
       "coros_token_expires_in": jsonTokens["expires_in"],
@@ -975,11 +980,12 @@ exports.stravaCallback = functions.https.onRequest(async (req, res) => {
     return;
   }
   const secretLookup = await db.collection("developers").doc(devId).get();
-  const lookup = await secretLookup.data()["secret_lookup"];
+  const tag = await secretLookup.data()["secret_lookup"];
+  const secrets = getSecrets.fromTag("strava", tag);
   const dataString = "client_id="+
-     configurations[lookup]["stravaClientId"]+
+    secrets.clientId+
      "&client_secret="+
-     configurations[lookup]["stravaClientSecret"]+
+     secrets.secret+
      "&code="+
      code+
      "&grant_type=authorization_code";
@@ -993,7 +999,7 @@ exports.stravaCallback = functions.https.onRequest(async (req, res) => {
   await request.post(options, async (error, response, body) => {
     if (!error && response.statusCode == 200) {
       // this is where the tokens come back.
-      stravaStoreTokens(userId, devId, JSON.parse(body), configurations[lookup]["stravaClientId"]);
+      stravaStoreTokens(userId, devId, JSON.parse(body), secrets.clientId);
       await getStravaAthleteId(userId, devId, JSON.parse(body));
       await getHistoryInBox.push("strava",
           transactionData.devId+transactionData.userId);
@@ -1065,8 +1071,8 @@ exports.garminWebhook = functions.https.onRequest(async (request, response) => {
   }
   if (request.method === "POST") {
     // check the webhook token is correct
-    const lookups = configurations["garminWebhookService"]["secret_lookups"];
-    if (lookups == undefined) { // TODO put in validation function
+    const secrets = configurations.providerConfigs.garmin[0];
+    if (secrets == undefined) { // TODO put in validation function
       console.log("Garmin Webhook event recieved that did not have the correct validation");
       response.status(401);
       response.send("NOT AUTHORISED");
@@ -1074,7 +1080,7 @@ exports.garminWebhook = functions.https.onRequest(async (request, response) => {
     }
     // save the webhook message and asynchronously process
     try {
-      const webhookDoc = await webhookInBox.push(request, "garmin", lookups);
+      const webhookDoc = await webhookInBox.push(request, "garmin", secrets.clientId);
       response.sendStatus(200);
       // now we have saved the request and returned ok to the provider
       // the message will trigger an asynchronous process
@@ -1150,10 +1156,11 @@ async function stravaStoreTokens(userId, devId, data, stravaClientId) {
 async function getStravaAthleteId(userId, devId, data) {
   // get athlete id from strava.
   const secretLookup = await db.collection("developers").doc(devId).get();
-  const lookup = await secretLookup.data()["secret_lookup"];
+  const tag = await secretLookup.data()["secret_lookup"];
+  const secrets = getSecrets.fromTag("strava", tag);
   stravaApi.config({
-    "client_id": configurations[lookup]["stravaClientId"],
-    "client_secret": configurations[lookup]["stravaClientSecret"],
+    "client_id": secrets.clientId,
+    "client_secret": secrets.secret,
     "redirect_uri": callbackBaseUrl+"/stravaCallback",
   });
   const parameters = {
@@ -1172,9 +1179,10 @@ async function stravaOauth(transactionData, transactionId) {
   const devId = transactionData.devId;
   // add parameters from user onto the callback redirect.
   const secretLookup = await db.collection("developers").doc(devId).get();
-  const lookup = await secretLookup.data()["secret_lookup"];
+  const tag = await secretLookup.data()["secret_lookup"];
+  const secrets = getSecrets.fromTag("strava", tag);
   const parameters = {
-    client_id: configurations[lookup]["stravaClientId"],
+    client_id: secrets.clientId,
     response_type: "code",
     redirect_uri: callbackBaseUrl+
       "/stravaCallback?transactionId="+
@@ -1207,11 +1215,12 @@ async function garminOauth(transactionData, transactionId) {
   const oauthTimestamp = Math.round(new Date().getTime()/1000);
   // console.log(oauth_timestamp);
   const secretLookup = await db.collection("developers").doc(devId).get();
-  const lookup = await secretLookup.data()["secret_lookup"];
-  const consumerSecret = configurations[lookup]["consumerSecret"];
+  const tag = await secretLookup.data()["secret_lookup"];
+  const secrets = getSecrets.fromTag("garmin", tag);
+  const consumerSecret = secrets.secret;
   const parameters = {
     oauth_nonce: oauthNonce,
-    oauth_consumer_key: configurations[lookup]["oauth_consumer_key"],
+    oauth_consumer_key: secrets.clientId,
     oauth_timestamp: oauthTimestamp,
     oauth_signature_method: "HMAC-SHA1",
     oauth_version: "1.0",
@@ -1227,7 +1236,7 @@ async function garminOauth(transactionData, transactionId) {
   const encodedSignature = encodeURIComponent(signature);
   const url =
      "https://connectapi.garmin.com/oauth-service/oauth/request_token?oauth_consumer_key="+
-     configurations[lookup]["oauth_consumer_key"]+
+     secrets.clientId+
      "&oauth_nonce="+
      oauthNonce.toString()+
      "&oauth_signature_method=HMAC-SHA1&oauth_timestamp="+
@@ -1262,11 +1271,11 @@ async function garminOauth(transactionData, transactionId) {
 async function corosOauth(transactionData, transactionId) {
   const userId = transactionData.userId;
   const devId =transactionData.devId;
-  const secretLookup = await db.collection("developers").doc(devId).get();
-  const lookup = await secretLookup.data()["secret_lookup"];
+  const devDoc = await db.collection("developers").doc(devId).get();
+  const secrets = getSecrets.fromTag("coros", devDoc.data()["secret_lookup"]);
   // add parameters from user onto the callback redirect.
   const parameters = {
-    client_id: configurations[lookup]["corosClientId"],
+    client_id: secrets.clientId,
     response_type: "code",
     redirect_uri: callbackBaseUrl+"/corosCallback",
     state: transactionId,
@@ -1294,10 +1303,11 @@ async function polarOauth(transactionData, transactionId) {
   const userId = transactionData.userId;
   const devId =transactionData.devId;
   const secretLookup = await db.collection("developers").doc(devId).get();
-  const lookup = await secretLookup.data()["secret_lookup"];
+  const tag = await secretLookup.data()["secret_lookup"];
+  const secrets = getSecrets.fromTag("polar", tag);
   // add parameters from user onto the callback redirect.
   const parameters = {
-    client_id: configurations[lookup]["polarClientId"],
+    client_id: secrets.clientId,
     response_type: "code",
     redirect_uri: callbackBaseUrl+"/polarCallback",
     scope: "accesslink.read_all",
@@ -1339,8 +1349,9 @@ exports.polarCallback = functions.https.onRequest(async (req, res) => {
     return;
   }
   const secretLookup = await db.collection("developers").doc(devId).get();
-  const lookup = await secretLookup.data()["secret_lookup"];
-  const clientIdClientSecret = configurations[lookup]["polarClientId"]+":"+configurations[lookup]["polarSecret"];
+  const tag = await secretLookup.data()["secret_lookup"];
+  const secrets = getSecrets.fromTag("polar", tag);
+  const clientIdClientSecret = secrets.clientId+":"+secrets.secret;
    const buffer = new Buffer.from(clientIdClientSecret); // eslint-disable-line
   const base64String = buffer.toString("base64");
 
@@ -1365,7 +1376,7 @@ exports.polarCallback = functions.https.onRequest(async (req, res) => {
       // this is where the tokens come back.
       let message ="";
       message = await registerUserWithPolar(userId, devId, JSON.parse(body), db);
-      await polarStoreTokens(userId, devId, JSON.parse(body), configurations[lookup]["polarClientId"]);
+      await polarStoreTokens(userId, devId, JSON.parse(body), secrets.clientId);
       await getHistoryInBox.push("polar", devId + userId);
       const urlString = await successDevCallback(transactionData);
       res.redirect(urlString);
@@ -1460,16 +1471,18 @@ exports.wahooCallback = functions.https.onRequest(async (req, res) => {
 });
 
 exports.corosWebhook = functions.https.onRequest(async (request, response) => {
-  const lookups = configurations.corosWebhookService.secret_lookups;
-  if (lookups == undefined) { // TODO put in validation function
+  const headers = request.headers;
+  const clientId = headers.client;
+  const secrets = getSecrets.fromClientId("coros", clientId);
+  if (secrets == undefined) { // TODO put in validation function
     console.log("Coros Webhook event recieved that did not have the correct validation");
     response.status(401);
     response.send("NOT AUTHORISED");
     return;
   }
-  const webhookDoc = await webhookInBox.push(request, "coros", lookups);
+  const webhookDoc = await webhookInBox.push(request, "coros", secrets.clientId);
   response.status(200);
-  response.send();
+  response.send({"message": "ok", "result": "0000"});
 });
 
 exports.corosStatus = functions.https.onRequest(async (request, response) => {
@@ -1501,10 +1514,10 @@ exports.stravaWebhook = functions.https.onRequest(async (request, response) => {
       response.sendStatus(403);
     }
   } else if (request.method === "POST") {
-    const stravaWebhook =
-        configurations["stravaSubscriptions"][request.body.subscription_id];
+    const secrets = getSecrets
+        .fromWebhookId("strava", request.body.subscription_id);
     // check the webhook token is correct
-    if (stravaWebhook == undefined) {
+    if (secrets == undefined) {
       console.log("Strava Webhook event recieved that did not have the correct subscription Id");
       response.status(401);
       response.send("NOT AUTHORISED");
@@ -1513,7 +1526,7 @@ exports.stravaWebhook = functions.https.onRequest(async (request, response) => {
     // save the webhook message and asynchronously process
     try {
       const webhookDoc = await webhookInBox
-          .push(request, "strava", stravaWebhook["secret_lookups"]);
+          .push(request, "strava", secrets.clientId);
       response.sendStatus(200);
       // now we have saved the request and returned ok to the provider
       // the message will trigger an asynchronous process
@@ -1529,13 +1542,13 @@ exports.stravaWebhook = functions.https.onRequest(async (request, response) => {
 
 async function processStravaWebhook(webhookDoc) {
   const webhookBody = JSON.parse(webhookDoc.data()["body"]);
-  const lookups = webhookDoc.data()["secret_lookups"];
+  const clientId = webhookDoc.data()["secret_lookups"];
+  const secrets = getSecrets.fromClientId("strava", clientId);
   const userDocsList = [];
-  const devDocsList = [];
 
   stravaApi.config({
-    "client_id": configurations[lookups[0]]["stravaClientId"],
-    "client_secret": configurations[lookups[0]]["stravaClientSecret"],
+    "client_id": secrets.clientId,
+    "client_secret": secrets.secret,
     "redirect_uri": callbackBaseUrl+"/stravaCallback",
   });
   // get userbased on userid. (.where("id" == request.body.owner_id)).
@@ -1543,22 +1556,14 @@ async function processStravaWebhook(webhookDoc) {
   if (webhookBody.aspect_type == "delete") {
     return; // TODO: put in delete logic
   }
-  const devQuery = await db.collection("developers")
-      .where("secret_lookup", "in", lookups)
-      .get();
-  devQuery.docs.forEach((doc)=>{
-    devDocsList.push(doc.id);
-  });
 
   const userQuery = await db.collection("users")
       .where("strava_id", "==", webhookBody.owner_id)
+      .where("strava_client_id", "==", clientId)
       .get();
 
   userQuery.docs.forEach((doc)=>{
-  // exclude devs that are not managed by this webhook subscription
-    if (devDocsList.includes(doc.data()["devId"])) {
-      userDocsList.push(doc);
-    }
+    userDocsList.push(doc);
   });
 
   if (userDocsList.length == 0) {
@@ -1608,7 +1613,7 @@ async function processStravaWebhook(webhookDoc) {
     // sanitisedActivity[0]["samples"] = samples;
   }
   for (const userDoc of userDocsList) {
-    saveAndSendActivity(userDoc,
+    await saveAndSendActivity(userDoc,
         sanitisedActivity[0],
         activity);
   }
@@ -1624,9 +1629,8 @@ exports.wahooWebhook = functions.https.onRequest(async (request, response) => {
   // then process asynchronously
   if (request.method === "POST") {
     // check the webhook token is correct
-    const wahooWebhook =
-        configurations["wahooWebhookTokens"][request.body.webhook_token];
-    if (wahooWebhook == undefined) {
+    const secrets = getSecrets.fromWebhookId("wahoo", request.body.webhook_token);
+    if (secrets == undefined) {
       console.log("Wahoo Webhook event recieved that did not have the correct webhook token");
       response.status(401);
       response.send("NOT AUTHORISED");
@@ -1635,7 +1639,7 @@ exports.wahooWebhook = functions.https.onRequest(async (request, response) => {
     // save the webhook message and asynchronously process
     try {
       const webhookDoc = await webhookInBox
-          .push(request, "wahoo", wahooWebhook["secret_lookups"]);
+          .push(request, "wahoo", secrets.clientId);
       response.sendStatus(200);
       // now we have saved the request and returned ok to the provider
       // the message will trigger an asynchronous process
@@ -1697,27 +1701,19 @@ exports.processWebhookInBox = functions.firestore
       return;
     });
 async function processWahooWebhook(webhookDoc) {
+  const provider = "wahoo";
   const webhookBody = JSON.parse(webhookDoc.data()["body"]);
-  const lookups = webhookDoc.data()["secret_lookups"];
+  const secrets = getSecrets.fromClientId(provider, webhookDoc.data()["secret_lookups"]);
   const userDocsList = [];
   const devDocsList = [];
 
-  const devQuery = await db.collection("developers")
-      .where("secret_lookup", "in", lookups)
-      .get();
-  devQuery.docs.forEach((doc)=>{
-    devDocsList.push(doc.id);
-  });
-
   const userQuery = await db.collection("users")
       .where("wahoo_user_id", "==", webhookBody.user.id)
+      .where("wahoo_client_id", "==", secrets.clientId)
       .get();
 
   userQuery.docs.forEach((doc)=>{
-    // exclude devs that are not managed by this webhook subscription
-    if (devDocsList.includes(doc.data()["devId"])) {
-      userDocsList.push(doc);
-    }
+    userDocsList.push(doc);
   });
 
   if (userDocsList.length == 0) {
@@ -1745,26 +1741,16 @@ async function processWahooWebhook(webhookDoc) {
 
 async function processCorosWebhook(webhookDoc) {
   const webhookBody = JSON.parse(webhookDoc.data()["body"]);
-  const lookups = webhookDoc.data()["secret_lookups"];
+  const clientId = webhookDoc.data()["secret_lookups"];
   const userDocsList = [];
-  const devDocsList = [];
-
-  const devQuery = await db.collection("developers")
-      .where("secret_lookup", "in", lookups)
-      .get();
-  devQuery.docs.forEach((doc)=>{
-    devDocsList.push(doc.id);
-  });
 
   const userQuery = await db.collection("users")
       .where("coros_user_id", "==", webhookBody.sportDataList[0].openId)
+      .where("coros_client_id", "==", clientId)
       .get();
 
   userQuery.docs.forEach((doc)=>{
-    // exclude devs that are not managed by this webhook subscription
-    if (devDocsList.includes(doc.data()["devId"])) {
-      userDocsList.push(doc);
-    }
+    userDocsList.push(doc);
   });
 
   if (userDocsList.length == 0) {
@@ -1804,12 +1790,12 @@ exports.polarWebhook = functions.https.onRequest(async (request, response) => {
   if (request.method === "POST") {
     // check the webhook token is correct
     const signature = request.headers["polar-webhook-signature"];
-    const lookups = encodeparams
-        .getLookupFromPolarSignature(
+    const secrets = encodeparams
+        .getSecretsFromPolarSignature(
             request.rawBody,
-            configurations.polarWebhookSecrets,
+            configurations.providerConfigs.polar,
             signature);
-    if (lookups == "error") { // TODO put in validation function
+    if (secrets == "error") { // TODO put in validation function
       console.log("Polar Webhook event recieved that did not have a valid signature");
       response.status(401);
       response.send("NOT AUTHORISED");
@@ -1817,7 +1803,7 @@ exports.polarWebhook = functions.https.onRequest(async (request, response) => {
     }
     // save the webhook message and asynchronously process
     try {
-      const webhookDoc = await webhookInBox.push(request, "polar", lookups);
+      const webhookDoc = await webhookInBox.push(request, "polar", secrets.clientId);
       response.sendStatus(200);
       // now we have saved the request and returned ok to the provider
       // the message will trigger an asynchronous process
@@ -1837,30 +1823,20 @@ exports.polarWebhook = functions.https.onRequest(async (request, response) => {
 
 async function processPolarWebhook(webhookDoc) {
   const webhookBody = JSON.parse(webhookDoc.data()["body"]);
-  const lookups = webhookDoc.data()["secret_lookups"];
+  const clientId = webhookDoc.data()["secret_lookups"];
   if (webhookBody.event === "PING") {
     console.log("polar webhook message event = PING, do nothing");
     return;
   }
   const userDocsList = [];
-  const devDocsList = [];
-
-  const devQuery = await db.collection("developers")
-      .where("secret_lookup", "in", lookups)
-      .get();
-  devQuery.docs.forEach((doc)=>{
-    devDocsList.push(doc.id);
-  });
 
   const userQuery = await db.collection("users")
       .where("polar_user_id", "==", webhookBody.user_id)
+      .where("polar_client_id", "==", clientId)
       .get();
 
   userQuery.docs.forEach((doc)=>{
-    // exclude devs that are not managed by this webhook subscription
-    if (devDocsList.includes(doc.data()["devId"])) {
-      userDocsList.push(doc);
-    }
+    userDocsList.push(doc);
   });
 
   if (userDocsList.length == 0) {
@@ -2095,10 +2071,11 @@ async function getStravaDetailedActivity(userDoc, activityDoc) {
   const stravaActivityId = await activityDoc["id"];
   const devId = await userDoc["devId"];
   const secretLookup = await db.collection("developers").doc(devId).get();
-  const lookup = await secretLookup.data()["secret_lookup"];
+  const tag = await secretLookup.data()["secret_lookup"];
+  const secrets = getSecrets.fromTag("strava", tag);
   stravaApi.config({
-    "client_id": configurations[lookup]["stravaClientId"],
-    "client_secret": configurations[lookup]["stravaClientSecret"],
+    "client_id": secrets.clientId,
+    "client_secret": secrets.secret,
     "redirect_uri": callbackBaseUrl+"/stravaCallback",
   });
 
@@ -2253,9 +2230,10 @@ async function getGarminDetailedActivity(userDoc, activityDoc) {
     const url = "https://apis.garmin.com/wellness-api/rest/activityDetails";
     const devId = userDoc["devId"];
     const secretLookup = await db.collection("developers").doc(devId).get();
-    const lookup = await secretLookup.data()["secret_lookup"];
-    const consumerSecret = configurations[lookup]["consumerSecret"];
-    const oAuthConsumerSecret = configurations[lookup]["oauth_consumer_key"];
+    const tag = await secretLookup.data()["secret_lookup"];
+    const secrets = getSecrets.fromTag("garmin", tag);
+    const consumerSecret = secrets.secret;
+    const oAuthConsumerSecret = secrets.clientId;
     let startTime = activityDoc["startTimeInSeconds"];
     const endTime = startTime + 7*24*60*60;
     const activityId = activityDoc["activityId"];
@@ -2594,8 +2572,9 @@ exports.processGetHistoryInBox = functions.firestore
 
 async function polarWebhookUtility(devId, action, webhookId) {
   const secretLookup = await db.collection("developers").doc(devId).get();
-  const lookup = await secretLookup.data()["secret_lookup"];
-  const clientIdClientSecret = configurations[lookup]["polarClientId"]+":"+configurations[lookup]["polarSecret"];
+  const tag = await secretLookup.data()["secret_lookup"];
+  const secrets = getSecrets.fromTag("polar", tag);
+  const clientIdClientSecret = secrets.clientId+":"+secrets.secret;
    const buffer = new Buffer.from(clientIdClientSecret); // eslint-disable-line
   const base64String = buffer.toString("base64");
   const _headers = {
@@ -2650,9 +2629,10 @@ async function oauthCallbackHandlerGarmin(oAuthCallback, transactionData) {
   const userId = transactionData.userId;
   const devId = transactionData.devId;
   const secretLookup = await db.collection("developers").doc(devId).get();
-  const lookup = await secretLookup.data()["secret_lookup"];
-  const consumerSecret = configurations[lookup]["consumerSecret"];
-  const oauthConsumerKey = configurations[lookup]["oauth_consumer_key"];
+  const tag = await secretLookup.data()["secret_lookup"];
+  const secrets = getSecrets.fromTag("garmin", tag);
+  const consumerSecret = secrets.secret;
+  const oauthConsumerKey = secrets.clientId;
   oauthTokenSecret = oauthTokenSecret[0];
   const parameters = {
     oauth_nonce: oauthNonce,
