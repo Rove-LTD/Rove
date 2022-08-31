@@ -3,7 +3,8 @@
 // 24/05/2022
 // Wahoo sanatise Function by Paul Ventisei
 // 15/06/2022
-
+/* eslint-disable max-len */
+/* eslint-disable */
 /**
  * Sanatise Error class is used to throw an error message from the
  * sanatise functions
@@ -17,13 +18,7 @@ class SanatiseError extends Error {
   }
 }
 
-/* eslint-disable max-len */
-/* eslint-disable */
-const {ParseError} = require("got/dist/source");
-const td = require("tinyduration");
-
-
-class standard_format {
+class standardFormat {
   constructor() {
     let activity_id = null;
     let activity_name = null;
@@ -42,146 +37,97 @@ class standard_format {
   }
 }
 
-  exports.corosSanatise = function (a) {
-    try{
-      summaryActivity = {
-        // standard fields
-        "activity_id": a["labelId"],
-        "activity_name": "Coros " + corosSportLookup[a.mode][0],
-        "activity_type": corosSportLookup[a.mode][1],
-        "distance_in_meters": a["distance"],
-        "active_calories": a["calorie"],
-        "start_time": new Date(a["startTime"]*1000).toISOString(),
-        "provider": "coros",
-        "average_pace_in_meters_per_second": (a["avgSpeed"]>0 ? 
-            (1/(a["avgSpeed"])*1000) :
-            0),
-        "activity_duration_in_seconds": a["duration"],
-        "file": {"url": a["fitUrl"] ?? null}
-      }
-    } catch (err) {
-      throw new Error("Cant sanitise message: "+err.message);
-    }
-    for (const property in summaryActivity) {
-      if (typeof summaryActivity[property] == "undefined") {
-        summaryActivity[property] = null;
-      }
-    }
-    return summaryActivity;
-  }
-// sports lookup with {mode: [name, submode]} //ignoring submodes for now...
-const corosSportLookup = {
-8:	["Run", 	1],	
-9:	["Bike", 	1],
-10:	["Swimming", 	1],
-13:	["Multisport",	1],
-14:	["Mountaineering", 	1],	
-15:	["Trail Run", 	1],
-16:	["Hike", 	1],
-18:	["Cardio", 	1],	
-19:	["XC Ski", 	1],
-20:	["Track Run", 1],
-21:	["Ski", 1	],	
-22:	["Pilot", 1],
-23:	["Strength", 2],
-24:	["Rowing", 	1],
-25:	["Whitewater", 1],
-26:	["Flatwater", 	1],
-27:	["Windsurfing", 	1],
-28:	["Speedsurfing", 	1],
-29:	["Ski Touring", 	1],
-31:	["Walk", 1],}
+const td = require("tinyduration");
 
-  exports.polarSanatise = function (activity) {
-    // standard fields
+exports.corosSanatise = function (a) {
+  try{
     summaryActivity = {
       // standard fields
-      "activity_id": activity["id"],
-      "activity_name": activity["detailed_sport_info"],
-      "activity_type": activity["sport"],
-      "distance": activity["distance"],
-      "active_calories": activity["calories"],
-      "start_time": new Date(activity["start_time"]).toISOString(),
-      "provider": "polar",
-      "avg_speed": null,
-      "version": "1.0",
+      "activity_id": a["labelId"],
+      "activity_name": "Coros " + corosSportLookup[a.mode][0],
+      "activity_type": corosSportLookup[a.mode][1],
+      "distance_in_meters": a["distance"],
+      "active_calories": a["calorie"],
+      "start_time": new Date(a["startTime"]*1000).toISOString(),
+      "provider": "coros",
+      "average_pace_in_meters_per_second": (a["avgSpeed"]>0 ? 
+          (1/(a["avgSpeed"])*1000) :
+          0),
+      "activity_duration_in_seconds": a["duration"],
+      "file": {"url": a["fitUrl"] ?? null}
     }
-    const duration = td.parse(activity["duration"]);
-    let durationInSeconds = 0;
-    Object.keys(duration).forEach(function(key,index) {
-      switch (key) {
-        case "hours":
-          durationInSeconds = durationInSeconds + duration[key]*3600;
-          break;
-        case "minutes":
-          durationInSeconds = durationInSeconds + duration[key]*60;
-          break;
-        case "seconds":
-          durationInSeconds = durationInSeconds + duration[key];
-          break;
-        case "days":
-          durationInSeconds = durationInSeconds + duration[key]*3600*24;
-          break;
-        case "weeks":
-          durationInSeconds = durationInSeconds + duration[key]*3600*24*7;
-          break;
-        case "months":
-          durationInSeconds = NaN
-          break;
-        case "years":
-          durationInSeconds = NaN;
-          break;
-      }
-    });
-    summaryActivity.activity_duration = durationInSeconds;
-    if (activity["heart_rate"]["average"] != undefined) {
-      // deal with the fact that some don't have hr
-      summaryActivity.avg_heart_rate =
-          activity["heart_rate"]["average"];
-      summaryActivity.max_heart_rate_bpm =
-          activity["heart_rate"]["maximum"];
-    } else {
-      summaryActivity.avg_heart_rate = null;
-      summaryActivity.max_heart_rate_bpm = null;
-    };
-    summaryActivity.avg_cadence = null;
-    summaryActivity.elevation_gain = null;
-    summaryActivity.elevation_loss = null;
-    for (const property in summaryActivity) {
-      if (typeof summaryActivity[property] == "undefined") {
-        summaryActivity[property] = null;
-      }
-    };
-    return summaryActivity;
+  } catch (err) {
+    throw new Error("Cant sanitise message: "+err.message);
   }
-/*{
-    Polar Example Return.
-    "id": 1937529874,
-    "upload-time": "2008-10-13T10:40:02Z",
-    "polar-user": "https://www.polaraccesslink/v3/users/1",
-    "transaction-id": 179879,
-    "device": "Polar M400",
-    "device-id": "1111AAAA",
-    "start-time": "2008-10-13T10:40:02Z",
-    "start-time-utc-offset": 180,
-    "duration": "PT2H44M",
-    "calories": 530,
-    "distance": 1600,
-    "heart-rate": {
-      "average": 129,
-      "maximum": 147
-    },
-    "training-load": 143.22,
-    "sport": "OTHER",
-    "has-route": true,
-    "club-id": 999,
-    "club-name": "Polar Club",
-    "detailed-sport-info": "WATERSPORTS_WATERSKI",
-    "fat-percentage": 60,
-    "carbohydrate-percentage": 38,
-    "protein-percentage": 2
-  }*/
-
+  for (const property in summaryActivity) {
+    if (typeof summaryActivity[property] == "undefined") {
+      summaryActivity[property] = null;
+    }
+  }
+  return summaryActivity;
+}
+exports.polarSanatise = function (activity) {
+  // standard fields
+  summaryActivity = {
+    // standard fields
+    "activity_id": activity["id"],
+    "activity_name": activity["detailed_sport_info"],
+    "activity_type": activity["sport"],
+    "distance": activity["distance"],
+    "active_calories": activity["calories"],
+    "start_time": new Date(activity["start_time"]).toISOString(),
+    "provider": "polar",
+    "avg_speed": null,
+    "version": "1.0",
+  }
+  const duration = td.parse(activity["duration"]);
+  let durationInSeconds = 0;
+  Object.keys(duration).forEach(function(key,index) {
+    switch (key) {
+      case "hours":
+        durationInSeconds = durationInSeconds + duration[key]*3600;
+        break;
+      case "minutes":
+        durationInSeconds = durationInSeconds + duration[key]*60;
+        break;
+      case "seconds":
+        durationInSeconds = durationInSeconds + duration[key];
+        break;
+      case "days":
+        durationInSeconds = durationInSeconds + duration[key]*3600*24;
+        break;
+      case "weeks":
+        durationInSeconds = durationInSeconds + duration[key]*3600*24*7;
+        break;
+      case "months":
+        durationInSeconds = NaN
+        break;
+      case "years":
+        durationInSeconds = NaN;
+        break;
+    }
+  });
+  summaryActivity.activity_duration = durationInSeconds;
+  if (activity["heart_rate"]["average"] != undefined) {
+    // deal with the fact that some don't have hr
+    summaryActivity.avg_heart_rate =
+        activity["heart_rate"]["average"];
+    summaryActivity.max_heart_rate_bpm =
+        activity["heart_rate"]["maximum"];
+  } else {
+    summaryActivity.avg_heart_rate = null;
+    summaryActivity.max_heart_rate_bpm = null;
+  };
+  summaryActivity.avg_cadence = null;
+  summaryActivity.elevation_gain = null;
+  summaryActivity.elevation_loss = null;
+  for (const property in summaryActivity) {
+    if (typeof summaryActivity[property] == "undefined") {
+      summaryActivity[property] = null;
+    }
+  };
+  return summaryActivity;
+}
 exports.stravaSanitise = function(activities) {
   let summaryActivities = [{}];
 
@@ -297,66 +243,7 @@ exports.garminSanitise = function(activities) {
     }
     return summaryActivities
 }
-
 exports.wahooSanitise = function (activity) {
-  wahooWorkoutType = { 
-    0:	"BIKING",
-    1: "RUNNING",
-    2: "FE",
-    3: "RUNNING_TRACK",
-    4: "RUNNING_TRAIL",
-    5: "RUNNING_TREADMILL",	
-    6: "WALKING",
-    7: "WALKING_SPEED",
-    8: "WALKING_NORDIC",
-    9: "HIKING",
-    10: "MOUNTAINEERING",
-    11: "BIKING_CYCLECROSS",
-    12: "BIKING_INDOOR",
-    13: "BIKING_MOUNTAIN",	
-    14: "BIKING_RECUMBENT",
-    15: "BIKING_ROAD",
-    16: "BIKING_TRACK",
-    17: "BIKING_MOTOCYCLING",
-    18: "FE_GENERAL",
-    19: "FE_TREADMILL",
-    20: "FE_ELLIPTICAL",
-    21: "FE_BIKE",
-    22: "FE_ROWER",
-    23: "FE_CLIMBER",
-    25: "SWIMMING_LAP",
-    26: "SWIMMING_OPEN_WATER",
-    27: "SNOWBOARDING",
-    28: "SKIING",
-    29: "SKIING_DOWNHILL",
-    30: "SKIINGCROSS_COUNTRY",
-    31: "SKATING",
-    32: "SKATING_ICE",
-    33:	"SKATING_INLINE",
-    34:	"LONG_BOARDING",
-    35:	"SAILING",
-    36:	"WINDSURFING",
-    37:	"CANOEING",
-    38:	"KAYAKING",	
-    39:	"ROWING",
-    40:	"KITEBOARDING",
-    41:	"STAND_UP_PADDLE_BOARD",
-    42:	"WORKOUT",
-    43:	"CARDIO_CLASS",
-    44:	"STAIR_CLIMBER",	
-    45:	"WHEELCHAIR",
-    46:	"GOLFING",
-    47:	"OTHER",
-    49:	"BIKING_INDOOR_CYCLING_CLASS",
-    56:	"WALKING_TREADMILL",
-    61:	"BIKING_INDOOR_TRAINER",	
-    62:	"MULTISPORT",
-    63:	"TRANSITION",
-    64:	"EBIKING",
-    65:	"TICKR_OFFLINE",
-    66:	"YOGA",
-    255:"UNKNOWN",}
- 
   let summaryActivity = {};
   if (activity.event_type == "workout_summary") {
     summaryActivity = {
@@ -420,270 +307,99 @@ exports.wahooSanitise = function (activity) {
 
   return summaryActivity;
 }
-
-strava_examplar_1 = {
-    "id" : 12345678987654321,
-    "resource_state" : 3,
-    "external_id" : "garmin_push_12345678987654321",
-    "upload_id" : 98765432123456789,
-    "athlete" : {
-      "id" : 134815,
-      "resource_state" : 1
-    },
-    "name" : "Happy Friday",
-    "distance" : 28099,
-    "moving_time" : 4207,
-    "elapsed_time" : 4410,
-    "total_elevation_gain" : 516,
-    "type" : "Ride",
-    "start_date" : "2018-02-16T14:52:54Z",
-    "start_date_local" : "2018-02-16T06:52:54Z",
-    "timezone" : "(GMT-08:00) America/Los_Angeles",
-    "utc_offset" : -28800,
-    "start_latlng" : [ 37.83, -122.26 ],
-    "end_latlng" : [ 37.83, -122.26 ],
-    "achievement_count" : 0,
-    "kudos_count" : 19,
-    "comment_count" : 0,
-    "athlete_count" : 1,
-    "photo_count" : 0,
-    "map" : {
-      "id" : "a1410355832",
-      "polyline" : "ki{eFvqfiVqAWQIGEEKAYJgBVqDJ{BHa@jAkNJw@Pw@V{APs@^aABQAOEQGKoJ_FuJkFqAo@{A}@sH{DiAs@Q]?WVy@`@oBt@_CB]KYMMkB{AQEI@WT{BlE{@zAQPI@ICsCqA_BcAeCmAaFmCqIoEcLeG}KcG}A}@cDaBiDsByAkAuBqBi@y@_@o@o@kB}BgIoA_EUkAMcACa@BeBBq@LaAJe@b@uA`@_AdBcD`@iAPq@RgALqAB{@EqAyAoOCy@AmCBmANqBLqAZkB\\iCPiBJwCCsASiCq@iD]eA]y@[i@w@mAa@i@k@g@kAw@i@Ya@Q]EWFMLa@~BYpAFNpA`Aj@n@X`@V`AHh@JfB@xAMvAGZGHIDIAWOEQNcC@sACYK[MSOMe@QKKKYOs@UYQISCQ?Q@WNo@r@OHGAGCKOQ_BU}@MQGG]Io@@c@FYNg@d@s@d@ODQAMOMaASs@_@a@SESAQDqBn@a@RO?KK?UBU\\kA@Y?WMo@Iy@GWQ_@WSSGg@AkABQB_Ap@_A^o@b@Q@o@IS@OHi@n@OFS?OI}@iAQMQGQC}@DOIIUK{@IUOMyBo@kASOKIQCa@L[|AgATWN[He@?QKw@FOPCh@Fx@l@TDLELKl@aAHIJEX@r@ZTDV@LENQVg@RkA@c@MeA?WFOPMf@Ej@Fj@@LGHKDM?_@_@iC?a@HKRIl@NT?FCHMFW?YEYGWQa@GYBiAIq@Gq@L_BHSHK|@WJETSLQZs@z@_A~@uA^U`@G\\CRB\\Tl@p@Th@JZ^bB`@lAHLXVLDP?LGFSKiDBo@d@wBVi@R]VYVE\\@`@Lh@Fh@CzAk@RSDQA]GYe@eAGWSiBAWBWBIJORK`@KPOPSTg@h@}Ad@o@F[E_@EGMKUGmAEYGMIMYKs@?a@J}@@_BD_@HQJMx@e@LKHKHWAo@UoAAWFmAH}@?w@C[YwAAc@HSNM|Ao@rA}@zAq@`@a@j@eAxAuBXQj@MXSR[b@gAFg@?YISOGaAHi@Xw@v@_@d@WRSFqARUHQJc@d@m@`A[VSFUBcAEU@WFULUPa@v@Y~@UrBc@dBI~@?l@P~ABt@N`HEjA]zAEp@@p@TrBCl@CTQb@k@dAg@jAU^KJYLK@k@A[Js@d@a@b@]RgBl@[FMAw@[]G]?m@D_@F]P[Vu@t@[TMF_@Do@E_@@q@P]PWZUZw@vAkAlAGJOj@IlAMd@OR{@p@a@d@sBpD]v@a@`Aa@n@]TODgBVk@Pe@^cBfBc@Rs@La@RSPm@|@wCpDS^Wp@QZML{@l@qBbCYd@k@lAIVCZBZNTr@`@RRHZANIZQPKDW@e@CaASU?I@YTKRQx@@\\VmALYRQLCL?v@P|@D\\GJEFKDM@OCa@COOYIGm@YMUCM@]JYr@uAx@kAt@}@jAeAPWbAkBj@s@bAiAz@oAj@m@VQlAc@VQ~@aA`Au@p@Q`AIv@MZORUV_@p@iB|AoCh@q@dAaANUNWH[N{AJ[^m@t@_Av@wA\\a@`@W`@In@Al@B^E`@Wl@u@\\[VQ\\K`@Eb@?R@dAZP@d@CRExAs@\\Yt@{@LG\\MjAATINOXo@d@kAl@_AHYBOCe@QiBCm@Fq@\\wADo@AyGEeBWuB@YHu@Tu@Lk@VcCTo@d@aA\\WJE`@G~@FP?VI\\U~@sANO`@SfAMj@U\\WjAsAXS`@UNENALBHFFL?^Ml@Uj@]b@q@RUJSPkChEc@XcAb@sA|@]PaA\\OJKNER?TDTNj@Jn@?p@OfC@ZR`B@VCV_@n@{@l@WbACv@OlABnAPl@LNNHbBBNBLFFJ@^GLg@x@i@|AMP[X}@XOJKPET?l@LhAFXp@fBDRCd@S\\_@Ps@PQ@}A]S?QDe@V]b@MR[fAKt@ErAF~CANILYDKGIKe@{@Yy@e@sB[gA[c@e@YUCU?WBUHUNQPq@`AiArAMV[^e@Zc@JQJKNMz@?r@Bb@PfAAfA@VVbADn@E`@KHSEe@SMAKDKFM\\^dDCh@m@LoAQ_@@MFOZLfBEl@QbASd@KLQBOAaAc@QAQ@QHc@v@ONMJOBOCg@c@]O[EMBKFGL?RHv@ARERGNe@h@{@h@WVGNDt@JLNFPFz@LdBf@f@PJNHPF`ADPJJJDl@I`@B^Tp@bALJNDNALIf@i@PGPCt@DNE`@Uv@[dAw@RITGRCtAARBPJLPJRZxB?VEX_@vAAR?RDNHJJBh@UnBm@h@IRDRJNNJPNbBFRJLLBLCzAmAd@Uf@Gf@?P@PFJNHPFTH`BDTHNJJJ@LG`@m@^YPER@RDPHNNJRLn@HRLN^VNPHTFX@\\UlDFb@FHh@NP@HKPsB?}ASkCQ{@[y@q@}@cA{@KOCQDa@t@{CFGJCf@Nl@ZtA~@r@p@`@h@rAxBd@rA\\fARdAPjANrB?f@AtBCd@QfBkAjJOlBChA?rBFrBNlBdAfKFzAC~@Iz@Mz@Sv@s@jBmAxBi@hAWt@Sv@Qx@O`BA`@?dAPfBVpAd@`BfBlFf@fBdA~Cr@pAz@fApBhBjAt@H?IL?FBFJLx@^lHvDvh@~XnElCbAd@pGhDbAb@nAr@`Ad@`GhDnBbAxCbBrWhNJJDPARGP_@t@Qh@]pAUtAoA`Ny@jJApBBNFLJFJBv@Hb@HBF?\\",
-      "resource_state" : 3,
-      "summary_polyline" : "ki{eFvqfiVsBmA`Feh@qg@iX`B}JeCcCqGjIq~@kf@cM{KeHeX`@_GdGkSeBiXtB}YuEkPwFyDeAzAe@pC~DfGc@bIOsGmCcEiD~@oBuEkFhBcBmDiEfAVuDiAuD}NnDaNiIlCyDD_CtJKv@wGhD]YyEzBo@g@uKxGmHpCGtEtI~AuLrHkAcAaIvEgH_EaDR_FpBuBg@sNxHqEtHgLoTpIiCzKNr[sB|Es\\`JyObYeMbGsMnPsAfDxAnD}DBu@bCx@{BbEEyAoD`AmChNoQzMoGhOwX|[yIzBeFKg[zAkIdU_LiHxK}HzEh@vM_BtBg@xGzDbCcF~GhArHaIfByAhLsDiJuC?_HbHd@nL_Cz@ZnEkDDy@hHwJLiCbIrNrIvN_EfAjDWlEnEiAfBxDlFkBfBtEfDaAzBvDKdFx@|@XgJmDsHhAgD`GfElEzOwBnYdBxXgGlSc@bGdHpW|HdJztBnhAgFxc@HnCvBdA"
-    },
-    "trainer" : false,
-    "commute" : false,
-    "manual" : false,
-    "private" : false,
-    "flagged" : false,
-    "gear_id" : "b12345678987654321",
-    "from_accepted_tag" : false,
-    "average_speed" : 6.679,
-    "max_speed" : 18.5,
-    "average_cadence" : 78.5,
-    "average_temp" : 4,
-    "average_watts" : 185.5,
-    "weighted_average_watts" : 230,
-    "kilojoules" : 780.5,
-    "device_watts" : true,
-    "has_heartrate" : false,
-    "max_watts" : 743,
-    "elev_high" : 446.6,
-    "elev_low" : 17.2,
-    "pr_count" : 0,
-    "total_photo_count" : 2,
-    "has_kudoed" : false,
-    "workout_type" : 10,
-    "suffer_score" : null,
-    "description" : "",
-    "calories" : 870.2,
-    "segment_efforts" : [ {
-      "id" : 12345678987654321,
-      "resource_state" : 2,
-      "name" : "Tunnel Rd.",
-      "activity" : {
-        "id" : 12345678987654321,
-        "resource_state" : 1
-      },
-      "athlete" : {
-        "id" : 134815,
-        "resource_state" : 1
-      },
-      "elapsed_time" : 2038,
-      "moving_time" : 2038,
-      "start_date" : "2018-02-16T14:56:25Z",
-      "start_date_local" : "2018-02-16T06:56:25Z",
-      "distance" : 9434.8,
-      "start_index" : 211,
-      "end_index" : 2246,
-      "average_cadence" : 78.6,
-      "device_watts" : true,
-      "average_watts" : 237.6,
-      "segment" : {
-        "id" : 673683,
-        "resource_state" : 2,
-        "name" : "Tunnel Rd.",
-        "activity_type" : "Ride",
-        "distance" : 9220.7,
-        "average_grade" : 4.2,
-        "maximum_grade" : 25.8,
-        "elevation_high" : 426.5,
-        "elevation_low" : 43.4,
-        "start_latlng" : [ 37.8346153, -122.2520872 ],
-        "end_latlng" : [ 37.8476261, -122.2008944 ],
-        "climb_category" : 3,
-        "city" : "Oakland",
-        "state" : "CA",
-        "country" : "United States",
-        "private" : false,
-        "hazardous" : false,
-        "starred" : false
-      },
-      "kom_rank" : null,
-      "pr_rank" : null,
-      "achievements" : [ ],
-      "hidden" : false
-    } ],
-    "splits_metric" : [ {
-      "distance" : 1001.5,
-      "elapsed_time" : 141,
-      "elevation_difference" : 4.4,
-      "moving_time" : 141,
-      "split" : 1,
-      "average_speed" : 7.1,
-      "pace_zone" : 0
-    } ],
-    "laps" : [ {
-      "id" : 4479306946,
-      "resource_state" : 2,
-      "name" : "Lap 1",
-      "activity" : {
-        "id" : 1410355832,
-        "resource_state" : 1
-      },
-      "athlete" : {
-        "id" : 134815,
-        "resource_state" : 1
-      },
-      "elapsed_time" : 1573,
-      "moving_time" : 1569,
-      "start_date" : "2018-02-16T14:52:54Z",
-      "start_date_local" : "2018-02-16T06:52:54Z",
-      "distance" : 8046.72,
-      "start_index" : 0,
-      "end_index" : 1570,
-      "total_elevation_gain" : 276,
-      "average_speed" : 5.12,
-      "max_speed" : 9.5,
-      "average_cadence" : 78.6,
-      "device_watts" : true,
-      "average_watts" : 233.1,
-      "lap_index" : 1,
-      "split" : 1
-    } ],
-    "gear" : {
-      "id" : "b12345678987654321",
-      "primary" : true,
-      "name" : "Tarmac",
-      "resource_state" : 2,
-      "distance" : 32547610
-    },
-    "partner_brand_tag" : null,
-    "photos" : {
-      "primary" : {
-        "id" : null,
-        "unique_id" : "3FDGKL3-204E-4867-9E8D-89FC79EAAE17",
-        "urls" : {
-          "100" : "https://dgtzuqphqg23d.cloudfront.net/Bv93zv5t_mr57v0wXFbY_JyvtucgmU5Ym6N9z_bKeUI-128x96.jpg",
-          "600" : "https://dgtzuqphqg23d.cloudfront.net/Bv93zv5t_mr57v0wXFbY_JyvtucgmU5Ym6N9z_bKeUI-768x576.jpg"
-        },
-        "source" : 1
-      },
-      "use_primary_photo" : true,
-      "count" : 2
-    },
-    "highlighted_kudosers" : [ {
-      "destination_url" : "strava://athletes/12345678987654321",
-      "display_name" : "Marianne V.",
-      "avatar_url" : "https://dgalywyr863hv.cloudfront.net/pictures/athletes/12345678987654321/12345678987654321/3/medium.jpg",
-      "show_name" : true
-    } ],
-    "hide_from_home" : false,
-    "device_name" : "Garmin Edge 1030",
-    "embed_token" : "18e4615989b47dd4ff3dc711b0aa4502e4b311a9",
-    "segment_leaderboard_opt_out" : false,
-    "leaderboard_opt_out" : false
-  }
-garmin_examplar_1 = {
-    "activeKilocalories": 391,
-    "activityId": 7698241609,
-    "activityName": "Indoor Cycling",
-    "activityType": "INDOOR_CYCLING",
-    "averageHeartRateInBeatsPerMinute": 139,
-    "deviceName": "forerunner935",
-    "durationInSeconds": 1811,
-    "maxHeartRateInBeatsPerMinute": 178,
-    "startTimeInSeconds": 1634907261,
-    "startTimeOffsetInSeconds": 3600,
-    "summaryId": "7698241609",
-    "userAccessToken": "32ada6ab-e5fe-46a7-bd82-5bad6158d6eb",
-    "userId": "eb24e8e5-110d-4a87-b976-444f40ca27d4"
-  }
-garmin_examplar_2 = {
-    "activeKilocalories": 809,
-    "activityId": 7654562055,
-    "activityName": "Newcastle upon Tyne Running",
-    "activityType": "RUNNING",
-    "averageHeartRateInBeatsPerMinute": 143,
-    "averagePaceInMinutesPerKilometer": 5.6670065,
-    "averageRunCadenceInStepsPerMinute": 157.09375,
-    "averageSpeedInMetersPerSecond": 2.941,
-    "deviceName": "forerunner735xt",
-    "distanceInMeters": 12213.01,
-    "durationInSeconds": 4152,
-    "maxHeartRateInBeatsPerMinute": 161,
-    "maxPaceInMinutesPerKilometer": 3.7444768,
-    "maxRunCadenceInStepsPerMinute": 249,
-    "maxSpeedInMetersPerSecond": 4.451,
-    "startTimeInSeconds": 1634193362,
-    "startTimeOffsetInSeconds": 3600,
-    "startingLatitudeInDegree": 54.99477194622159,
-    "startingLongitudeInDegree": -1.6087607201188803,
-    "steps": 10856,
-    "summaryId": "7654562055",
-    "totalElevationGainInMeters": 91.247894,
-    "totalElevationLossInMeters": 90.40311,
-    "userAccessToken": "715a21a5-d9ae-4139-8ed7-d3ad4a833da4",
-    "userId": "8e1ec0b4-7fa9-4a1c-be14-d8f6dee46bf7"
-  }
-  wahooExemplar = {
-    "user": {
-      "id":1510441
-    },
-    "event_type":"workout_summary",
-    "workout_summary":{
-      "duration_active_accum":"9.0",
-      "workout": {
-        "name":"Cycling",
-        "workout_token":"ELEMNT AE48:274",
-        "workout_type_id":0,
-        "id":147564736,
-        "updated_at":"2022-06-13T16:39:08.000Z",
-        "plan_id":null,
-        "minutes":0,
-        "starts":"2022-06-13T16:38:51.000Z",
-        "created_at":"2022-06-13T16:39:08.000Z"
-      },
-      "speed_avg":"0.0",
-      "duration_total_accum":"9.0",
-      "cadence_avg":"0.0",
-      "id":140473420,
-      "work_accum":"0.0",
-      "power_bike_tss_last":null,
-      "ascent_accum":"0.0",
-      "power_bike_np_last":null,
-      "duration_paused_accum":"0.0",
-      "created_at":"2022-06-13T16:39:09.000Z",
-      "updated_at":"2022-06-13T16:39:09.000Z",
-      "power_avg":"0.0",
-      "file":{
-        "url":"https://cdn.wahooligan.com/wahoo-cloud/production/uploads/workout_file/file/WpHvKL3irWsv2vHzGzGF_Q/2022-06-13-163851-ELEMNT_AE48-274-0.fit"
-      },
-      "distance_accum":"0.0",
-      "heart_rate_avg":"0.0",
-      "calories_accum":"0.0"
-    },
-    "webhook_token":"97661c16-6359-4854-9498-a49c07b6ec11"
-  };
-/*
-x = stravaSanitise([strava_examplar_1]);
-y = garminSanitise([garmin_examplar_2])
-
-console.log("Strava Sanitised")
-console.log(x)
-console.log()
-console.log("Garmin Sanitised")
-console.log(y)
-*/
+/**
+ * @param {Map} sanitisedActivity
+ * @return {Map} compressedSanitisedActivity
+ */
+exports.compressSanitisedActivity = function(sanitisedActivity) {
+  const compressedSanitisedActivity = sanitisedActivity;
+  return compressedSanitisedActivity;
+}
+/**
+ * @param {Map} compressedSanitisedActivity
+ * @return {Map} sanitisedActivity
+ */
+ exports.uncompressSanitisedActivity = function(compressedSanitisedActivity) {
+  const sanitisedActivity = compressedSanitisedActivity;
+  return sanitisedActivity;
+}
+const wahooWorkoutType = { 
+  0:	"BIKING",
+  1: "RUNNING",
+  2: "FE",
+  3: "RUNNING_TRACK",
+  4: "RUNNING_TRAIL",
+  5: "RUNNING_TREADMILL",	
+  6: "WALKING",
+  7: "WALKING_SPEED",
+  8: "WALKING_NORDIC",
+  9: "HIKING",
+  10: "MOUNTAINEERING",
+  11: "BIKING_CYCLECROSS",
+  12: "BIKING_INDOOR",
+  13: "BIKING_MOUNTAIN",	
+  14: "BIKING_RECUMBENT",
+  15: "BIKING_ROAD",
+  16: "BIKING_TRACK",
+  17: "BIKING_MOTOCYCLING",
+  18: "FE_GENERAL",
+  19: "FE_TREADMILL",
+  20: "FE_ELLIPTICAL",
+  21: "FE_BIKE",
+  22: "FE_ROWER",
+  23: "FE_CLIMBER",
+  25: "SWIMMING_LAP",
+  26: "SWIMMING_OPEN_WATER",
+  27: "SNOWBOARDING",
+  28: "SKIING",
+  29: "SKIING_DOWNHILL",
+  30: "SKIINGCROSS_COUNTRY",
+  31: "SKATING",
+  32: "SKATING_ICE",
+  33:	"SKATING_INLINE",
+  34:	"LONG_BOARDING",
+  35:	"SAILING",
+  36:	"WINDSURFING",
+  37:	"CANOEING",
+  38:	"KAYAKING",	
+  39:	"ROWING",
+  40:	"KITEBOARDING",
+  41:	"STAND_UP_PADDLE_BOARD",
+  42:	"WORKOUT",
+  43:	"CARDIO_CLASS",
+  44:	"STAIR_CLIMBER",	
+  45:	"WHEELCHAIR",
+  46:	"GOLFING",
+  47:	"OTHER",
+  49:	"BIKING_INDOOR_CYCLING_CLASS",
+  56:	"WALKING_TREADMILL",
+  61:	"BIKING_INDOOR_TRAINER",	
+  62:	"MULTISPORT",
+  63:	"TRANSITION",
+  64:	"EBIKING",
+  65:	"TICKR_OFFLINE",
+  66:	"YOGA",
+  255:"UNKNOWN",}
+// sports lookup with {mode: [name, submode]} //ignoring submodes for now...
+const corosSportLookup = {
+  8:	["Run", 	1],	
+  9:	["Bike", 	1],
+  10:	["Swimming", 	1],
+  13:	["Multisport",	1],
+  14:	["Mountaineering", 	1],	
+  15:	["Trail Run", 	1],
+  16:	["Hike", 	1],
+  18:	["Cardio", 	1],	
+  19:	["XC Ski", 	1],
+  20:	["Track Run", 1],
+  21:	["Ski", 1	],	
+  22:	["Pilot", 1],
+  23:	["Strength", 2],
+  24:	["Rowing", 	1],
+  25:	["Whitewater", 1],
+  26:	["Flatwater", 	1],
+  27:	["Windsurfing", 	1],
+  28:	["Speedsurfing", 	1],
+  29:	["Ski Touring", 	1],
+  31:	["Walk", 1],}
+  

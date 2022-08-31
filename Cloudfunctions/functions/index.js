@@ -1895,20 +1895,25 @@ async function processPolarWebhook(webhookDoc) {
 async function saveAndSendActivity(userDocList,
     sanitisedActivity,
     activity) {
+  // create a version of the sanitised activity that compresses
+  // the "samples" array by replacing it with a reference to a file
+  // in storage.
+  const compressedSanitisedActivity = filters.compressSanitisedActivity(sanitisedActivity);
   for (const userDoc of userDocList) {
     // TODO: change this functoin to receive a list
     // of userDocs and put a for loop in here to save
     // to all of the UserDocs
     // tag the sanitised activty with the userId
-    sanitisedActivity["userId"] = userDoc.data()["userId"];
+    compressedSanitisedActivity["userId"] = userDoc.data()["userId"];
     // create a local copy of the activity to prevent the userId
     // being written incorrectly in this loop during async
     // firebase writes and developer sends.
     const localSanitisedActivity =
-        JSON.parse(JSON.stringify(sanitisedActivity));
+        JSON.parse(JSON.stringify(compressedSanitisedActivity));
     const activityDoc = userDoc.ref
         .collection("activities")
-        .doc(sanitisedActivity.activity_id+sanitisedActivity.provider);
+        .doc(compressedSanitisedActivity.activity_id+
+            compressedSanitisedActivity.provider);
 
     const doc = await activityDoc.get();
 
@@ -1980,7 +1985,6 @@ exports.sendToDeveloper = functions
           .get();
 
       const devId = userDoc.data()["devId"];
-      const datastring = {"sanitised": activityDoc.data()["sanitisedActivity"], "raw": activityDoc.data()["raw"]};
       const developerDoc = await db.collection("developers").doc(devId).get();
       // if the developer document has the "suppress_webhook" field
       // set to "true" then return without sending the activity.
@@ -1991,7 +1995,11 @@ exports.sendToDeveloper = functions
                 {merge: true});
         return;
       }
-
+      const uncompressSanitisedActivity =
+          filters
+              .uncompressSanitisedActivity(activityDoc
+                  .data()["sanitisedActivity"]);
+      const datastring = {"sanitised": uncompressSanitisedActivity, "raw": activityDoc.data()["raw"]};
       const endpoint = developerDoc.data()["endpoint"];
       const userData = userDoc.data();
       // check if the user is from notion.
