@@ -19,7 +19,6 @@ const request = require("request");
 const stravaApi = require("strava-v3");
 const OauthWahoo = require("./oauthWahoo");
 const contentsOfDotEnvFile = require("./config.json");
-const filters = require("./data-filter");
 const fs = require("fs");
 const notion = require("./notion");
 const fitDecoder = require("fit-decoder");
@@ -31,6 +30,7 @@ admin.initializeApp();
 const db = admin.firestore();
 const storage = admin.storage();
 
+const filters = require("./data-filter");
 const webhookInBox = require("./webhookInBox");
 const getHistoryInBox = require("./getHistoryInBox");
 const getSecrets = require("./getSecrets");
@@ -234,7 +234,7 @@ exports.getActivityList = functions.https.onRequest(async (req, res) => {
     res.status(200);
     // write the docs into the database now.
     for (let i = 0; i < payload.length; i++) {
-      saveAndSendActivity(userDoc,
+      saveAndSendActivity([userDoc],
           payload[i].sanitised,
           payload[i].raw);
     }
@@ -1123,11 +1123,9 @@ async function processGarminWebhook(webhookDoc) {
     // const samples = await getDetailedActivity(userDocsList[0].data(), webhookBody.activities[index], "garmin");
     // sanitisedActivity["samples"] = samples;
     // save raw and sanitised activites as a backup for each user
-    for (const userDoc of userDocsList) {
-      saveAndSendActivity(userDoc,
-          sanitisedActivity,
-          webhookBody.activities[index]);
-    }
+    saveAndSendActivity(userDocsList,
+        sanitisedActivity,
+        webhookBody.activities[index]);
     index=index+1;
   }
   return;
@@ -1612,11 +1610,9 @@ async function processStravaWebhook(webhookDoc) {
     // const samples = await getDetailedActivity(userDocsList[0].data(), activity, "strava");
     // sanitisedActivity[0]["samples"] = samples;
   }
-  for (const userDoc of userDocsList) {
-    await saveAndSendActivity(userDoc,
-        sanitisedActivity[0],
-        activity);
-  }
+  await saveAndSendActivity(userDocsList,
+      sanitisedActivity[0],
+      activity);
 }
 
 exports.wahooWebhook = functions.https.onRequest(async (request, response) => {
@@ -1731,11 +1727,9 @@ async function processWahooWebhook(webhookDoc) {
   // sanitisedActivity["samples"] = samples;
 
   // save raw and sanitised activites as a backup for each user
-  for (const userDoc of userDocsList) {
-    await saveAndSendActivity(userDoc,
-        sanitisedActivity,
-        webhookBody);
-  }
+  await saveAndSendActivity(userDocsList,
+      sanitisedActivity,
+      webhookBody);
   return;
 }
 
@@ -1770,12 +1764,10 @@ async function processCorosWebhook(webhookDoc) {
     sanitisedActivities = sanitisedActivities.concat(currentActivity);
   }
   // save raw and sanitised activites as a backup for each user
-  for (const userDoc of userDocsList) {
-    for (let i = 0; i<sanitisedActivities.length; i++) {
-      saveAndSendActivity(userDoc,
-          sanitisedActivities[i],
-          webhookBody);
-    }
+  for (let i = 0; i<sanitisedActivities.length; i++) {
+    saveAndSendActivity(userDocsList,
+        sanitisedActivities[i],
+        webhookBody);
   }
   return;
 }
@@ -1885,9 +1877,7 @@ async function processPolarWebhook(webhookDoc) {
     // sanitisedActivity["samples"] = samples;
     // write sanitised information and raw information to each user and then
     // send to developer
-    for (const userDoc of userDocsList) {
-      await saveAndSendActivity(userDoc, sanitisedActivity, activity);
-    }
+    await saveAndSendActivity(userDocsList, sanitisedActivity, activity);
   } else {
     throw Error("Polar activity type "+webhookBody.event+" not supported");
   }
@@ -1896,30 +1886,42 @@ async function processPolarWebhook(webhookDoc) {
  * checks if a duplicate and if not then
  * saves the activity to the user collection
  * then sends to the developer.
- * @param {FirebaseFirestore} userDoc
+ * - when saving to the Activity Record the "session" array
+ * is saved in storage and replaced with the storage id
+ * @param {Array<FirebaseFirestore>} userDocList
  * @param {Map} sanitisedActivity
  * @param {Map} activity
  */
-async function saveAndSendActivity(userDoc,
+async function saveAndSendActivity(userDocList,
     sanitisedActivity,
     activity) {
-  // tag the sanitised activty with the userId
-  sanitisedActivity["userId"] = userDoc.data()["userId"];
-  // create a local copy of the activity to prevent the userId
-  // being written incorrectly in this loop during async
-  // firebase writes and developer sends.
-  const localSanitisedActivity =
-      JSON.parse(JSON.stringify(sanitisedActivity));
-  const activityDoc = userDoc.ref
-      .collection("activities")
-      .doc(sanitisedActivity.activity_id+sanitisedActivity.provider);
+  // create a version of the sanitised activity that compresses
+  // the "samples" array by replacing it with a reference to a file
+  // in storage.
+  const compressedSanitisedActivity = await filters.compressSanitisedActivity(sanitisedActivity);
+  for (const userDoc of userDocList) {
+    // TODO: change this functoin to receive a list
+    // of userDocs and put a for loop in here to save
+    // to all of the UserDocs
+    // tag the sanitised activty with the userId
+    compressedSanitisedActivity["userId"] = userDoc.data()["userId"];
+    // create a local copy of the activity to prevent the userId
+    // being written incorrectly in this loop during async
+    // firebase writes and developer sends.
+    const localSanitisedActivity =
+        JSON.parse(JSON.stringify(compressedSanitisedActivity));
+    const activityDoc = userDoc.ref
+        .collection("activities")
+        .doc(compressedSanitisedActivity.activity_id+
+            compressedSanitisedActivity.provider);
 
-  const doc = await activityDoc.get();
+    const doc = await activityDoc.get();
 
-  if (!doc.exists) {
-    await activityDoc.set({"sanitised": localSanitisedActivity, "raw": activity});
-  } else {
-    console.log("duplicate activity - not written or sent");
+    if (!doc.exists) {
+      await activityDoc.set({"sanitised": localSanitisedActivity, "raw": activity});
+    } else {
+      console.log("duplicate activity - not written or sent");
+    }
   }
 }
 
@@ -1983,7 +1985,6 @@ exports.sendToDeveloper = functions
           .get();
 
       const devId = userDoc.data()["devId"];
-      const datastring = {"sanitised": activityDoc.data()["sanitisedActivity"], "raw": activityDoc.data()["raw"]};
       const developerDoc = await db.collection("developers").doc(devId).get();
       // if the developer document has the "suppress_webhook" field
       // set to "true" then return without sending the activity.
@@ -1994,7 +1995,13 @@ exports.sendToDeveloper = functions
                 {merge: true});
         return;
       }
-
+      // now before we send get the sessions field from
+      // storage if it exists
+      const uncompressSanitisedActivity =
+          await filters
+              .uncompressSanitisedActivity(activityDoc
+                  .data()["sanitised"]);
+      const datastring = {"sanitised": uncompressSanitisedActivity, "raw": activityDoc.data()["raw"]};
       const endpoint = developerDoc.data()["endpoint"];
       const userData = userDoc.data();
       // check if the user is from notion.

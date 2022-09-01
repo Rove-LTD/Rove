@@ -72,6 +72,7 @@ describe("Testing that sending webhook messages to developers work: ", () => {
             elevation_gain: "0.0",
             elevation_loss: null,
             provider: "wahoo",
+            sessions: {"file": "sessions/140473420wahoo"},
             power_bike_tss_last: null,
             power_bike_np_last: null,
             ascent_accum: "0.0",
@@ -134,8 +135,23 @@ describe("Testing that sending webhook messages to developers work: ", () => {
           .set(activityDoc1);
 
         const snapshot = test.firestore.makeDocumentSnapshot(activityDoc1, "users/"+testDev+testUser+"/activities/"+activityDoc1.sanitised.activity_id+"wahoo");
+        gotPostSpy = sinon.spy(got, "post");
         wrapped = test.wrap(myFunctions.sendToDeveloper);
         await wrapped(snapshot, {params: {userDocId: testDev+testUser, activityId: activityDoc1.sanitised.activity_id+"wahoo"}});
+        // now check the got call was correct information
+        let args = gotPostSpy.getCall(0).args[0]
+        args.body = JSON.parse(args.body);
+        activityDoc1.sanitised.sessions = {"heartRate": [1,2,3,4,5]}
+        expectedOptions = {
+            method: "POST",
+            url: devTestData.endpoint,
+            headers: {
+            "Accept": "application/json",
+            "Content-type": "application/json",
+            },
+            body: activityDoc1,
+        };
+        assert.deepEqual(args, expectedOptions, "the wrong info was sent to the developer endpoint");
         //now check the database was updated correctly
        const testUserDoc = await admin.firestore()
           .collection("users")
@@ -151,6 +167,7 @@ describe("Testing that sending webhook messages to developers work: ", () => {
        activityDoc1.status = "sent";
        activityDoc1.timestamp = "not tested";
        activityDoc1.triesSoFar = 1;
+       activityDoc1.sanitised.sessions = {"file": "sessions/140473420wahoo" }
 
       assert.deepEqual(sanatisedActivity, activityDoc1);
       sinon.restore();
