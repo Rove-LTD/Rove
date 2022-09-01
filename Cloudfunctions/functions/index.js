@@ -354,10 +354,8 @@ async function getPolarActivityList(start, end, userDoc) {
 async function getGarminActivityList(start, end, userDoc) {
   const url = "https://apis.garmin.com/wellness-api/rest/activities";
   const userDocData = await userDoc.data();
-  const devId = userDocData["devId"];
-  const secretLookup = await db.collection("developers").doc(devId).get();
-  const tag = await secretLookup.data()["secret_lookup"];
-  const secrets = getSecrets.fromTag("garmin", tag);
+  const clientId = userDocData["garmin_client_id"];
+  const secrets = getSecrets.fromClientId("garmin", clientId);
   const consumerSecret = secrets.secret;
   const oAuthConsumerSecret = secrets.clientId;
   let activityList = [];
@@ -365,7 +363,17 @@ async function getGarminActivityList(start, end, userDoc) {
   // we have to run the API call for each day in the call.
   while (start.getTime() < end.getTime()) {
     requestEndTime = new Date(start.getTime() + (24*60*60*1000));
-    const options = await encodeparams.garminCallOptions(url, "GET", consumerSecret, oAuthConsumerSecret, userDocData["garmin_access_token"], userDocData["garmin_access_token_secret"], {from: start.getTime()/1000, to: requestEndTime.getTime()/1000});
+    const options = await encodeparams.garminCallOptions(
+        url,
+        "GET",
+        consumerSecret,
+        oAuthConsumerSecret,
+        userDocData["garmin_access_token"],
+        userDocData["garmin_access_token_secret"],
+        {
+          from: start.getTime()/1000,
+          to: requestEndTime.getTime()/1000,
+        });
     let currentActivityList = await got.get(options);
     currentActivityList = JSON.parse(currentActivityList.body);
     activityList = activityList.concat(currentActivityList);
@@ -381,23 +389,29 @@ async function getGarminActivityList(start, end, userDoc) {
   return listOfValidActivities;
 }
 async function getStravaActivityList(start, end, userDoc) {
-  const userDocData = await userDoc.data();
-  const devId = userDocData["devId"];
-  const accessToken = userDocData["strava_access_token"];
-  const secretLookup = await db.collection("developers").doc(devId).get();
-  const tag = await secretLookup.data()["secret_lookup"];
-  const secrets = getSecrets.fromTag("strava", tag);
+  let userDocData = await userDoc.data();
+  let accessToken = userDocData["strava_access_token"];
+  const clientId = userDocData["strava_client_id"];
+  const secrets = getSecrets.fromClientId("strava", clientId);
   stravaApi.config({
     "client_id": secrets.clientId,
     "client_secret": secrets.secret,
     "redirect_uri": callbackBaseUrl+"/stravaCallback",
   });
+  if (await checkStravaTokens(userDoc.id, db) == true) {
+    // token out of date, make request for new ones.
+    const payload = await stravaApi.oauth.refreshToken(userDoc.data()["strava_refresh_token"]);
+    await stravaTokenStorage(userDoc.id, payload, accessToken, userDoc.data()["strava_id"]);
+    accessToken = payload["access_token"];
+    userDoc = await userDoc.ref.get(); //refresh the userdoc and data
+    userDocData = await userDoc.data();
+  }
   const result = await stravaApi.athlete.listActivities({"before": Math.round(end.getTime() / 1000), "after": Math.round(start.getTime() / 1000), "access_token": accessToken});
   const sanitisedActivities = filters.stravaSanitise(result);
   const listOfValidActivities = [];
   for (let i = 0; i<sanitisedActivities.length; i++) {
     listOfValidActivities.push({"raw": result[i], "sanitised": sanitisedActivities[i]});
-    // listOfValidActivities[i]["sanitised"]["samples"] = getDetailedActivity(userDocData, result[i]);
+    listOfValidActivities[i]["sanitised"]["samples"] = await getDetailedActivity(userDocData, result[i], "strava");
   }
   return listOfValidActivities;
 }
@@ -648,9 +662,8 @@ async function deleteGarminActivity(userDoc, webhookCall) {
 }
 async function deleteGarminUser(userDoc) {
   // console.log(oauth_timestamp);
-  const devDoc = await db.collection("developers").doc(userDoc.data()["devId"]).get();
-  const tag = devDoc.data()["secret_lookup"];
-  const secrets = getSecrets.fromTag("garmin", tag);
+  const clientId = userDoc.data()["garmin_client_id"];
+  const secrets = getSecrets.fromClientId("garmin", clientId);
   const options = encodeparams.garminCallOptions(
       "https://apis.garmin.com/wellness-api/rest/user/registration",
       "DELETE",
@@ -1995,7 +2008,7 @@ exports.sendToDeveloper = functions
                 {merge: true});
         return;
       }
-      // now before we send get the sessions field from
+      // now before we send get the samples field from
       // storage if it exists
       const uncompressSanitisedActivity =
           await filters
@@ -2076,10 +2089,8 @@ exports.polarWebhookSetup = functions.https.onRequest(async (req, res) => {
 
 async function getStravaDetailedActivity(userDoc, activityDoc) {
   const stravaActivityId = await activityDoc["id"];
-  const devId = await userDoc["devId"];
-  const secretLookup = await db.collection("developers").doc(devId).get();
-  const tag = await secretLookup.data()["secret_lookup"];
-  const secrets = getSecrets.fromTag("strava", tag);
+  const clientId = await userDoc["strava_client_id"];
+  const secrets = getSecrets.fromClientId("strava", clientId);
   stravaApi.config({
     "client_id": secrets.clientId,
     "client_secret": secrets.secret,
@@ -2136,7 +2147,7 @@ async function getPolarDetailedActivity(userDoc, activityDoc) {
           console.log(error);
           sanitised = error;
         } else {
-          sanitised["samples"] = sanitisePolarFitFile(jsonRaw);
+          sanitised["samples"] = filters.sanitisePolarFitFile(jsonRaw);
         }
       });
     }
@@ -2147,49 +2158,6 @@ async function getPolarDetailedActivity(userDoc, activityDoc) {
   }
 }
 
-function sanitisePolarFitFile(fitFile) {
-  const session = fitFile.sessions[0];
-  let cadence;
-  if (session.sport == "running") {
-    cadence = "running_cadence";
-  } else if (session.sport == "CYCLING") {
-    cadence = "cadence";
-  }
-  const records = fitFile.records;
-  const sanitisedSamples = [];
-  records.forEach((record) => {
-    sanitisedSamples.push(
-        {
-          "timestamp": (record.timestamp).toISOString(),
-          "temperature": record.temperature,
-          "distance": record.distance,
-          "power": record.power,
-          "heartRate": record.heart_rate,
-          "speed": record.speed,
-          "altitude": record.altitude,
-          "position": {"latitude": record.position_lat, "longitute": record.position_long},
-          "gradient": null,
-          "calories": null,
-          "cadence": record[cadence],
-          "ascent": null,
-          "descent": null,
-        },
-    );
-  });
-  for (let i=0; i<sanitisedSamples.length; i++) {
-    for (const prop in sanitisedSamples[i]) {
-      if (Object.prototype.hasOwnProperty.call(sanitisedSamples[i], prop)) {
-        if (sanitisedSamples[i][prop] == undefined) {
-          sanitisedSamples[i][prop] = null;
-        } if ((prop == "position") && (sanitisedSamples[i][prop]["latitude"] === undefined)) {
-          sanitisedSamples[i][prop] = {"latitude": null, "longitute": null};
-        }
-      }
-    }
-  }
-  return sanitisedSamples;
-}
-
 async function getWahooDetailedActivity(userDoc, activityDoc) {
   try { // or 'https' for https:// URLs
     const fileLocation = activityDoc["file"];
@@ -2198,7 +2166,7 @@ async function getWahooDetailedActivity(userDoc, activityDoc) {
     const jsonRaw = fitDecoder.fit2json(buffer);
     const json = fitDecoder.parseRecords(jsonRaw);
     const records = json.records;
-    const sanitised = jsonFitSanitise(records);
+    const sanitised = filters.jsonFitSanitise(records);
     return sanitised;
   } catch (error) {
     console.log(error);
@@ -2221,12 +2189,19 @@ async function getGarminDetailedActivity(userDoc, activityDoc) {
     startTime += activityDoc["durationInSeconds"];
     let activity;
     while (activity == undefined && startTime < endTime) {
-      const options = await encodeparams.garminCallOptions(url, "GET", consumerSecret, oAuthConsumerSecret, userDoc["garmin_access_token"], userDoc["garmin_access_token_secret"], {from: startTime, to: startTime+24*60*60});
+      const options = await encodeparams.garminCallOptions(
+          url,
+          "GET",
+          consumerSecret,
+          oAuthConsumerSecret,
+          userDoc["garmin_access_token"],
+          userDoc["garmin_access_token_secret"],
+          {from: startTime, to: startTime+24*60*60});
       const response = await got.get(options);
       const activityList = JSON.parse(response.body);
       for (const _activity in activityList) {
         if (activityList[_activity]["activityId"] == activityId) {
-          activity = garminDetailedSanitise(activityList[_activity]);
+          activity = filters.garminDetailedSanitise(activityList[_activity]);
           return activity;
         }
       }
@@ -2237,167 +2212,6 @@ async function getGarminDetailedActivity(userDoc, activityDoc) {
     console.log(error);
     return error;
   }
-}
-
-function garminDetailedSanitise(activity) {
-  const type = activity["summary"]["activityType"];
-  let cadence;
-  let aveCadence;
-  if (type == "RUNNING") {
-    cadence = "stepsPerMinute";
-    aveCadence = "averageRunCadenceInStepsPerMinute";
-  } else if (type == "CYCLING") {
-    cadence = "bikeCadenceInRPM";
-    aveCadence ="averageBikeCadenceInRPM";
-  }
-  const sanitisedSamples = [];
-  activity["samples"].forEach((sample) => {
-    sanitisedSamples.push(
-        {
-          "timestamp": (new Date(sample["startTimeInSeconds"]*1000)).toISOString(),
-          "timer": sample["timerDurationInSeconds"],
-          "temperature": sample["airTemperatureCelcius"],
-          "distance": sample["totalDistanceInMeters"],
-          "power": sample["powerInWatts"],
-          "heartRate": sample["heartRate"],
-          "speed": sample["speedMetersPerSecond"],
-          "altitude": sample["elevationInMeters"],
-          "position": {"latitude": sample["latitudeInDegree"], "longitude": sample["longitudeInDegree"]},
-          "gradient": sample["grade"],
-          "calories": sample["calories"],
-          "cadence": sample[cadence],
-          "ascent": sample["ascent"],
-          "descent": sample["descent"],
-        },
-    );
-  });
-  for (let i=0; i<sanitisedSamples.length; i++) {
-    for (const prop in sanitisedSamples[i]) {
-      if (Object.prototype.hasOwnProperty.call(sanitisedSamples[i], prop)) {
-        if (sanitisedSamples[i][prop] == undefined) {
-          sanitisedSamples[i][prop] = null;
-        } if ((prop == "position") && (sanitisedSamples[i][prop]["latitude"] === undefined)) {
-          sanitisedSamples[i][prop] = {"latitude": null, "longitute": null};
-        }
-      }
-    }
-  }
-  const sanitisedData = {
-    "summary": {
-      "start_time": (new Date(activity["summary"]["startTimeInSeconds"]*1000)).toISOString(),
-      "total_elapsed_time": null,
-      "activity_duration": activity["summary"]["durationInSeconds"],
-      "avg_speed": activity["summary"]["averageSpeedInMetersPerSecond"],
-      "max_speed": activity["summary"]["maxSpeedInMetersPerSecond"],
-      "distance": activity["summary"]["distanceInMeters"],
-      "min_heart_rate": null,
-      "avg_heart_rate": activity["summary"]["averageHeartRateInBeatsPerMinute"],
-      "max_heart_rate": activity["summary"]["maxHeartRateInBeatsPerMinute"],
-      "min_altitude": null,
-      "avg_altitude": null,
-      "max_altitude": null,
-      "max_neg_grade": null,
-      "avg_grade": null,
-      "max_pos_grade": null,
-      "active_calories": activity["summary"]["activeKilocalories"],
-      "avg_temperature": null,
-      "max_temperature": null,
-      "elevation_gain": activity["summary"]["totalElevationGainInMeters"],
-      "elevation_loss": activity["summary"]["totalElevationLossInMeters"],
-      "activity_type": activity["summary"]["activityType"],
-      "num_laps": null,
-      "threshold_power": null,
-    },
-    "samples": sanitisedSamples,
-  };
-  return sanitisedData;
-}
-
-function jsonFitSanitise(jsonRecords) {
-  const records = jsonRecords.filter((element) => element["type"] == "record");
-  let summary = jsonRecords.filter((element) => element["type"] == "session");
-  const events = jsonRecords.filter((element) => element["data"]["event"] == "timer");
-  summary = summary[0]["data"];
-  const sanitisedSamples = [];
-  const sanitisedData = {
-    "summary": {
-      "start_time": (summary["start_time"]).toISOString(),
-      "total_elapsed_time": summary["total_elapsed_time"],
-      "activity_duration": summary["total_timer_time"],
-      "avg_speed": summary["avg_speed"],
-      "max_speed": summary["max_speed"],
-      "distance": summary["total_distance"],
-      "min_heart_rate": summary["min_heart_rate"],
-      "avg_heart_rate": summary["avg_heart_rate"],
-      "max_heart_rate": summary["max_heart_rate"],
-      "min_altitude": summary["min_altitude"],
-      "avg_altitude": summary["avg_altitude"],
-      "max_altitude": summary["max_altitude"],
-      "max_negative_grade": summary["max_neg_grade"],
-      "avg_grade": summary["avg_grade"],
-      "max_positive_grade": summary["max_pos_grade"],
-      "active_calories": summary["total_calories"],
-      "avg_temperature": summary["avg_temperature"],
-      "max_temperature": summary["max_temperature"],
-      "elevation_gain": summary["total_ascent"],
-      "elevation_loss": summary["total_descent"],
-      "activity_type": summary["sport"],
-      "num_laps": summary["num_laps"],
-      "threshold_power": summary["threshold_power"],
-    },
-  };
-  // assign initial start/stop events
-  let startIndex = 0;
-  let endIndex = 1;
-  let currStart = events[0]["data"]["timestamp"];
-  let currEnd = events[1]["data"]["timestamp"];
-  let timer = 1;
-  records.forEach((_record) => {
-    // if the record is outside the current start/stop window
-    // if so then advance to the next window
-    if ((record["timestamp"]).toISOString() > currEnd) {
-      startIndex+=2;
-      endIndex+=2;
-      currStart = events[startIndex]["data"]["timestamp"];
-      currEnd = events[endIndex]["data"]["timestamp"];
-      timer += 1;
-    }
-    const record = _record["data"];
-    timer += ((record["timestamp"]).toISOString() - currStart)/1000;
-    sanitisedSamples.push(
-        {
-          "timer": timer,
-          "timestamp": (record["timestamp"]).toISOString(),
-          "distance": record["distance"],
-          "power": record["power"],
-          "heartRate": record["heart_rate"],
-          "speed": record["speed"],
-          "altitude": record["altitude"],
-          "position": {"latitude": record["position_lat"], "longitude": record["position_long"]},
-          "gradient": record["grade"],
-          "calories": record["calories"],
-          "cadence": record["cadence"],
-          "ascent": record["acent"],
-          "descent": record["decent"],
-        },
-    );
-    currStart = (record["timestamp"]).toISOString();
-  });
-  // assign undefined samples to null
-  for (let i=0; i<sanitisedSamples.length; i++) {
-    for (const prop in sanitisedSamples[i]) {
-      if (Object.prototype.hasOwnProperty.call(sanitisedSamples[i], prop)) {
-        if (sanitisedSamples[i][prop] == undefined) {
-          sanitisedSamples[i][prop] = null;
-        } if ((prop == "position") && (sanitisedSamples[i][prop]["latitude"] === undefined)) {
-          sanitisedSamples[i][prop] = {"latitude": null, "longitute": null};
-        }
-      }
-    }
-  }
-  // assign to samples
-  sanitisedData["samples"]= sanitisedSamples;
-  return sanitisedData;
 }
 
 async function getDetailedActivity(userDoc, activityDoc, source) {
@@ -2612,12 +2426,15 @@ async function stravaTokenStorage(userDocId, data, originalAccessToken, usersStr
     "strava_token_expires_in": data["expires_in"],
     "strava_connected": true,
   };
-  const usedDocs = await db.collection("users")
+  const userDocs = await db.collection("users")
       .where("strava_access_token", "==", originalAccessToken)
       .where("strava_id", "==", usersStravaId)
       .get();
 
-  await db.collection("users").doc(userDocId).set(parameters, {merge: true});
+  for (const doc of userDocs.docs) {
+    await doc.ref.set(parameters, {merge: true});
+  }
+  // await db.collection("users").doc(userDocId).set(parameters, {merge: true});
   // TODO the access token needs to update all users with the old access code
   // and strava user id
 }

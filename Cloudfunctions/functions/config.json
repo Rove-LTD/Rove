@@ -47,10 +47,14 @@
       "garmin": [
         {
           "tags": ["roveLiveSecrets",
-                "roveLiveSecretsGroup2",
-                "roveTestSecrets"],
+                "roveLiveSecretsGroup2"],
           "clientId": "d3dd1cc9-06b2-4b3e-9eb4-8a40cbd8e53f",
           "secret": "RvHa65YoagdgEgczFWLNfBrAtPCN8lKUtzA"
+        },
+        {
+          "tags": ["roveTestSecrets"],
+          "clientId": "eb0a9a22-db68-4188-a913-77ee997924a8",
+          "secret": "ffqgs2OxeJkFHUM0c3pGysdCp1Znt0tnc2s"
         }
       ],
       "strava": [

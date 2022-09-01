@@ -61,11 +61,12 @@ describe("Testing that the developer can call API to getActivityList() and recei
             "strava_client_id":  "72486",
             "strava_refresh_token": "077e305b5af2ed1667fa5406aec491b31ba50b5d",
             "strava_token_expires_at": "1659274746",
-            "garmin_access_token" :"58362aa6-f71c-499f-b0c6-a46371278298",
+            "garmin_access_token" :"d14a1877-e331-43ac-8fa8-de8162b23fa7",
+            "garmin_user_id": "bf26c167-6fea-4a96-bcc6-588a0ee6c0e3",
             "garmin_client_id": "d3dd1cc9-06b2-4b3e-9eb4-8a40cbd8e53f",
-            "garmin_access_token_secret": "HQ0o8k9gxNsULie2MknQDfY494fZ2Q5gh9T"
+            "garmin_access_token_secret": "7UoTR7bt9SoMzaKIAnLico5nL76rdfTKxdK"
         }, {merge: true});
-  
+
         activityDocs = await admin.firestore()
             .collection("users")
             .doc(testDev+testUser)
@@ -150,7 +151,7 @@ describe("Testing that the developer can call API to getActivityList() and recei
     };
     res = {
         send: (JSON)=> {assert.equal(JSON, "OK");},
-        status: (code)=>{assert.equal(code, 400);},
+        status: (code)=>{assert.equal(code, 200);},
     }
 
 
