@@ -1,4 +1,4 @@
-/*{
+wahooActivityList = {
     workouts: [
       {
         id: 159493187,
@@ -1061,4 +1061,5 @@
     per_page: 30,
     order: "descending",
     sort: "starts",
-  }*/
+  }
+  
