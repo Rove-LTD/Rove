@@ -2149,59 +2149,33 @@ function sanitisePolarFitFile(fitFile) {
     cadence = "cadence";
   }
   const records = fitFile.records;
-  const timerSamples = [];
-  const timestampSamples = [];
-  const temperatureSamples = [];
-  const distanceSamples = [];
-  const powerSamples = [];
-  const heartRateSamples = [];
-  const speedSamples = [];
-  const altitudeSamples = [];
-  const positionSamples = [];
-  const gradientSamples = [];
-  const calorieSamples = [];
-  const cadenceSamples = [];
-  const acentSamples = [];
-  const decentSamples = [];
+  const sanitisedSamples = [];
   records.forEach((record) => {
-    timestampSamples.push((record.timestamp).toISOString());
-    temperatureSamples.push(record.temperature);
-    distanceSamples.push(record.distance);
-    powerSamples.push(record.power);
-    heartRateSamples.push(record.heart_rate);
-    speedSamples.push(record.speed);
-    altitudeSamples.push(record.altitude);
-    positionSamples.push({"latitude": record.position_lat, "longitute": record.position_long});
-    gradientSamples.push(null);
-    calorieSamples.push(null);
-    cadenceSamples.push(record[cadence]);
-    acentSamples.push(null);
-    decentSamples.push(null);
+    sanitisedSamples.push(
+        {
+          "timestamp": (record.timestamp).toISOString(),
+          "temperature": record.temperature,
+          "distance": record.distance,
+          "power": record.power,
+          "heartRate": record.heart_rate,
+          "speed": record.speed,
+          "altitude": record.altitude,
+          "position": {"latitude": record.position_lat, "longitute": record.position_long},
+          "gradient": null,
+          "calories": null,
+          "cadence": record[cadence],
+          "ascent": null,
+          "descent": null,
+        },
+    );
   });
-  const sanitisedSamples= {
-    "timestampSamples": timestampSamples,
-    "distanceSamples": distanceSamples,
-    "powerSamples": powerSamples,
-    "heartRateSamples": heartRateSamples,
-    "speedSamples": speedSamples,
-    "altitudeSamples": altitudeSamples,
-    "positionSamples": positionSamples,
-    "gradientSamples": gradientSamples,
-    "calorieSamples": calorieSamples,
-    "cadenceSamples": cadenceSamples,
-    "acentSamples": acentSamples,
-    "decentSamples": decentSamples,
-    "timerSamples": timerSamples,
-  };
-  for (const prop in sanitisedSamples) {
-    if (Object.prototype.hasOwnProperty.call(sanitisedSamples, prop)) {
-      for (let i=0; i<sanitisedSamples[prop].length; i++) {
-        if (sanitisedSamples[prop][i] == undefined) {
-          sanitisedSamples[prop][i] = null;
-        } if (prop == "positionSamples") {
-          if (sanitisedSamples[prop][i][0] == undefined) {
-            sanitisedSamples[prop][i] = [null, null];
-          }
+  for (let i=0; i<sanitisedSamples.length; i++) {
+    for (const prop in sanitisedSamples[i]) {
+      if (Object.prototype.hasOwnProperty.call(sanitisedSamples[i], prop)) {
+        if (sanitisedSamples[i][prop] == undefined) {
+          sanitisedSamples[i][prop] = null;
+        } if ((prop == "position") && (sanitisedSamples[i][prop]["latitude"] === undefined)) {
+          sanitisedSamples[i][prop] = {"latitude": null, "longitute": null};
         }
       }
     }
@@ -2269,36 +2243,38 @@ function garminDetailedSanitise(activity) {
     cadence = "bikeCadenceInRPM";
     aveCadence ="averageBikeCadenceInRPM";
   }
-  const timerSamples = [];
-  const timestampSamples = [];
-  const temperatureSamples = [];
-  const distanceSamples = [];
-  const powerSamples = [];
-  const heartRateSamples = [];
-  const speedSamples = [];
-  const altitudeSamples = [];
-  const positionSamples = [];
-  const gradientSamples = [];
-  const calorieSamples = [];
-  const cadenceSamples = [];
-  const acentSamples = [];
-  const decentSamples = [];
+  const sanitisedSamples = [];
   activity["samples"].forEach((sample) => {
-    timestampSamples.push((new Date(sample["startTimeInSeconds"]*1000)).toISOString());
-    timerSamples.push(sample["timerDurationInSeconds"]);
-    temperatureSamples.push(sample["airTemperatureCelcius"]);
-    distanceSamples.push(sample["totalDistanceInMeters"]);
-    powerSamples.push(sample["powerInWatts"]);
-    heartRateSamples.push(sample["heartRate"]);
-    speedSamples.push(sample["speedMetersPerSecond"]);
-    altitudeSamples.push(sample["elevationInMeters"]);
-    positionSamples.push({"latitude": sample["latitudeInDegree"], "longitude": sample["longitudeInDegree"]});
-    gradientSamples.push(sample["grade"]);
-    calorieSamples.push(sample["calories"]);
-    cadenceSamples.push(sample[cadence]);
-    acentSamples.push(sample["acent"]);
-    decentSamples.push(sample["decent"]);
+    sanitisedSamples.push(
+        {
+          "timestamp": (new Date(sample["startTimeInSeconds"]*1000)).toISOString(),
+          "timer": sample["timerDurationInSeconds"],
+          "temperature": sample["airTemperatureCelcius"],
+          "distance": sample["totalDistanceInMeters"],
+          "power": sample["powerInWatts"],
+          "heartRate": sample["heartRate"],
+          "speed": sample["speedMetersPerSecond"],
+          "altitude": sample["elevationInMeters"],
+          "position": {"latitude": sample["latitudeInDegree"], "longitude": sample["longitudeInDegree"]},
+          "gradient": sample["grade"],
+          "calories": sample["calories"],
+          "cadence": sample[cadence],
+          "ascent": sample["ascent"],
+          "descent": sample["descent"],
+        },
+    );
   });
+  for (let i=0; i<sanitisedSamples.length; i++) {
+    for (const prop in sanitisedSamples[i]) {
+      if (Object.prototype.hasOwnProperty.call(sanitisedSamples[i], prop)) {
+        if (sanitisedSamples[i][prop] == undefined) {
+          sanitisedSamples[i][prop] = null;
+        } if ((prop == "position") && (sanitisedSamples[i][prop]["latitude"] === undefined)) {
+          sanitisedSamples[i][prop] = {"latitude": null, "longitute": null};
+        }
+      }
+    }
+  }
   const sanitisedData = {
     "summary": {
       "start_time": (new Date(activity["summary"]["startTimeInSeconds"]*1000)).toISOString(),
@@ -2325,37 +2301,8 @@ function garminDetailedSanitise(activity) {
       "num_laps": null,
       "threshold_power": null,
     },
-    "samples": {
-      "timestampSamples": timestampSamples,
-      "distanceSamples": distanceSamples,
-      "powerSamples": powerSamples,
-      "heartRateSamples": heartRateSamples,
-      "speedSamples": speedSamples,
-      "altitudeSamples": altitudeSamples,
-      "positionSamples": positionSamples,
-      "gradientSamples": gradientSamples,
-      "calorieSamples": calorieSamples,
-      "cadenceSamples": cadenceSamples,
-      "acentSamples": acentSamples,
-      "decentSamples": decentSamples,
-      "timerSamples": timerSamples,
-    },
+    "samples": sanitisedSamples,
   };
-  for (const prop in sanitisedData["samples"]) {
-    if (Object.prototype.hasOwnProperty.call(sanitisedData["samples"], prop)) {
-      /* let initValue = sanitisedData["samples"][prop].find((element) => element != undefined && element != [undefined, undefined]);
-      if (initValue == undefined) {
-        initValue = null;
-      } */
-      for (let i=0; i<sanitisedData["samples"][prop].length; i++) {
-        if (sanitisedData["samples"][prop][i] == undefined) {
-          sanitisedData["samples"][prop][i] = null;
-        } if (sanitisedData["samples"][prop][i] == [undefined, undefined]) {
-          sanitisedData["samples"][prop][i] = [null, null];
-        }
-      }
-    }
-  }
   return sanitisedData;
 }
 
@@ -2364,19 +2311,7 @@ function jsonFitSanitise(jsonRecords) {
   let summary = jsonRecords.filter((element) => element["type"] == "session");
   const events = jsonRecords.filter((element) => element["data"]["event"] == "timer");
   summary = summary[0]["data"];
-  const timerSamples = [];
-  const timestampSamples = [];
-  const distanceSamples = [];
-  const powerSamples = [];
-  const heartRateSamples = [];
-  const speedSamples = [];
-  const altitudeSamples = [];
-  const positionSamples = [];
-  const gradientSamples = [];
-  const calorieSamples = [];
-  const cadenceSamples = [];
-  const acentSamples = [];
-  const decentSamples = [];
+  const sanitisedSamples = [];
   const sanitisedData = {
     "summary": {
       "start_time": (summary["start_time"]).toISOString(),
@@ -2404,79 +2339,57 @@ function jsonFitSanitise(jsonRecords) {
       "threshold_power": summary["threshold_power"],
     },
   };
-  // assign arrays
+  // assign initial start/stop events
+  let startIndex = 0;
+  let endIndex = 1;
+  let currStart = events[0]["data"]["timestamp"];
+  let currEnd = events[1]["data"]["timestamp"];
+  let timer = 1;
   records.forEach((_record) => {
+    // if the record is outside the current start/stop window
+    // if so then advance to the next window
+    if ((record["timestamp"]).toISOString() > currEnd) {
+      startIndex+=2;
+      endIndex+=2;
+      currStart = events[startIndex]["data"]["timestamp"];
+      currEnd = events[endIndex]["data"]["timestamp"];
+      timer += 1;
+    }
     const record = _record["data"];
-    timestampSamples.push((record["timestamp"]).toISOString());
-    distanceSamples.push(record["distance"]);
-    powerSamples.push(record["power"]);
-    heartRateSamples.push(record["heart_rate"]);
-    speedSamples.push(record["speed"]);
-    altitudeSamples.push(record["altitude"]);
-    positionSamples.push({"latitude": record["position_lat"], "longitude": record["position_long"]});
-    gradientSamples.push(record["grade"]);
-    calorieSamples.push(record["calories"]);
-    cadenceSamples.push(record["cadence"]);
-    acentSamples.push(record["acent"]);
-    decentSamples.push(record["decent"]);
+    timer += ((record["timestamp"]).toISOString() - currStart)/1000;
+    sanitisedSamples.push(
+        {
+          "timer": timer,
+          "timestamp": (record["timestamp"]).toISOString(),
+          "distance": record["distance"],
+          "power": record["power"],
+          "heartRate": record["heart_rate"],
+          "speed": record["speed"],
+          "altitude": record["altitude"],
+          "position": {"latitude": record["position_lat"], "longitude": record["position_long"]},
+          "gradient": record["grade"],
+          "calories": record["calories"],
+          "cadence": record["cadence"],
+          "ascent": record["acent"],
+          "descent": record["decent"],
+        },
+    );
+    currStart = (record["timestamp"]).toISOString();
   });
-  // assign to samples
-  sanitisedData["samples"]= {
-    "timestampSamples": timestampSamples,
-    "distanceSamples": distanceSamples,
-    "powerSamples": powerSamples,
-    "heartRateSamples": heartRateSamples,
-    "speedSamples": speedSamples,
-    "altitudeSamples": altitudeSamples,
-    "positionSamples": positionSamples,
-    "gradientSamples": gradientSamples,
-    "calorieSamples": calorieSamples,
-    "cadenceSamples": cadenceSamples,
-    "acentSamples": acentSamples,
-    "decentSamples": decentSamples,
-  };
-  // remove undefined samples
-  for (const prop in sanitisedData["samples"]) {
-    if (Object.prototype.hasOwnProperty.call(sanitisedData["samples"], prop)) {
-      /* let initValue = sanitisedData["samples"][prop].find((element) => element != undefined);
-      if (initValue == undefined) {
-        initValue = null;
-      } */
-      for (let i=0; i<sanitisedData["samples"][prop].length; i++) {
-        if (sanitisedData["samples"][prop][i] == undefined) {
-          sanitisedData["samples"][prop][i] = null;
-        } if (prop == "positionSamples") {
-          if (sanitisedData["samples"][prop][i]["latitude"] == undefined) {
-            sanitisedData["samples"][prop][i]["latitude"] = null;
-          }
-          if (sanitisedData["samples"][prop][i]["longitude"] == undefined) {
-            sanitisedData["samples"][prop][i]["longitude"] = null;
-          }
+  // assign undefined samples to null
+  for (let i=0; i<sanitisedSamples.length; i++) {
+    for (const prop in sanitisedSamples[i]) {
+      if (Object.prototype.hasOwnProperty.call(sanitisedSamples[i], prop)) {
+        if (sanitisedSamples[i][prop] == undefined) {
+          sanitisedSamples[i][prop] = null;
+        } if ((prop == "position") && (sanitisedSamples[i][prop]["latitude"] === undefined)) {
+          sanitisedSamples[i][prop] = {"latitude": null, "longitute": null};
         }
       }
     }
   }
-  // add timer samples
-  for (let i=0; i < (events.length-1)/2; i++) {
-    const currEnd = events[2*i+1]["data"]["timestamp"];
-    const currStart = events[2*i]["data"]["timestamp"];
-    let index = timestampSamples.findIndex((element) => element >= currStart);
-    let start;
-    if (index == 0) {
-      start = 0;
-    } else {
-      start = timerSamples[index - 1];
-    }
-    timerSamples.push(start + 1 + (timestampSamples[index] - currStart)/1000);
-    index += 1;
-    while (timestampSamples[index] <= currEnd) {
-      const t0 = timestampSamples[index-1];
-      const t1 = timestampSamples[index];
-      const t = timerSamples[index-1] + (t1 - t0)/1000;
-      timerSamples.push(t);
-      index += 1;
-    }
-  }
+  // assign to samples
+  sanitisedData["samples"]= sanitisedSamples;
   return sanitisedData;
 }
 
