@@ -570,10 +570,8 @@ exports.disconnectService = functions.https.onRequest(async (req, res) => {
 });
 
 async function deleteStravaActivity(userDoc, webhookCall) {
-  const devId = await userDoc.data()["devId"];
-  const secretLookup = await db.collection("developers").doc(devId).get();
-  const tag = await secretLookup.data()["secret_lookup"];
-  const secrets = getSecrets.fromTag("strava", tag);
+  const clientId = userDoc.data()["strava_client_id"];
+  const secrets = getSecrets.fromClientId("strava", clientId);
   stravaApi.config({
     "client_id": secrets.clientId,
     "client_secret": secrets.secret,
@@ -1017,7 +1015,7 @@ exports.stravaCallback = functions.https.onRequest(async (req, res) => {
     if (!error && response.statusCode == 200) {
       // this is where the tokens come back.
       stravaStoreTokens(userId, devId, JSON.parse(body), secrets.clientId);
-      await getStravaAthleteId(userId, devId, JSON.parse(body));
+      await getStravaAthleteId(userId, devId, JSON.parse(body), secrets);
       await getHistoryInBox.push("strava",
           transactionData.devId+transactionData.userId);
       const urlString = await successDevCallback(transactionData);
@@ -1168,11 +1166,8 @@ async function stravaStoreTokens(userId, devId, data, stravaClientId) {
   // write resultant message to dev endpoint.
   return;
 }
-async function getStravaAthleteId(userId, devId, data) {
+async function getStravaAthleteId(userId, devId, data, secrets) {
   // get athlete id from strava.
-  const secretLookup = await db.collection("developers").doc(devId).get();
-  const tag = await secretLookup.data()["secret_lookup"];
-  const secrets = getSecrets.fromTag("strava", tag);
   stravaApi.config({
     "client_id": secrets.clientId,
     "client_secret": secrets.secret,
@@ -2186,10 +2181,8 @@ async function getWahooDetailedActivity(userDoc, activityDoc) {
 async function getGarminDetailedActivity(userDoc, activityDoc) {
   try {
     const url = "https://apis.garmin.com/wellness-api/rest/activityDetails";
-    const devId = userDoc["devId"];
-    const secretLookup = await db.collection("developers").doc(devId).get();
-    const tag = await secretLookup.data()["secret_lookup"];
-    const secrets = getSecrets.fromTag("garmin", tag);
+    const clientId = userDoc["garmin_client_id"];
+    const secrets = getSecrets.fromClientId("garmin", clientId);
     const consumerSecret = secrets.secret;
     const oAuthConsumerSecret = secrets.clientId;
     let startTime = activityDoc["startTimeInSeconds"];
