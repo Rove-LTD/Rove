@@ -411,7 +411,8 @@ async function getStravaActivityList(start, end, userDoc) {
   const listOfValidActivities = [];
   for (let i = 0; i<sanitisedActivities.length; i++) {
     listOfValidActivities.push({"raw": result[i], "sanitised": sanitisedActivities[i]});
-    listOfValidActivities[i]["sanitised"]["samples"] = await getDetailedActivity(userDocData, result[i], "strava");
+    // TODO: uncomment when detail needed
+    // listOfValidActivities[i]["sanitised"]["samples"] = await getDetailedActivity(userDocData, result[i], "strava");
   }
   return listOfValidActivities;
 }
