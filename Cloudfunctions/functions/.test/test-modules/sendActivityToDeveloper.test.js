@@ -34,7 +34,7 @@ myFunctions = require('../../index.js');
 // name as in the function we are testing
 const got = require('got');
 const webhookInBox = require('../../webhookInBox');
-const sampleFile = require("./samples-7509571698strava");
+// const sampleFile = require("./samples-7509571698strava");
 //-------------TEST --- webhooks-------
 describe("Testing that sending webhook messages to developers work: ", () => {
     before ('set up the userIds and activity records in the test User doc', async () => {
