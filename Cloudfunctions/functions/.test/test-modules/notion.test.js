@@ -41,6 +41,7 @@ const webhookInBox = require('../../webhookInBox');
         "userId": testUser,
         "strava_id" : "notion_test_strava_id",
         "strava_access_token": "test_strava_access_token",
+        "strava_client_id":  72486,
         "strava_refresh_token": "test_strava_refresh_token",
         "strava_token_expires_at": new Date().getTime()/1000 + 60,
         "garmin_access_token" :"garmin-test-access-token",
@@ -69,7 +70,7 @@ const webhookInBox = require('../../webhookInBox');
         provider: "strava",
             status: "new",
             method: "POST",
-            secret_lookup: "roveLiveSecrets",
+            secret_lookups: 72486,
             body: JSON.stringify({"updates":{},"object_type":"activity","object_id":7345142595,"owner_id":"notion_test_strava_id","subscription_id":217520,"aspect_type":"create","event_time":1655824005})
         };
     const snapshot = test.firestore.makeDocumentSnapshot(inboxData, "webhookInBox/testWebhookMessageDocId");
@@ -77,8 +78,6 @@ const webhookInBox = require('../../webhookInBox');
     wrapped = test.wrap(myFunctions.processWebhookInBox);
     await wrapped(snapshot);
 
-    const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
-    await wait(1000);
     // check the webhookInBox function was called with the correct args
     stubbedWebhookInBox.calledOnceWith(snapshot.ref);
     //now check the database was updated correctly

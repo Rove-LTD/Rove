@@ -103,46 +103,33 @@ module.exports = {
     return options;
   },
   /**
-   * creates a signature that should match the polar signature
-   * available in the polar webhook messages using the available keys,
-   * the matching key is used to return the secret_lookup for that key.
-   * If non match an string containing "error" is returned.
-   * @param {String} rawBody
-   * @param {String} polarKeys
-   * @param {String} signature
-   * @return {String} secret_lookup as a string
-   */
-  getLookupFromPolarSignature: function(rawBody, polarKeys, signature) {
+ * creates a signature that should match the polar signature
+ * available in the polar webhook messages using the available keys,
+ * the matching key is used to return the secrets for that key.
+ * If non match an string containing "error" is returned.
+ * @param {String} rawBody
+ * @param {Array<String>} polarSecrets
+ * @param {String} signature
+ * @return {String} secret_lookup as a string
+ */
+  getSecretsFromPolarSignature: function(rawBody, polarSecrets, signature) {
     // eslint-disable-next-line require-jsdoc
-    let lookup = "";
-    Object.keys(polarKeys).forEach(function(key) {
+    let secrets;
+    for (const config of polarSecrets) {
+      const key = config.webhookSecret;
       const calculatedSignature = crypto
           .createHmac("sha256", key)
           .update(rawBody)
           .digest("hex");
       if (calculatedSignature == signature) {
-        lookup = polarKeys[key]["secret_lookup"];
+        secrets = config;
         console.log("managed to match the polar signature");
       }
-    });
-    if (lookup == "") {
-      // default depending on the google project if
-      // test use the test keys if live use the live keys
-      // this is a temporary fix while we wait for Polar to explain exactly
-      // how the signature should be calculated
-      console.log("polar signatures did not match - using defaults based on project");
-      switch (process.env.GCLOUD_PROJECT) {
-        case "rovetest-beea7":
-          lookup = "roveTestSecrets";
-          break;
-        case "rove-26":
-          lookup = "roveLivesecrets";
-          break;
-        default:
-          lookup = "error";
-          break;
-      }
     }
-    return lookup;
+    if (secrets == undefined) {
+      console.log("polar signatures did not match - using defaults based on project");
+      secrets = "error";
+    }
+    return secrets;
   },
 };

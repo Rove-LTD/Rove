@@ -79,7 +79,7 @@ class OauthProviderName {
         this.state = this.userId+":"+this.devId;
         break;
       case "wahoo":
-        this.clientId = this.config[this.devId]["whaooClientId"];
+        this.clientId = this.config[this.devId]["wahooClientId"];
         this.clientSecret = this.config[this.devId]["wahooSecret"];
         this.callbackBaseUrl =
           "https://us-central1-rove-26.cloudfunctions.net/wahooCallback";
@@ -248,7 +248,7 @@ class OauthProviderName {
       case "wahoo":
         _dataString = "code="+
         this.code+
-        "&client_id="+this.config[this.devId]["whaooClientId"]+
+        "&client_id="+this.config[this.devId]["wahooClientId"]+
         "&client_secret="+this.config[this.devId]["wahooSecret"]+
         "&grant_type=authorization_code"+
         "&redirect_uri=https://us-central1-rove-26.cloudfunctions.net/wahooCallback?state="+this.userId+":"+this.devId;

@@ -1,0 +1,81 @@
+{
+    "sportDataList":[
+        {
+            "avgFrequency":0,
+            "avgSpeed":0,
+            "calorie":220000,
+            "deviceName":"COROS PACE",
+            "distance":22000,
+            "duration":2200,
+            "endTime":1532576178,
+            "endTimezone":32,
+            "labelId":"418173292602490880",
+            "openId": "42dbb958c5a146f29ce9f89e05e5195a",
+            "mode":13000,
+            "subMode":1,
+            "startTime":1522576178,
+            "startTimezone":32,
+            "step":2200,
+            "triathlonItemList":[
+                {
+                    "calorie":117738,
+                    "distance":748.07,
+                    "duration":901,
+                    "fitUrl":"https://oss.coros.com/fit/407419767966679040/418173292602490880_0.fit",
+                    "mode":10,
+                    "subMode":1
+                },
+                {
+                    "calorie":391220,
+                    "distance":19911.3,
+                    "duration":2761,
+                    "fitUrl":"https://oss.coros.com/fit/407419767966679040/418173292602490880_1.fit",
+                    "mode":9,
+                    "subMode":1
+                },
+                {
+                    "calorie":248338,
+                    "distance":5142.43,
+                    "duration":1592,
+                    "fitUrl":"https://oss.coros.com/fit/407419767966679040/418173292602490880_2.fit",
+                    "mode":8,
+                    "subMode":1
+                }]},
+                {
+                    "avgFrequency":0,
+                    "avgSpeed":368,
+                    "calorie":30000,
+                    "deviceName":"COROS PACE",
+                    "distance":40000,
+                    "duration":300,
+                    "endTime":1532576159,
+                    "endTimezone":32,
+        "fitUrl":"https://oss.coros.com/fit/407419767966679040/418173315956375553.fit",
+                    "labelId":"418173315956375553",
+                                "openId": "42dbb958c5a146f29ce9f89e05e5195a",
+                    "mode":8,
+                    "startTime":1522576159,
+                    "startTimezone":32,
+                    "step":300,
+                    "subMode":1
+                },
+                {
+                    "avgFrequency":0,
+                    "avgSpeed":0,
+                    "calorie":20000,
+                    "deviceName":"COROS PACE",
+                    "distance":20000,
+                    "duration":200,
+                    "endTime":1532576158,
+                    "endTimezone":32,
+                    "fitUrl":"https://oss.coros.com/fit/407419767966679040/418173315956375552.fit",
+                    "labelId":"418173315956375552",
+                    "openId": "42dbb958c5a146f29ce9f89e05e5195a",
+                    "mode":9,
+                    "startTime":1522576158,
+                    "startTimezone":32,
+                    "step":200,
+                    "subMode":1
+                    }
+        ]
+}

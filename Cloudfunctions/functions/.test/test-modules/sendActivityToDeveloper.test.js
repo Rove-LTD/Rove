@@ -34,6 +34,7 @@ myFunctions = require('../../index.js');
 // name as in the function we are testing
 const got = require('got');
 const webhookInBox = require('../../webhookInBox');
+// const sampleFile = require("./samples-7509571698strava");
 //-------------TEST --- webhooks-------
 describe("Testing that sending webhook messages to developers work: ", () => {
     before ('set up the userIds and activity records in the test User doc', async () => {
@@ -55,22 +56,13 @@ describe("Testing that sending webhook messages to developers work: ", () => {
       activityDocs.forEach(async (doc)=>{
           await doc.ref.delete();
       });
-
-      successfulWebhookMessage1 = {
-            provider: "wahoo",
-            body: '{"user":{"id":"wahoo_test_user"},"event_type":"workout_summary","workout_summary":{"duration_active_accum":"9.0","workout":{"name":"Cycling","workout_token":"ELEMNT AE48:274","workout_type_id":0,"id":147564736,"updated_at":"2022-06-13T16:39:08.000Z","plan_id":null,"minutes":0,"starts":"2022-06-13T16:38:51.000Z","created_at":"2022-06-13T16:39:08.000Z"},"speed_avg":"0.0","duration_total_accum":"9.0","cadence_avg":"0.0","id":140473422,"work_accum":"0.0","power_bike_tss_last":null,"ascent_accum":"0.0","power_bike_np_last":null,"duration_paused_accum":"0.0","created_at":"2022-06-13T16:39:09.000Z","updated_at":"2022-06-13T16:39:09.000Z","power_avg":"0.0","file":{"url":"https://cdn.wahooligan.com/wahoo-cloud/production/uploads/workout_file/file/WpHvKL3irWsv2vHzGzGF_Q/2022-06-13-163851-ELEMNT_AE48-274-0.fit"},"distance_accum":"0.0","heart_rate_avg":"0.0","calories_accum":"0.0"},"webhook_token":"348a6fe2-3719-4647-a233-933b8c404d6b"}',
-            method: "POST",
-            secret_lookup: "roveLiveSecrets",
-            status: "added before the tests to be successful",
-      }
-      successfulWebhookMessage2 = {
+      const successfulWebhookMessage1 = {
         provider: "wahoo",
-        body: '{"user":{"id":"wahoo_test_user"},"event_type":"workout_summary","workout_summary":{"duration_active_accum":"9.0","workout":{"name":"Cycling","workout_token":"ELEMNT AE48:274","workout_type_id":0,"id":147564736,"updated_at":"2022-06-13T16:39:08.000Z","plan_id":null,"minutes":0,"starts":"2022-06-13T16:38:51.000Z","created_at":"2022-06-13T16:39:08.000Z"},"speed_avg":"0.0","duration_total_accum":"9.0","cadence_avg":"0.0","id":140473426,"work_accum":"0.0","power_bike_tss_last":null,"ascent_accum":"0.0","power_bike_np_last":null,"duration_paused_accum":"0.0","created_at":"2022-06-13T16:39:09.000Z","updated_at":"2022-06-13T16:39:09.000Z","power_avg":"0.0","file":{"url":"https://cdn.wahooligan.com/wahoo-cloud/production/uploads/workout_file/file/WpHvKL3irWsv2vHzGzGF_Q/2022-06-13-163851-ELEMNT_AE48-274-0.fit"},"distance_accum":"0.0","heart_rate_avg":"0.0","calories_accum":"0.0"},"webhook_token":"348a6fe2-3719-4647-a233-933b8c404d6b"}',
+        body: '{"user":{"id":"wahoo_test_user"},"event_type":"workout_summary","workout_summary":{"duration_active_accum":"9.0","workout":{"name":"Cycling","workout_token":"ELEMNT AE48:274","workout_type_id":0,"id":147564736,"updated_at":"2022-06-13T16:39:08.000Z","plan_id":null,"minutes":0,"starts":"2022-06-13T16:38:51.000Z","created_at":"2022-06-13T16:39:08.000Z"},"speed_avg":"0.0","duration_total_accum":"9.0","cadence_avg":"0.0","id":140473420,"work_accum":"0.0","power_bike_tss_last":null,"ascent_accum":"0.0","power_bike_np_last":null,"duration_paused_accum":"0.0","created_at":"2022-06-13T16:39:09.000Z","updated_at":"2022-06-13T16:39:09.000Z","power_avg":"0.0","file":{"url":"https://cdn.wahooligan.com/wahoo-cloud/production/uploads/workout_file/file/WpHvKL3irWsv2vHzGzGF_Q/2022-06-13-163851-ELEMNT_AE48-274-0.fit"},"distance_accum":"0.0","heart_rate_avg":"0.0","calories_accum":"0.0"},"webhook_token":"348a6fe2-3719-4647-a233-933b8c404d6b"}',
         method: "POST",
-        secret_lookup: "roveLiveSecrets",
+        secret_lookups: "IGQW1vInhei9CE_tEyoso2V4COhNOn53AfYGsTx96oA",
         status: "added before the tests to be successful",
-  }
-
+      }
       activityDoc1 = {
         sanitised: {
             userId: testUser,
@@ -149,8 +141,22 @@ describe("Testing that sending webhook messages to developers work: ", () => {
           .set(activityDoc1);
 
         const snapshot = test.firestore.makeDocumentSnapshot(activityDoc1, "users/"+testDev+testUser+"/activities/"+activityDoc1.sanitised.activity_id+"wahoo");
+        gotPostSpy = sinon.spy(got, "post");
         wrapped = test.wrap(myFunctions.sendToDeveloper);
         await wrapped(snapshot, {params: {userDocId: testDev+testUser, activityId: activityDoc1.sanitised.activity_id+"wahoo"}});
+        // now check the got call was correct information
+        let args = gotPostSpy.getCall(0).args[0]
+        args.body = JSON.parse(args.body);
+        expectedOptions = {
+            method: "POST",
+            url: devTestData.endpoint,
+            headers: {
+            "Accept": "application/json",
+            "Content-type": "application/json",
+            },
+            body: activityDoc1,
+        };
+        assert.deepEqual(args, expectedOptions, "the wrong info was sent to the developer endpoint");
         //now check the database was updated correctly
        const testUserDoc = await admin.firestore()
           .collection("users")
@@ -165,10 +171,8 @@ describe("Testing that sending webhook messages to developers work: ", () => {
        // expected results
        activityDoc1.status = "sent";
        activityDoc1.timestamp = "not tested";
-       activityDoc1.triesSoFar = "not tested";
+       activityDoc1.triesSoFar = 1;
 
-      sanatisedActivity.timestamp = "not tested";
-      sanatisedActivity.triesSoFar = "not tested";
       assert.deepEqual(sanatisedActivity, activityDoc1);
       sinon.restore();
     })

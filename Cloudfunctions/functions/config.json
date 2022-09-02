@@ -1,49 +1,75 @@
 {"config": {
     "InBoxRealTimeCheck": false,
-    "roveLiveSecrets": {
-      "stravaClientId": 72486,
-      "stravaClientSecret": "b0d500111e3d1774903da1f067b5b7adf38ca726",
-      "consumerSecret": "RvHa65YoagdgEgczFWLNfBrAtPCN8lKUtzA",
-      "oauth_consumer_key": "d3dd1cc9-06b2-4b3e-9eb4-8a40cbd8e53f",
-      "polarClientId": "654623e7-7191-4cfe-aab5-0bc24785fdee",
-      "polarSecret": "f797c0e1-a39d-4b48-a2d9-89c2baea9005",
-      "whaooClientId": "iA2JRS_dBkikcb0uEnHPtb6IDt1vDYNbityEEhp801I",
-      "wahooSecret": "w4FvDllcO0zYrnV1-VKR-T2gJ4mYUOiFJuwx-8C-C2I",
-      "corosClientId": "e8925760066a490b9d26187f731020f8",
-      "corosSecret": "3fec831e956045db9ec000d2083fa056"
-    },
-    "roveTestSecrets": {
-      "consumerSecret": "RvHa65YoagdgEgczFWLNfBrAtPCN8lKUtzA",
-      "oauth_consumer_key": "d3dd1cc9-06b2-4b3e-9eb4-8a40cbd8e53f",
-      "whaooClientId": "IGQW1vInhei9CE_tEyoso2V4COhNOn53AfYGsTx96oA",
-      "wahooSecret": "-TQHcASsAk-cTUN3485_oyY6lUqsKhFLLpoKoWrCnHs",
-      "polarClientId": "0544732f-0024-4645-a844-6f46ba09fe8d",
-      "polarSecret": "42b1eed7-108c-4ab6-b090-b21e42f1dca1",
-      "corosClientId": "e8925760066a490b9d26187f731020f8",
-      "corosSecret": "3fec831e956045db9ec000d2083fa056"
-    },
-    "stravaSubscriptions": {
-      "217520": {
-        "secret_lookup": "roveLiveSecrets"
-      }
-    },
-    "polarWebhookSecrets": {
-      "e14f5f33-0ffc-4f38-8f7e-8d243337f986": {
-        "secret_lookup": "roveLiveSecrets",
-        "webhook_id": "wPWwr1P7"
-      },
-      "f20098c4-eeac-4516-8ade-66b0581fadb8": {
-        "secret_lookup": "roveTestSecrets",
-        "webhook_id": "6y8wRGPQ"
-      }
-    },
-    "wahooWebhookTokens": {
-      "348a6fe2-3719-4647-a233-933b8c404d6b": {
-        "secret_lookup": "roveTestSecrets"
-      },
-      "97661c16-6359-4854-9498-a49c07b6ec11": {
-        "secret_lookup": "roveLiveSecrets"
-      }
+    "providerConfigs": {
+      "wahoo": [
+        {
+          "tags": ["roveLiveSecrets"],
+          "clientId": "iA2JRS_dBkikcb0uEnHPtb6IDt1vDYNbityEEhp801I",
+          "secret": "w4FvDllcO0zYrnV1-VKR-T2gJ4mYUOiFJuwx-8C-C2I",
+          "webhookId": "97661c16-6359-4854-9498-a49c07b6ec11"
+        },
+        {
+          "tags": ["roveLiveSecretsGroup2"],
+          "clientId": "qxclu_dyEMRbBE1Wh9C2OhWQKmU_5NQe0SajXAwRDmw",
+          "secret": "JGnTbc52jW13a3Xey92Tot3ZxnPPB1ckrhrt_R8nS5g",
+          "webhookId": "396ff7e3-ece2-4f99-ad3b-97277fe7fe6f"
+        },
+        {
+          "tags": ["roveTestSecrets"],
+          "clientId": "IGQW1vInhei9CE_tEyoso2V4COhNOn53AfYGsTx96oA",
+          "secret": "-TQHcASsAk-cTUN3485_oyY6lUqsKhFLLpoKoWrCnHs",
+          "webhookId": "348a6fe2-3719-4647-a233-933b8c404d6b"
+        }
+      ],
+      "coros": [
+        {
+          "tags": ["roveLiveSecrets","roveTestSecrets","roveLiveSecretsGroup2"],
+          "clientId": "e8925760066a490b9d26187f731020f8",
+          "secret": "3fec831e956045db9ec000d2083fa056"
+        }
+      ],
+      "polar": [
+        {
+          "tags": ["roveLiveSecrets","roveLiveSecretsGroup2"],
+          "clientId": "654623e7-7191-4cfe-aab5-0bc24785fdee",
+          "secret": "f797c0e1-a39d-4b48-a2d9-89c2baea9005",
+          "webhookSecret": "e14f5f33-0ffc-4f38-8f7e-8d243337f986",
+          "webhookId": "wPWwr1P7"
+        },
+        {
+          "tags": ["roveTestSecrets"],
+          "clientId": "0544732f-0024-4645-a844-6f46ba09fe8d",
+          "secret": "42b1eed7-108c-4ab6-b090-b21e42f1dca1",
+          "webhookSecret": "f20098c4-eeac-4516-8ade-66b0581fadb8",
+          "webhookId": "6y8wRGPQ"
+        }
+      ],
+      "garmin": [
+        {
+          "tags": ["roveLiveSecrets",
+                "roveLiveSecretsGroup2"],
+          "clientId": "d3dd1cc9-06b2-4b3e-9eb4-8a40cbd8e53f",
+          "secret": "RvHa65YoagdgEgczFWLNfBrAtPCN8lKUtzA"
+        },
+        {
+          "tags": ["roveTestSecrets"],
+          "clientId": "eb0a9a22-db68-4188-a913-77ee997924a8",
+          "secret": "ffqgs2OxeJkFHUM0c3pGysdCp1Znt0tnc2s"
+        }
+      ],
+      "strava": [
+        {
+          "tags": ["roveLiveSecrets",
+                "roveLiveSecretsGroup2",
+                "roveTestSecrets"],
+          "clientId": 72486,
+          "secret": "b0d500111e3d1774903da1f067b5b7adf38ca726",
+          "webhookId": 217520
+        }
+      ],
+      "fitBit": [
+
+      ]
     }
   }
 }

@@ -44,6 +44,7 @@ describe("Testing that the garmin Webhooks work: ", () => {
           "userId": testUser,
           "garmin_user_id" : "eb24e8e5-110d-4a87-b976-444f40ca27d4",
           "garmin_access_token": "test_garmin_access_token",
+          "garmin_client_id": "test client ID",
       });
       activityDocs = await admin.firestore()
           .collection("users")
@@ -135,7 +136,7 @@ describe("Testing that the garmin Webhooks work: ", () => {
         await myFunctions.garminWebhook(req, res);
 
         // check the webhookInBox was called correctly
-        assert(stubbedWebhookInBox.calledOnceWithExactly(req, "garmin"),
+        assert(stubbedWebhookInBox.calledOnceWithExactly(req, "garmin", "d3dd1cc9-06b2-4b3e-9eb4-8a40cbd8e53f"),
                 "webhookInBox called with wrong args");
         sinon.restore();
 

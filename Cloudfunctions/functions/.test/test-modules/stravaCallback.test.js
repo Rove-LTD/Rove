@@ -65,6 +65,7 @@ const getHistoryInBox = require('../../getHistoryInBox');
           email: devUserData.email,
           strava_id: 12345678,
           strava_access_token: 'test-long-access-token',
+          strava_client_id: 72486,
           strava_refresh_token: 'test-refresh_token',
           strava_token_expires_at: 1654014114,
           strava_token_expires_in: 21600,
