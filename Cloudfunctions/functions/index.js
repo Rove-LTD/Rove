@@ -232,11 +232,13 @@ exports.getActivityList = functions.https.onRequest(async (req, res) => {
     const payload = await requestForDateRange(providersConnected, userDoc, start, end);
     url = "all checks passing";
     res.status(200);
-    // write the docs into the database now.
+    // write the docs into the database now and force a resend.
+    const resendFlag = true;
     for (let i = 0; i < payload.length; i++) {
       saveAndSendActivity([userDoc],
           payload[i].sanitised,
-          payload[i].raw);
+          payload[i].raw,
+          resendFlag);
     }
     res.send("OK");
   } catch (error) {
@@ -1906,18 +1908,17 @@ async function processPolarWebhook(webhookDoc) {
  * @param {Array<FirebaseFirestore>} userDocList
  * @param {Map} sanitisedActivity
  * @param {Map} activity
+ * @param {Boolean} resendFlag set to true if activity should be resent
  */
 async function saveAndSendActivity(userDocList,
     sanitisedActivity,
-    activity) {
+    activity,
+    resendFlag) {
   // create a version of the sanitised activity that compresses
   // the "samples" array by replacing it with a reference to a file
   // in storage.
   const compressedSanitisedActivity = await filters.compressSanitisedActivity(sanitisedActivity);
   for (const userDoc of userDocList) {
-    // TODO: change this functoin to receive a list
-    // of userDocs and put a for loop in here to save
-    // to all of the UserDocs
     // tag the sanitised activty with the userId
     compressedSanitisedActivity["userId"] = userDoc.data()["userId"];
     // create a local copy of the activity to prevent the userId
@@ -1935,7 +1936,11 @@ async function saveAndSendActivity(userDocList,
     if (!doc.exists) {
       await activityDoc.set({"sanitised": localSanitisedActivity, "raw": activity});
     } else {
-      console.log("duplicate activity - not written or sent");
+      if (resendFlag == true) {
+        await activityDoc.set({"sanitised": localSanitisedActivity, "raw": activity});
+      } else {
+        console.log("duplicate activity - not written or sent");
+      }
     }
   }
 }
@@ -1944,7 +1949,11 @@ exports.sendToDeveloper = functions
     .runWith({failurePolicy: true})
     .firestore
     .document("users/{userDocId}/activities/{activityId}")
-    .onCreate(async (activitySnap, context) => {
+    .onWrite(async (changeSnap, context) => {
+      const beforeData = changeSnap.before.data();
+      console.log("before "+beforeData);
+      const afterData = changeSnap.after.data();
+      console.log("before "+beforeData);
       const userDocId = context.params.userDocId;
       const activityDocId = context.params.activityId;
       const activityDoc = await db

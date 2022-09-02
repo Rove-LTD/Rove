@@ -140,7 +140,10 @@ describe("Testing that sending webhook messages to developers work: ", () => {
           .doc(activityDoc1.sanitised.activity_id+"wahoo")
           .set(activityDoc1);
 
-        const snapshot = test.firestore.makeDocumentSnapshot(activityDoc1, "users/"+testDev+testUser+"/activities/"+activityDoc1.sanitised.activity_id+"wahoo");
+        const snapshotBefore = test.firestore.makeDocumentSnapshot(activityDoc1, "users/"+testDev+testUser+"/activities/"+activityDoc1.sanitised.activity_id+"wahoo");
+        const snapshotAfter = test.firestore.makeDocumentSnapshot(activityDoc1, "users/"+testDev+testUser+"/activities/"+activityDoc1.sanitised.activity_id+"wahoo");
+        const snapshot = test.makeChange(snapshotBefore, snapshotAfter);
+
         gotPostSpy = sinon.spy(got, "post");
         wrapped = test.wrap(myFunctions.sendToDeveloper);
         await wrapped(snapshot, {params: {userDocId: testDev+testUser, activityId: activityDoc1.sanitised.activity_id+"wahoo"}});
