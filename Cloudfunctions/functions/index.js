@@ -403,7 +403,7 @@ async function getStravaActivityList(start, end, userDoc) {
     const payload = await stravaApi.oauth.refreshToken(userDoc.data()["strava_refresh_token"]);
     await stravaTokenStorage(userDoc.id, payload, accessToken, userDoc.data()["strava_id"]);
     accessToken = payload["access_token"];
-    userDoc = await userDoc.ref.get(); //refresh the userdoc and data
+    userDoc = await userDoc.ref.get(); // refresh the userdoc and data
     userDocData = await userDoc.data();
   }
   const result = await stravaApi.athlete.listActivities({"before": Math.round(end.getTime() / 1000), "after": Math.round(start.getTime() / 1000), "access_token": accessToken});
