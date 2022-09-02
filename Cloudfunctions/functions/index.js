@@ -869,6 +869,9 @@ async function getCorosToken(userDoc) {
     return userToken;
   }
 }
+// TODO: need to propogate the new tokens to all
+// client docs that have the same old token and the
+// same coros_client_id
 async function corosStoreTokens(tokens, userDoc) {
   await db.collection("users").doc(userDoc.id).set({
     "coros_access_token": tokens["access_token"],
