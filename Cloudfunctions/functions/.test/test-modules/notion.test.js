@@ -80,6 +80,8 @@ const webhookInBox = require('../../webhookInBox');
 
     // check the webhookInBox function was called with the correct args
     stubbedWebhookInBox.calledOnceWith(snapshot.ref);
+    const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+    await wait(2000);
     //now check the database was updated correctly
    const testUserDocs = await admin.firestore()
         .collection("users")
