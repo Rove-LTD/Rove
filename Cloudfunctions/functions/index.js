@@ -1951,9 +1951,7 @@ exports.sendToDeveloper = functions
     .document("users/{userDocId}/activities/{activityId}")
     .onWrite(async (changeSnap, context) => {
       const beforeData = changeSnap.before.data();
-      console.log("before "+beforeData);
       const afterData = changeSnap.after.data();
-      console.log("before "+beforeData);
       const userDocId = context.params.userDocId;
       const activityDocId = context.params.activityId;
       const activityDoc = await db
