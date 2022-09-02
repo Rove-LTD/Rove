@@ -177,7 +177,7 @@ describe("Testing that the developer can call API to getActivityList() and recei
 
    assert.deepEqual(sanatisedActivity, expectedResults);
 })
-it('Check that activities are correctly sanitised and concatonated...', async () => {
+it.only('Check that activities are correctly sanitised and concatonated...', async () => {
     // set the request object with the correct provider, developerId and userId
     const req = {
         url: 'https://us-central1-rovetest-beea7.cloudfunctions.net/getActivityList?devId='+testDev+'&userId='+testUser+'&devKey=test-key&start=2022-07-27T09:15:33.000Z&end=2022-07-29T09:15:33.000Z',
@@ -214,7 +214,7 @@ it('Check that activities are correctly sanitised and concatonated...', async ()
       console.log("arg "+i+": "+JSON.stringify(args));
     } */
     const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
-    await wait(1000);
+    await wait(4000);
 
     //now check the database was updated correctly
     const testUserActivities = await admin.firestore()

@@ -297,7 +297,7 @@ async function getWahooActivityList(start, end, userDoc) {
       for (let i = 0; i<activityList.workouts.length; i++) {
         sanitisedList.push({"raw": activityList.workouts[i], "sanitised": filters.wahooSanitise(activityList.workouts[i])});
         // TODO: add back in when detail needed
-        // sanitisedList[i]["sanitised"]["samples"] = await getDetailedActivity(userDoc.data(), activityList.workouts[i]);
+        sanitisedList[i]["sanitised"]["samples"] = await getDetailedActivity(userDoc.data(), activityList.workouts[i]);
       }
       // now filter for start times
       const startTime = start.getTime();
@@ -335,6 +335,7 @@ async function getPolarActivityList(start, end, userDoc) {
       // TODO: just get the file add the samples later when detail is needed
       const detailedSanitisedList = await getDetailedActivity(userDoc.data(), activityList[i], "polar");
       sanitisedList[i]["sanitised"]["file"] = detailedSanitisedList.file;
+      sanitisedList[i]["sanitised"]["samples"] = detailedSanitisedList.samples;
     }
     const startTime = start.getTime();
     const endTime = end.getTime();
@@ -384,7 +385,7 @@ async function getGarminActivityList(start, end, userDoc) {
   for (let i=0; i< activityList.length; i++) {
     listOfValidActivities.push({"raw": activityList[i], "sanitised": listOfSanitisedActivities[i]});
     // TODO: uncomment when detail needed
-    // listOfValidActivities[i]["sanitised"]["samples"] = await getDetailedActivity(userDocData, activityList[i]);
+    listOfValidActivities[i]["sanitised"]["samples"] = await getDetailedActivity(userDocData, activityList[i]);
   }
   return listOfValidActivities;
 }
@@ -412,7 +413,7 @@ async function getStravaActivityList(start, end, userDoc) {
   for (let i = 0; i<sanitisedActivities.length; i++) {
     listOfValidActivities.push({"raw": result[i], "sanitised": sanitisedActivities[i]});
     // TODO: uncomment when detail needed
-    // listOfValidActivities[i]["sanitised"]["samples"] = await getDetailedActivity(userDocData, result[i], "strava");
+    listOfValidActivities[i]["sanitised"]["samples"] = await getDetailedActivity(userDocData, result[i], "strava");
   }
   return listOfValidActivities;
 }
@@ -1879,7 +1880,7 @@ async function processPolarWebhook(webhookDoc) {
     const urlOptions = {
       version: "v4",
       action: "read",
-      expires: Date.now() + (1*24*60*60*1000), // 1 days in milleseconds till expiry
+      expires: Date.now() + (7*24*60*60*1000)-1000, // 7 days in milleseconds till expiry
     };
     const downloadURL = await storageRef.file("public/"+webhookBody.entity_id+".fit").getSignedUrl(urlOptions);
 
