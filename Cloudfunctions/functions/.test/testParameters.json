@@ -1,6 +1,6 @@
 { "testDev" :  "paulsTestDev",
   "testUser": "paulsTestUser",
-  "testNotionDev" :  "9e796cc24091489d97865364dc726b7b",
+  "testNotionDev" :  "1e493a63e26f4658854b0f0836de0b28",
   "testNotionUser": "notion",
   "firebaseConfig": {
     "apiKey": "AIzaSyCiMcMwrKgSKu6w5XW8hdCrWnLeI8CtGY4",
@@ -32,7 +32,8 @@
     "endpoint": "1e493a63e26f4658854b0f0836de0b28"
   },
   "devUserNotionData": {
-    "userId": "notion"
+    "userId": "notion",
+    "devId": "1e493a63e26f4658854b0f0836de0b28"
   },
   "devUserData": {
     "email": "paul.userTest@gmail.com"

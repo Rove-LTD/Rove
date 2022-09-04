@@ -1,5 +1,5 @@
 {"config": {
-    "InBoxRealTimeCheck": false,
+    "InBoxRealTimeCheck": true,
     "providerConfigs": {
       "wahoo": [
         {
