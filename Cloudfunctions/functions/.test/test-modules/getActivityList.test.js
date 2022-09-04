@@ -48,9 +48,9 @@ describe("Testing that the developer can call API to getActivityList() and recei
             "devId": testDev,
             "userId": testUser,
             "wahoo_user_id": "1510441",
-            "wahoo_access_token": "8rrxrPBKmf38DVO5Obo7ul4xjUGqvVjwjxX3n9nyob0",
-            "wahoo_client_id":  "iA2JRS_dBkikcb0uEnHPtb6IDt1vDYNbityEEhp801I",
-            "wahoo_refresh_token": "EoHcXrqpHpvRyT6EGNzzEk0ljVCMe2j7cVcruDxujEY",
+            "wahoo_access_token": "8opzllqq3kDLFrcGBF6FvBm4CkMZpN9R962S-OLcvQI",
+            "wahoo_client_id":  "IGQW1vInhei9CE_tEyoso2V4COhNOn53AfYGsTx96oA",
+            "wahoo_refresh_token": "6QrHr06pE-pwILv_vzZQShj8OPbouTVNCI9kfDPBHng",
             "wahoo_token_expires_at":new Date()/1000+36000,
             "wahoo_token_expires_in": "7200",
             "polar_user_id": "polar_test_user",
@@ -177,7 +177,7 @@ describe("Testing that the developer can call API to getActivityList() and recei
 
    assert.deepEqual(sanatisedActivity, expectedResults);
 })
-it.only('Check that activities are correctly sanitised and concatonated...', async () => {
+it('Check that activities are correctly sanitised and concatonated...', async () => {
     // set the request object with the correct provider, developerId and userId
     const req = {
         url: 'https://us-central1-rovetest-beea7.cloudfunctions.net/getActivityList?devId='+testDev+'&userId='+testUser+'&devKey=test-key&start=2022-07-27T09:15:33.000Z&end=2022-07-29T09:15:33.000Z',

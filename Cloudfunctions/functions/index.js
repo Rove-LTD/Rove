@@ -298,7 +298,7 @@ async function getWahooActivityList(start, end, userDoc) {
       const sanitisedList = [];
       for (let i = 0; i<activityList.workouts.length; i++) {
         sanitisedList.push({"raw": activityList.workouts[i], "sanitised": filters.wahooSanitise(activityList.workouts[i])});
-        // TODO: add back in when detail needed
+        // now get detail samples
         sanitisedList[i]["sanitised"]["samples"] = await getDetailedActivity(userDoc.data(), activityList.workouts[i]);
       }
       // now filter for start times
@@ -315,7 +315,7 @@ async function getWahooActivityList(start, end, userDoc) {
     if (error == 401) { // unauthorised
       // consider refreshing the access code and trying again
     }
-    return 400;
+    throw (error);
   }
 }
 async function getPolarActivityList(start, end, userDoc) {

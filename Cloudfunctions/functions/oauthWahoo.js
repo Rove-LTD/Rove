@@ -252,7 +252,11 @@ class OauthWahoo {
    *
    */
   get secrets() {
-    return getSecrets.fromTag("wahoo", this.lookup);
+    if (this.clientId != undefined || this.clientId != null) {
+      return getSecrets.fromClientId("wahoo", this.clientId);
+    } else {
+      return getSecrets.fromTag("wahoo", this.lookup);
+    }
   }
   /**
    *
@@ -292,9 +296,9 @@ class OauthWahoo {
    */
   async getUserToken(userDoc) {
     const userToken = userDoc.data()["wahoo_access_token"];
+    this.clientId = userDoc.data()["wahoo_client_id"];
     this.devId = userDoc.data()["devId"];
     this.userId = userDoc.data()["userId"];
-    await this.getDevDoc();
     if (this.userId == undefined || this.devId == undefined) {
       throw (new Error("error: userId or DevId not set"));
     }
