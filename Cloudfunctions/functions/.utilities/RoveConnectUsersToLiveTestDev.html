@@ -5,6 +5,8 @@
 <input type="submit" value="Start" onclick="signUpWith('garmin')">
 <h5>Sign in with polar!</h5>
 <input type="submit" value="Start" onclick="signUpWith('polar')">
+<h5>Sign in with coros!</h5>
+<input type="submit" value="Start" onclick="signUpWith('coros')">
 
  <h5>Disconnect with Wahoo!</h5>
  <input type="submit" value="Start" onclick="signOutWith('wahoo')">
@@ -12,6 +14,8 @@
 <input type="submit" value="Start" onclick="signOutWith('garmin')">
 <h5>Disconnect with polar!</h5>
 <input type="submit" value="Start" onclick="signOutWith('polar')">
+<h5>Disconnect with coros!</h5>
+<input type="submit" value="Start" onclick="signOutWith('coros')">
 
 <h5>Error Message</h5>
 <body error>errorMessage goes here</body>
@@ -33,7 +37,7 @@
 		function signOutWith(provider) {
     	window.location.href = 
     	'https://us-central1-rove-26.cloudfunctions.net/disconnectService?userId='
-    	+testUser+
+    	+provider+testUser+
     	'&devId='+testDev+
     	'&devKey='+devKey+
     	'&provider='+provider;
