@@ -34,6 +34,7 @@ const filters = require("./data-filter");
 const webhookInBox = require("./webhookInBox");
 const getHistoryInBox = require("./getHistoryInBox");
 const getSecrets = require("./getSecrets");
+const {sendToNotionEndpoint} = require("./notion");
 const oauthWahoo = new OauthWahoo(configurations, db);
 const callbackBaseUrl = "https://us-central1-"+process.env.GCLOUD_PROJECT+".cloudfunctions.net";
 const redirectPageUrl = "https://"+process.env.GCLOUD_PROJECT+".web.app";
@@ -298,7 +299,7 @@ async function getWahooActivityList(start, end, userDoc) {
       const sanitisedList = [];
       for (let i = 0; i<activityList.workouts.length; i++) {
         sanitisedList.push({"raw": activityList.workouts[i], "sanitised": filters.wahooSanitise(activityList.workouts[i])});
-        // TODO: add back in when detail needed
+        // now get detail samples
         sanitisedList[i]["sanitised"]["samples"] = await getDetailedActivity(userDoc.data(), activityList.workouts[i]);
       }
       // now filter for start times
@@ -315,7 +316,7 @@ async function getWahooActivityList(start, end, userDoc) {
     if (error == 401) { // unauthorised
       // consider refreshing the access code and trying again
     }
-    return 400;
+    throw (error);
   }
 }
 async function getPolarActivityList(start, end, userDoc) {
@@ -570,10 +571,8 @@ exports.disconnectService = functions.https.onRequest(async (req, res) => {
 });
 
 async function deleteStravaActivity(userDoc, webhookCall) {
-  const devId = await userDoc.data()["devId"];
-  const secretLookup = await db.collection("developers").doc(devId).get();
-  const tag = await secretLookup.data()["secret_lookup"];
-  const secrets = getSecrets.fromTag("strava", tag);
+  const clientId = userDoc.data()["strava_client_id"];
+  const secrets = getSecrets.fromClientId("strava", clientId);
   stravaApi.config({
     "client_id": secrets.clientId,
     "client_secret": secrets.secret,
@@ -871,6 +870,9 @@ async function getCorosToken(userDoc) {
     return userToken;
   }
 }
+// TODO: need to propogate the new tokens to all
+// client docs that have the same old token and the
+// same coros_client_id
 async function corosStoreTokens(tokens, userDoc) {
   await db.collection("users").doc(userDoc.id).set({
     "coros_access_token": tokens["access_token"],
@@ -1017,7 +1019,7 @@ exports.stravaCallback = functions.https.onRequest(async (req, res) => {
     if (!error && response.statusCode == 200) {
       // this is where the tokens come back.
       stravaStoreTokens(userId, devId, JSON.parse(body), secrets.clientId);
-      await getStravaAthleteId(userId, devId, JSON.parse(body));
+      await getStravaAthleteId(userId, devId, JSON.parse(body), secrets);
       await getHistoryInBox.push("strava",
           transactionData.devId+transactionData.userId);
       const urlString = await successDevCallback(transactionData);
@@ -1168,11 +1170,8 @@ async function stravaStoreTokens(userId, devId, data, stravaClientId) {
   // write resultant message to dev endpoint.
   return;
 }
-async function getStravaAthleteId(userId, devId, data) {
+async function getStravaAthleteId(userId, devId, data, secrets) {
   // get athlete id from strava.
-  const secretLookup = await db.collection("developers").doc(devId).get();
-  const tag = await secretLookup.data()["secret_lookup"];
-  const secrets = getSecrets.fromTag("strava", tag);
   stravaApi.config({
     "client_id": secrets.clientId,
     "client_secret": secrets.secret,
@@ -1933,20 +1932,16 @@ async function saveAndSendActivity(userDocList,
 
     const doc = await activityDoc.get();
 
-    if (!doc.exists) {
-      await activityDoc.set({"sanitised": localSanitisedActivity, "raw": activity});
+    if (!doc.exists || resendFlag) {
+      await activityDoc.set({"sanitised": localSanitisedActivity, "raw": activity, "status": "send"});
     } else {
-      if (resendFlag == true) {
-        await activityDoc.set({"sanitised": localSanitisedActivity, "raw": activity});
-      } else {
-        console.log("duplicate activity - not written or sent");
-      }
+      console.log("duplicate activity - not written or sent");
     }
   }
 }
 
 exports.sendToDeveloper = functions
-    .runWith({failurePolicy: true})
+    .runWith({failurePolicy: false})
     .firestore
     .document("users/{userDocId}/activities/{activityId}")
     .onWrite(async (changeSnap, context) => {
@@ -1954,115 +1949,143 @@ exports.sendToDeveloper = functions
       const afterData = changeSnap.after.data();
       const userDocId = context.params.userDocId;
       const activityDocId = context.params.activityId;
-      const activityDoc = await db
-          .collection("users")
-          .doc(userDocId)
-          .collection("activities")
-          .doc(activityDocId)
-          .get();
-      // return without processing if the configuration is set to
-      // switch the process off
-      if (configurations.InBoxRealTimeCheck == true) {
-        const sendToDevConfig = await db
-            .collection("realTimeConfigs")
-            .doc("sendToDeveloper")
-            .get();
-        if (sendToDevConfig.exists) {
-          if (sendToDevConfig.data()["off"]) {
-            return; // no processing should be done
+      const retryStatuses = ["retry", "resend", "send"];
+      try {
+        if (afterData && retryStatuses.includes(afterData.status)) {
+          // return without processing if the configuration is set to
+          // switch the process off
+          if (configurations.InBoxRealTimeCheck == true) {
+            const sendToDevConfig = await db
+                .collection("realTimeConfigs")
+                .doc("sendToDeveloper")
+                .get();
+            if (sendToDevConfig.exists) {
+              if (sendToDevConfig.data()["off"]) {
+                return; // no processing should be done
+              }
+            }
           }
+          // now send to the developerEndPoint
+          const update = await sendToDeveloperEndPoint(beforeData,
+              afterData,
+              userDocId,
+              activityDocId);
+          await db.collection("users")
+              .doc(userDocId)
+              .collection("activities")
+              .doc(activityDocId)
+              .set(update, {merge: true});
         } else {
-          // if the realTimeConfigs is not set up then carry
-          // on as normal
-        }
-      }
-      if (!activityDoc.exists || activityDoc.data()["status"] == "sent") {
-        console.log("activity "+activityDocId+" for user "+userDocId+" has been deleted or has already been sent not sending again");
-        return;
-      }
-      const MaxRetries = 3;
-      let triesSoFar = activityDoc.data()["triesSoFar"] || 0;
-      if (triesSoFar <= MaxRetries) {
-        triesSoFar = triesSoFar+1;
-        console.log("sending to developer - try number: "+triesSoFar);
-        await activityDoc.ref
-            .set({status: "sending try number.. "+triesSoFar,
-              timestamp: new Date().toISOString(),
-              triesSoFar: triesSoFar,
-            },
-            {merge: true});
-      } else {
-        // max retries email developer
-        await activityDoc.ref
-            .set({status: "error: failed to send - max retries reached.  Fix issue before trying again",
-              timestamp: new Date().toISOString(),
-            },
-            {merge: true});
-        console.log("max retries on sending activity for userDoc: "+userDocId+" - Activity "+activityDocId+" - fail");
-        return;
-      }
-      const userDoc = await db
-          .collection("users")
-          .doc(userDocId)
-          .get();
-
-      const devId = userDoc.data()["devId"];
-      const developerDoc = await db.collection("developers").doc(devId).get();
-      // if the developer document has the "suppress_webhook" field
-      // set to "true" then return without sending the activity.
-      if (developerDoc.data()["suppress_webhook"]) {
-        // the developer does not want webhook data to be sent
-        await activityDoc.ref
-            .set({status: "suppressed", timestamp: new Date().toISOString()},
-                {merge: true});
-        return;
-      }
-      // now before we send get the samples field from
-      // storage if it exists
-      const uncompressSanitisedActivity =
-          await filters
-              .uncompressSanitisedActivity(activityDoc
-                  .data()["sanitised"]);
-      const datastring = {"sanitised": uncompressSanitisedActivity, "raw": activityDoc.data()["raw"]};
-      const endpoint = developerDoc.data()["endpoint"];
-      const userData = userDoc.data();
-      // check if the user is from notion.
-      if (userData["userId"] == "notion") {
-        notion.sendToNotionEndpoint(endpoint, developerDoc, activityDoc.data()["sanitisedActivity"]);
-      } else {
-        if (endpoint == undefined || endpoint == null) {
-        // cannot send to developer as endpoint does not exist
-          console.log("Cannot send webhook payload to "+devId+" endpoint not provided");
+          // these activity records are either a delete (afterData
+          // is undefined) or an error or already
+          // sent so return without processing.
           return;
         }
-        const options = {
-          method: "POST",
-          url: endpoint,
-          headers: {
-            "Accept": "application/json",
-            "Content-type": "application/json",
-          },
-          body: JSON.stringify(datastring),
-        };
-
-        try {
-          const response = await got.post(options);
-          if (response.statusCode == 200) {
-          // the developer accepted the information
-            await activityDoc.ref
-                .set({status: "sent", timestamp: new Date().toISOString()},
-                    {merge: true});
-          } else {
-            const error = new Error("developer sent back wrong code: "+response.statusCode);
-            console.log("retrying sending to developer");
-            return Promise.reject(error);
-          }
-        } catch (err) {
-          console.log("retrying sending to developer: "+err.message);
-          return Promise.reject(err);
-        }
+      } catch (err) {
+        // record the error for analysis
+        await db.collection("users")
+            .doc(userDocId)
+            .collection("activities")
+            .doc(activityDocId)
+            .set({"status": "error",
+              "errorMessage": err.message,
+              "timestamp": new Date().toISOString()}, {merge: true});
+        return Promise.reject(err);
       }
     });
+
+async function sendToDeveloperEndPoint(beforeData,
+    afterData,
+    userDocId,
+    activityDocId ) {
+  const MaxRetries = 3;
+  let update = {};
+  let triesSoFar = afterData.triesSoFar || 0;
+  triesSoFar = triesSoFar+1;
+  if (triesSoFar > MaxRetries) {
+    // max retries email developer
+    update = {status: "error",
+      errorMessage: "failed to send - max retries reached.  Fix issue before trying again",
+      timestamp: new Date().toISOString(),
+    };
+    console.log("max retries on sending activity for userDoc: "+userDocId+" - Activity "+activityDocId+" - fail");
+    return;
+  }
+  // passed the retry check so now try to send to the developer
+  // end point
+  const userDoc = await db
+      .collection("users")
+      .doc(userDocId)
+      .get();
+
+  const devId = userDoc.data()["devId"];
+  const developerDoc = await db.collection("developers").doc(devId).get();
+  // if the developer document has the "suppress_webhook" field
+  // set to "true" then return without sending the activity.
+  if (developerDoc.data()["suppress_webhook"]) {
+    // the developer does not want webhook data to be sent
+    update = {status: "suppressed",
+      timestamp: new Date().toISOString()};
+    return update;
+  }
+  // now before we send get the samples field from
+  // storage if it exists
+  const uncompressSanitisedActivity =
+      await filters
+          .uncompressSanitisedActivity(afterData["sanitised"]);
+  const datastring = {"sanitised": uncompressSanitisedActivity, "raw": afterData["raw"]};
+  const endpoint = developerDoc.data()["endpoint"];
+  const userData = userDoc.data();
+  // check if the user is from notion.
+  if (userData["userId"] == "notion") {
+    try {
+      await notion.sendToNotionEndpoint(endpoint, developerDoc, uncompressSanitisedActivity);
+      update = {status: "sent",
+        timestamp: new Date().toISOString()};
+      return update;
+    } catch (error) {
+      throw (error);
+    }
+  } else {
+    if (endpoint == undefined || endpoint == null) {
+    // cannot send to developer as endpoint does not exist
+      console.log("Cannot send webhook payload to "+devId+" endpoint not provided");
+      update = {status: "error",
+        errorMessage: "Cannot send webhook payload to "+devId+" endpoint not provided",
+        timestamp: new Date().toISOString()};
+      return update;
+    }
+    const options = {
+      method: "POST",
+      url: endpoint,
+      headers: {
+        "Accept": "application/json",
+        "Content-type": "application/json",
+      },
+      body: JSON.stringify(datastring),
+    };
+
+    try {
+      const response = await got.post(options);
+      if (response.statusCode == 200) {
+      // the developer accepted the information
+        update = {status: "sent",
+          timestamp: new Date().toISOString()};
+        return update;
+      } else {
+        const error = new Error("developer sent back wrong code: "+response.statusCode);
+        console.log("retrying sending to developer");
+        update = {status: "retry",
+          errorMessage: "developer sent back wrong code: "+response.statusCode,
+          triesSoFar: triesSoFar,
+          timestamp: new Date().toISOString()};
+        return update;
+      }
+    } catch (err) {
+      throw (err);
+    }
+  }
+}
 
 exports.polarWebhookSetup = functions.https.onRequest(async (req, res) => {
   // get the devId and DevKey
@@ -2186,10 +2209,8 @@ async function getWahooDetailedActivity(userDoc, activityDoc) {
 async function getGarminDetailedActivity(userDoc, activityDoc) {
   try {
     const url = "https://apis.garmin.com/wellness-api/rest/activityDetails";
-    const devId = userDoc["devId"];
-    const secretLookup = await db.collection("developers").doc(devId).get();
-    const tag = await secretLookup.data()["secret_lookup"];
-    const secrets = getSecrets.fromTag("garmin", tag);
+    const clientId = userDoc["garmin_client_id"];
+    const secrets = getSecrets.fromClientId("garmin", clientId);
     const consumerSecret = secrets.secret;
     const oAuthConsumerSecret = secrets.clientId;
     let startTime = activityDoc["startTimeInSeconds"];

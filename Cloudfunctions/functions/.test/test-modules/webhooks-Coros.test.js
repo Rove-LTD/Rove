@@ -156,11 +156,10 @@ describe("Testing that the Coros Webhooks work: ", () => {
                 "start_time": "2018-04-01T09:49:38.000Z",
                 "userId": testParameters.testUser,
             },
-            "status": "not tested",
+            "status": "send",
             "timestamp": "not tested",
             "triesSoFar": "not tested",
         }
-        sanatisedActivity.status = "not tested";
         sanatisedActivity.timestamp = "not tested";
         sanatisedActivity.triesSoFar = "not tested";
         assert.deepEqual(sanatisedActivity, expectedResults);

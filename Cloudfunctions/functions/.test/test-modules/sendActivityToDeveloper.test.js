@@ -16,12 +16,15 @@ const testParameters = require('../testParameters.json');
 const firebaseConfig = testParameters.firebaseConfig;
 const testUser = testParameters.testUser
 const testDev = testParameters.testDev
+const testNotionUser = testParameters.testNotionUser
+const testNotionDev = testParameters.testNotionDev
 const unsuccessfulWebhookMessageDoc = "unsuccessfulTestWebhookMessageDoc";
 const successfulWebhookMessageDoc1 = "successfulTestWebhookMessageDoc1";
 const successfulWebhookMessageDoc2 = "successfulTestWebhookMessageDoc2";
 let successfulWebhookMessage;
 let unsuccessfulWebhookMessage;
-const devTestData = testParameters.devTestData
+const devTestData = testParameters.devTestData;
+const devTestNotionData = testParameters.devTestNotionData;
 const devUserData = testParameters.devUserData
 const test = require('firebase-functions-test')(firebaseConfig, testParameters.testKeyFile);
 const admin = require("firebase-admin");
@@ -33,6 +36,7 @@ myFunctions = require('../../index.js');
 // testing processes - these have to have the same constant
 // name as in the function we are testing
 const got = require('got');
+const notion = require('../../notion.js');
 const webhookInBox = require('../../webhookInBox');
 // const sampleFile = require("./samples-7509571698strava");
 //-------------TEST --- webhooks-------
@@ -91,6 +95,7 @@ describe("Testing that sending webhook messages to developers work: ", () => {
             },
         },
         raw: JSON.parse(successfulWebhookMessage1.body),
+        status: "resend"
       }
       activityDoc2 = {
         sanitised: {
@@ -120,6 +125,37 @@ describe("Testing that sending webhook messages to developers work: ", () => {
             },
         },
         raw: JSON.parse(successfulWebhookMessage1.body),
+        status: "retry"
+      }
+      activityDoc3 = {
+        sanitised: {
+            userId: testNotionUser,
+            activity_id: 140473430,
+            activity_name: "Cycling",
+            activity_type: "BIKING",
+            distance_in_meters: "0.0",
+            average_pace_in_meters_per_second: "0.0",
+            active_calories: "0.0",
+            activity_duration_in_seconds: "9.0",
+            start_time: '2022-06-13T16:38:51.000Z',
+            average_heart_rate_bpm: "0.0",
+            average_cadence: "0.0",
+            elevation_gain: "0.0",
+            elevation_loss: null,
+            provider: "wahoo",
+            power_bike_tss_last: null,
+            power_bike_np_last: null,
+            ascent_accum: "0.0",
+            duration_paused_accum: "0.0",
+            created_at: "2022-06-13T16:39:09.000Z",
+            updated_at: "2022-06-13T16:39:09.000Z",
+            power_avg: "0.0",
+            file: {
+                "url":"https://cdn.wahooligan.com/wahoo-cloud/production/uploads/workout_file/file/WpHvKL3irWsv2vHzGzGF_Q/2022-06-13-163851-ELEMNT_AE48-274-0.fit"
+            },
+        },
+        raw: JSON.parse(successfulWebhookMessage1.body),
+        status: "send"
       }
 
     });
@@ -157,7 +193,8 @@ describe("Testing that sending webhook messages to developers work: ", () => {
             "Accept": "application/json",
             "Content-type": "application/json",
             },
-            body: activityDoc1,
+            body: {sanitised: activityDoc1.sanitised,
+              raw: activityDoc1.raw,},
         };
         assert.deepEqual(args, expectedOptions, "the wrong info was sent to the developer endpoint");
         //now check the database was updated correctly
@@ -174,7 +211,6 @@ describe("Testing that sending webhook messages to developers work: ", () => {
        // expected results
        activityDoc1.status = "sent";
        activityDoc1.timestamp = "not tested";
-       activityDoc1.triesSoFar = 1;
 
       assert.deepEqual(sanatisedActivity, activityDoc1);
       sinon.restore();
@@ -217,9 +253,122 @@ describe("Testing that sending webhook messages to developers work: ", () => {
         // expected results
         activityDoc2.status = "suppressed"
         activityDoc2.timestamp = "not tested";
-        activityDoc2.triesSoFar = 1;
 
         assert.deepEqual(sanatisedActivity, activityDoc2);
         sinon.restore();
+        await admin.firestore()
+        .collection("developers")
+        .doc(testDev)
+        .set({
+            "suppress_webhook": false
+        }, {merge: true});
+    });
+    it('check that retries work...', async ()=> {
+      // create snapshot
+
+      const snapshotBefore = test.firestore.makeDocumentSnapshot(activityDoc1, "users/"+testDev+testUser+"/activities/"+activityDoc1.sanitised.activity_id+"wahoo");
+      activityDoc1.status = "retry";
+      activityDoc1.triesSoFar = 1
+      const snapshotAfter = test.firestore.makeDocumentSnapshot(activityDoc1, "users/"+testDev+testUser+"/activities/"+activityDoc1.sanitised.activity_id+"wahoo");
+      const snapshot = test.makeChange(snapshotBefore, snapshotAfter);
+    
+      // set up activity in the database
+      await admin.firestore()
+        .collection("users")
+        .doc(testDev+testUser)
+        .collection("activities")
+        .doc(activityDoc1.sanitised.activity_id+"wahoo")
+        .set(activityDoc1);
+
+      // stub out/spy got call that send to developer
+      gotPostSpy = sinon.spy(got, "post");
+
+      // call sendToDeveloper function
+      wrapped = test.wrap(myFunctions.sendToDeveloper);
+      await wrapped(snapshot, {params: {userDocId: testDev+testUser, activityId: activityDoc1.sanitised.activity_id+"wahoo"}});
+
+      // now check the got call was correct information
+      let args = gotPostSpy.getCall(0).args[0]
+      args.body = JSON.parse(args.body);
+      expectedOptions = {
+          method: "POST",
+          url: devTestData.endpoint,
+          headers: {
+          "Accept": "application/json",
+          "Content-type": "application/json",
+          },
+          body: {"sanitised": activityDoc1.sanitised,
+              "raw": activityDoc1.raw},
+      };
+      assert.deepEqual(args, expectedOptions, "the wrong info was sent to the developer endpoint");
+       //now check the database was updated correctly
+       const testUserDoc = await admin.firestore()
+          .collection("users")
+          .doc(testDev+testUser)
+          .collection("activities")
+          .doc(activityDoc1.sanitised.activity_id+"wahoo")
+          .get();
+  
+       // actual results
+       const sanatisedActivity = testUserDoc.data();
+       sanatisedActivity.timestamp = "not tested";
+       // expected results
+       activityDoc1.status = "sent";
+       activityDoc1.triesSoFar = 1;
+       activityDoc1.timestamp = "not tested";
+
+      assert.deepEqual(sanatisedActivity, activityDoc1);
+      sinon.restore();
+    });
+    it('check send to notion works...', async ()=>{
+            // create snapshot
+
+            const snapshotBefore = test.firestore.makeDocumentSnapshot(activityDoc3, "users/"+testNotionDev+testNotionUser+"/activities/"+activityDoc3.sanitised.activity_id+"wahoo");
+            const snapshotAfter = test.firestore.makeDocumentSnapshot(activityDoc3, "users/"+testNotionDev+testNotionUser+"/activities/"+activityDoc3.sanitised.activity_id+"wahoo");
+            const snapshot = test.makeChange(snapshotBefore, snapshotAfter);
+          
+            // set up activity in the database
+            await admin.firestore()
+              .collection("users")
+              .doc(testNotionDev+testNotionUser)
+              .collection("activities")
+              .doc(activityDoc3.sanitised.activity_id+"wahoo")
+              .set(activityDoc3);
+      
+            // stub out/spy got call that send to developer
+            const stubbedNotion = sinon.stub(notion, "sendToNotionEndpoint");
+            stubbedNotion.onCall().returns("successful value");
+            // call sendToDeveloper function
+            wrapped = test.wrap(myFunctions.sendToDeveloper);
+            await wrapped(snapshot, {params: {userDocId: testNotionDev+testNotionUser, activityId: activityDoc3.sanitised.activity_id+"wahoo"}});
+      
+            // now check the got call was correct information
+            let args = stubbedNotion.getCall(0).args;
+            assert.deepEqual(args[0], testNotionDev,
+                  "the wrong Notion Dev Id was sent to notion");
+            assert.deepEqual(args[2], activityDoc3.sanitised, 
+                  "the wrong info was sent to the developer endpoint");
+             //now check the database was updated correctly
+             const testUserDoc = await admin.firestore()
+                .collection("users")
+                .doc(testNotionDev+testNotionUser)
+                .collection("activities")
+                .doc(activityDoc3.sanitised.activity_id+"wahoo")
+                .get();
+        
+             // actual results
+             const sanatisedActivity = testUserDoc.data();
+             sanatisedActivity.timestamp = "not tested";
+             // expected results
+             activityDoc3.status = "sent";
+             activityDoc3.timestamp = "not tested";
+      
+            assert.deepEqual(sanatisedActivity, activityDoc3);
+            sinon.restore();
+      // create snapshot
+      // stub out got call that send to developer
+      // call sendToDeveloper function
+      // check the data sent was correct
+      // check the Activity in the database was updated correctly
     });
 }); //End TEST

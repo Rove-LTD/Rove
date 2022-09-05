@@ -48,9 +48,9 @@ describe("Testing that the developer can call API to getActivityList() and recei
             "devId": testDev,
             "userId": testUser,
             "wahoo_user_id": "1510441",
-            "wahoo_access_token": "8rrxrPBKmf38DVO5Obo7ul4xjUGqvVjwjxX3n9nyob0",
-            "wahoo_client_id":  "iA2JRS_dBkikcb0uEnHPtb6IDt1vDYNbityEEhp801I",
-            "wahoo_refresh_token": "EoHcXrqpHpvRyT6EGNzzEk0ljVCMe2j7cVcruDxujEY",
+            "wahoo_access_token": "8opzllqq3kDLFrcGBF6FvBm4CkMZpN9R962S-OLcvQI",
+            "wahoo_client_id":  "IGQW1vInhei9CE_tEyoso2V4COhNOn53AfYGsTx96oA",
+            "wahoo_refresh_token": "6QrHr06pE-pwILv_vzZQShj8OPbouTVNCI9kfDPBHng",
             "wahoo_token_expires_at":new Date()/1000+36000,
             "wahoo_token_expires_in": "7200",
             "polar_user_id": "polar_test_user",
@@ -213,8 +213,9 @@ it('Check that activities are correctly sanitised and concatonated...', async ()
       const args = stubbedGot.getCall(i).args
       console.log("arg "+i+": "+JSON.stringify(args));
     } */
+    // wait for database to be updated async.
     const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
-    await wait(4000);
+    await wait(5000);
 
     //now check the database was updated correctly
     const testUserActivities = await admin.firestore()
