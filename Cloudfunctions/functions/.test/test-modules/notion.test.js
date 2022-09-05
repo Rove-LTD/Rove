@@ -90,7 +90,7 @@ const webhookInBox = require('../../webhookInBox');
         .where("raw.id", "==", 12345678987654321)
         .get();
 
-   const sanatisedActivity = testUserDocs.docs[0].data()["sanitised"];
+   const sanatisedActivity = testUserDocs.docs[0].data();
    const expectedResults = { // TODO:
         userId: "notion",
         activity_id: 12345678987654321,
@@ -109,7 +109,7 @@ const webhookInBox = require('../../webhookInBox');
         provider: "strava",
         version: "1.0",
     }
-   assert.deepEqual(sanatisedActivity, expectedResults);
+   assert.deepEqual(sanatisedActivity.sanitised, expectedResults);
    sinon.restore();
 })
 });//End TEST 2--- Test Callbacks for Strava--------------
