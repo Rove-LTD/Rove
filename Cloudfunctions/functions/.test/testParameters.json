@@ -1,6 +1,6 @@
 { "testDev" :  "paulsTestDev",
   "testUser": "paulsTestUser",
-  "testNotionDev" :  "1e493a63e26f4658854b0f0836de0b28",
+  "testNotionDev" :  "c72cddfd3bc4423093b3865e880f6418",
   "testNotionUser": "notion",
   "firebaseConfig": {
     "apiKey": "AIzaSyCiMcMwrKgSKu6w5XW8hdCrWnLeI8CtGY4",
@@ -27,13 +27,13 @@
     "secret_lookup": "roveLiveSecrets",
     "callbackURL": "https://notion.so",
     "deauthorize_endpoint": "",
-    "devKey": "secret_5XB9u3Q58hYDSo6Saj4mJztukVUSZJmpCjzmhJfYegZ",
+    "devKey": "secret_Eao52taMXX6DfziQ2Jer1de3s7EA90c71oHU2n7HW0j",
     "email": "",
-    "endpoint": "1e493a63e26f4658854b0f0836de0b28"
+    "endpoint": "c72cddfd3bc4423093b3865e880f6418"
   },
   "devUserNotionData": {
     "userId": "notion",
-    "devId": "1e493a63e26f4658854b0f0836de0b28"
+    "devId": "c72cddfd3bc4423093b3865e880f6418"
   },
   "devUserData": {
     "email": "paul.userTest@gmail.com"

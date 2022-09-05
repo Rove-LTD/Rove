@@ -1932,14 +1932,10 @@ async function saveAndSendActivity(userDocList,
 
     const doc = await activityDoc.get();
 
-    if (!doc.exists) {
-      await activityDoc.set({"sanitised": localSanitisedActivity, "raw": activity});
+    if (!doc.exists || resendFlag) {
+      await activityDoc.set({"sanitised": localSanitisedActivity, "raw": activity, "status": "send"});
     } else {
-      if (resendFlag == true) {
-        await activityDoc.set({"sanitised": localSanitisedActivity, "raw": activity});
-      } else {
-        console.log("duplicate activity - not written or sent");
-      }
+      console.log("duplicate activity - not written or sent");
     }
   }
 }
@@ -1953,9 +1949,9 @@ exports.sendToDeveloper = functions
       const afterData = changeSnap.after.data();
       const userDocId = context.params.userDocId;
       const activityDocId = context.params.activityId;
-      const retryStatuses = ["retry", "resend"];
+      const retryStatuses = ["retry", "resend", "send"];
       try {
-        if (!afterData.status || retryStatuses.includes(afterData.status)) {
+        if (afterData && retryStatuses.includes(afterData.status)) {
           // return without processing if the configuration is set to
           // switch the process off
           if (configurations.InBoxRealTimeCheck == true) {
@@ -1980,8 +1976,9 @@ exports.sendToDeveloper = functions
               .doc(activityDocId)
               .set(update, {merge: true});
         } else {
-          // these activity records are either an error or already
-          // sent so do not send again.
+          // these activity records are either a delete (afterData
+          // is undefined) or an error or already
+          // sent so return without processing.
           return;
         }
       } catch (err) {

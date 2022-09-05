@@ -95,6 +95,7 @@ describe("Testing that sending webhook messages to developers work: ", () => {
             },
         },
         raw: JSON.parse(successfulWebhookMessage1.body),
+        status: "resend"
       }
       activityDoc2 = {
         sanitised: {
@@ -124,6 +125,7 @@ describe("Testing that sending webhook messages to developers work: ", () => {
             },
         },
         raw: JSON.parse(successfulWebhookMessage1.body),
+        status: "retry"
       }
       activityDoc3 = {
         sanitised: {
@@ -153,6 +155,7 @@ describe("Testing that sending webhook messages to developers work: ", () => {
             },
         },
         raw: JSON.parse(successfulWebhookMessage1.body),
+        status: "send"
       }
 
     });
@@ -190,7 +193,8 @@ describe("Testing that sending webhook messages to developers work: ", () => {
             "Accept": "application/json",
             "Content-type": "application/json",
             },
-            body: activityDoc1,
+            body: {sanitised: activityDoc1.sanitised,
+              raw: activityDoc1.raw,},
         };
         assert.deepEqual(args, expectedOptions, "the wrong info was sent to the developer endpoint");
         //now check the database was updated correctly
