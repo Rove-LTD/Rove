@@ -2009,7 +2009,7 @@ async function sendToDeveloperEndPoint(beforeData,
       timestamp: new Date().toISOString(),
     };
     console.log("max retries on sending activity for userDoc: "+userDocId+" - Activity "+activityDocId+" - fail");
-    return;
+    return update;
   }
   // passed the retry check so now try to send to the developer
   // end point
