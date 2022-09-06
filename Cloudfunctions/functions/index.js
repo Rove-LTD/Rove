@@ -249,7 +249,7 @@ exports.getActivityList = functions.https.onRequest(async (req, res) => {
   // send to Dev first and then store all the activities.
 });
 
-async function requestForDateRange(providers, userDoc, start, end) {
+async function requestForDateRange(getAllFlag, providers, userDoc, start, end) {
   // we want to synchronously run these functions together
   // so I will create a .then for each to add to an integer.
   let numOfProviders = 0;
@@ -270,7 +270,7 @@ async function requestForDateRange(providers, userDoc, start, end) {
   }
   if (providers["polar"]) {
     numOfProviders ++;
-    activtyList = activtyList.concat(getPolarActivityList(start, end, userDoc));
+    activtyList = activtyList.concat(getPolarActivityList(start, end, userDoc, getAllFlag));
   }
   try {
     let returnList = await Promise.all(activtyList);
@@ -319,7 +319,7 @@ async function getWahooActivityList(start, end, userDoc) {
     throw (error);
   }
 }
-async function getPolarActivityList(start, end, userDoc) {
+async function getPolarActivityList(start, end, userDoc, getAllFlag) {
   const userToken = userDoc.data()["polar_access_token"];
   try {
     const headers = {
@@ -342,11 +342,17 @@ async function getPolarActivityList(start, end, userDoc) {
     }
     const startTime = start.getTime();
     const endTime = end.getTime();
-    const listOfValidActivities = sanitisedList.filter((element)=>{
-      if (new Date(element.sanitised.start_time).getTime() > startTime && new Date(element.sanitised.start_time).getTime() < endTime) {
-        return element;
-      }
-    });
+    let listOfValidActivities;
+    if (getAllFlag == true) {
+      // if the get
+      listOfValidActivities = sanitisedList;
+    } else {
+      listOfValidActivities = sanitisedList.filter((element)=>{
+        if (new Date(element.sanitised.start_time).getTime() > startTime && new Date(element.sanitised.start_time).getTime() < endTime) {
+          return element;
+        }
+      });
+    }
     return listOfValidActivities;
   } catch (error) {
     if (error == 401) { // unauthorised
@@ -2317,6 +2323,7 @@ exports.processGetHistoryInBox = functions.firestore
         }
         const payload =
           await requestForDateRange(
+              true,
               providersConnected,
               userDoc,
               start,
