@@ -270,7 +270,7 @@ async function requestForDateRange(providers, userDoc, start, end, getAllFlag) {
   }
   if (providers["polar"]) {
     numOfProviders ++;
-    activtyList = activtyList.concat(getPolarActivityList(start, end, userDoc));
+    activtyList = activtyList.concat(getPolarActivityList(start, end, userDoc, getAllFlag));
   }
   try {
     let returnList = await Promise.all(activtyList);
@@ -334,7 +334,7 @@ async function getWahooActivityList(start, end, userDoc, getAllFlag) {
   }
   return listOfValidActivities;
 }
-async function getPolarActivityList(start, end, userDoc) {
+async function getPolarActivityList(start, end, userDoc, getAllFlag) {
   const userToken = userDoc.data()["polar_access_token"];
   try {
     const headers = {
@@ -357,11 +357,17 @@ async function getPolarActivityList(start, end, userDoc) {
     }
     const startTime = start.getTime();
     const endTime = end.getTime();
-    const listOfValidActivities = sanitisedList.filter((element)=>{
-      if (new Date(element.sanitised.start_time).getTime() > startTime && new Date(element.sanitised.start_time).getTime() < endTime) {
-        return element;
-      }
-    });
+    let listOfValidActivities;
+    if (getAllFlag == true) {
+      // if the get
+      listOfValidActivities = sanitisedList;
+    } else {
+      listOfValidActivities = sanitisedList.filter((element)=>{
+        if (new Date(element.sanitised.start_time).getTime() > startTime && new Date(element.sanitised.start_time).getTime() < endTime) {
+          return element;
+        }
+      });
+    }
     return listOfValidActivities;
   } catch (error) {
     if (error == 401) { // unauthorised
@@ -2344,12 +2350,14 @@ exports.processGetHistoryInBox = functions.firestore
         if (!userDoc.exists) {
           throw Error("userDocument does not exist when trying to get "+provider+" History!");
         }
+
         const payload = await requestForDateRange(
             providersConnected,
             userDoc,
             start,
             end,
             getAllFlag);
+
         // write the docs into the database and send to the developer.
         for (const activity of payload) {
           await saveAndSendActivity([userDoc],
