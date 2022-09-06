@@ -14,8 +14,8 @@ class corosService {
     this.config = config;
     this.provider = "wahoo";
     this.devId = devId;
-    this.accessToken = "rg2-6ee918c0c7d3347aeaa1eae04a78d926";
-    this.providerUserId = "4211cf484d264f75935047b0d709d76c";
+    this.accessToken = "rg2-2ea808eaa0ea200c47a13e55477441c5";
+    this.providerUserId = "25ae6a09af044c0fbe34c751c9fcdca1";
     // for user paulsTestDevcorostestUser
   }
   /**
@@ -25,8 +25,8 @@ class corosService {
   async getActivityList() {
     this.error = false;
     this.errorMessage = "";
-    this.startDate = 20220812 //1000 //1625698800
-    this.endDate = 20220912 //new Date.now(); //1662678000
+    this.startDate = 20220904 //1000 //1625698800
+    this.endDate = 20220906 //new Date.now(); //1662678000
     try {
       const response = await this.makeCall();
       if (this.error) {
