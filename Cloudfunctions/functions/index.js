@@ -249,11 +249,7 @@ exports.getActivityList = functions.https.onRequest(async (req, res) => {
   // send to Dev first and then store all the activities.
 });
 
-<<<<<<< HEAD
-async function requestForDateRange(getAllFlag, providers, userDoc, start, end) {
-=======
 async function requestForDateRange(providers, userDoc, start, end, getAllFlag) {
->>>>>>> fix-get-History
   // we want to synchronously run these functions together
   // so I will create a .then for each to add to an integer.
   let numOfProviders = 0;
@@ -2328,7 +2324,6 @@ exports.processGetHistoryInBox = functions.firestore
         }
         const payload =
           await requestForDateRange(
-              true,
               providersConnected,
               userDoc,
               start,
