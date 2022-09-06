@@ -266,7 +266,7 @@ async function requestForDateRange(providers, userDoc, start, end, getAllFlag) {
   // sadly Polar is not available to list activities.
   if (providers["wahoo"]) {
     numOfProviders ++;
-    activtyList = activtyList.concat(getWahooActivityList(start, end, userDoc));
+    activtyList = activtyList.concat(getWahooActivityList(start, end, userDoc, getAllFlag));
   }
   if (providers["polar"]) {
     numOfProviders ++;
@@ -280,37 +280,39 @@ async function requestForDateRange(providers, userDoc, start, end, getAllFlag) {
     throw err;
   }
 }
-async function getWahooActivityList(start, end, userDoc) {
+async function getWahooActivityList(start, end, userDoc, getAllFlag) {
+  const sanitisedList = [];
+  let listOfValidActivities = [];
   try {
     const accessToken = await oauthWahoo.getUserToken(userDoc);
+    let page = 1;
+    const perPage = 60;
     const options = {
-      url: "https://api.wahooligan.com/v1/workouts",
+      url: "https://api.wahooligan.com/v1/workouts?page="+page+"&per_page="+perPage,
       method: "GET",
       headers: {
         "Accept": "application/json",
         "Authorization": "Bearer " + accessToken,
       },
     };
-    let activityList = await got.get(options);
-    activityList = JSON.parse(activityList.body);
-    if (activityList.hasOwnProperty("workouts")) {
-      // delivers a list of the last 30 workouts...
-      // return a sanitised list
-      const sanitisedList = [];
-      for (let i = 0; i<activityList.workouts.length; i++) {
-        sanitisedList.push({"raw": activityList.workouts[i], "sanitised": filters.wahooSanitise(activityList.workouts[i])});
-        // now get detail samples
-        sanitisedList[i]["sanitised"]["samples"] = await getDetailedActivity(userDoc.data(), activityList.workouts[i]);
-      }
-      // now filter for start times
-      const startTime = start.getTime();
-      const endTime = end.getTime();
-      const listOfValidActivities = sanitisedList.filter((element)=>{
-        if (new Date(element.sanitised.start_time).getTime() > startTime && new Date(element.sanitised.start_time).getTime() < endTime) {
-          return element;
+    let activityList;
+    let totalProcessed = 0;
+    page = 1;
+    while (!activityList || activityList.total > totalProcessed) { // TODO: add time frame to this.
+      options.url = "https://api.wahooligan.com/v1/workouts?page="+page+"&per_page="+perPage;
+      activityList = await got.get(options);
+      activityList = JSON.parse(activityList.body);
+      if (activityList.hasOwnProperty("workouts")) {
+      // we have the first page of activities.
+      // process them and then get the next page
+        for (let i = 0; i<activityList.workouts.length; i++) {
+          sanitisedList.push({"raw": activityList.workouts[i], "sanitised": filters.wahooSanitise(activityList.workouts[i])});
+          // now get detail samples
+          sanitisedList[i]["sanitised"]["samples"] = await getDetailedActivity(userDoc.data(), activityList.workouts[i]);
         }
-      });
-      return listOfValidActivities;
+      }
+      totalProcessed = totalProcessed + activityList.workouts.length;
+      page = page+1;
     }
   } catch (error) {
     if (error == 401) { // unauthorised
@@ -318,6 +320,19 @@ async function getWahooActivityList(start, end, userDoc) {
     }
     throw (error);
   }
+  if (getAllFlag) {
+    listOfValidActivities = sanitisedList;
+  } else {
+    // now filter for start times
+    const startTime = start.getTime();
+    const endTime = end.getTime();
+    listOfValidActivities = sanitisedList.filter((element)=>{
+      if (new Date(element.sanitised.start_time).getTime() > startTime && new Date(element.sanitised.start_time).getTime() < endTime) {
+        return element;
+      }
+    });
+  }
+  return listOfValidActivities;
 }
 async function getPolarActivityList(start, end, userDoc) {
   const userToken = userDoc.data()["polar_access_token"];
@@ -1925,19 +1940,27 @@ async function saveAndSendActivity(userDocList,
     // firebase writes and developer sends.
     const localSanitisedActivity =
         JSON.parse(JSON.stringify(compressedSanitisedActivity));
-    const activityDoc = userDoc.ref
-        .collection("activities")
-        .doc(compressedSanitisedActivity.activity_id+
-            compressedSanitisedActivity.provider);
 
-    const doc = await activityDoc.get();
+    if (compressedSanitisedActivity.activity_id) {
+      const activityDoc = userDoc.ref
+          .collection("activities")
+          .doc(compressedSanitisedActivity.activity_id+
+              compressedSanitisedActivity.provider);
 
-    if (!doc.exists || resendFlag) {
-      await activityDoc.set({"sanitised": localSanitisedActivity, "raw": activity, "status": "send"});
+      const doc = await activityDoc.get();
+
+      if (!doc.exists || resendFlag) {
+        await activityDoc.set({"sanitised": localSanitisedActivity, "raw": activity, "status": "send"});
+      } else {
+        console.log("duplicate activity - not written or sent");
+      }
     } else {
-      console.log("duplicate activity - not written or sent");
+      // activity Id missing
+      console.log("activity_id missing one activity record not written for: "+
+          compressedSanitisedActivity.provider);
     }
   }
+  return;
 }
 
 exports.sendToDeveloper = functions
@@ -2290,11 +2313,16 @@ exports.processGetHistoryInBox = functions.firestore
       const userDocId = snap.data()["userDocId"];
       const providersConnected = {};
       providersConnected[provider] = true;
-      const start = new Date(Date.now());
-      const end = new Date(Date.now() - 30*24*60*60*1000);
+      const end = new Date(Date.now());
+      const start = new Date(Date.now() - 30*24*60*60*1000);
       const getAllFlag = true;
+      const validProviders = ["polar", "wahoo"];
+      // only process wahoo and polar in theis version
       // return without processing if the configuration is set to
       // switch the process off
+      if (!validProviders.includes(provider)) {
+        return;
+      }
       if (configurations.InBoxRealTimeCheck == true) {
         const historyInBoxConfig = await db
             .collection("realTimeConfigs")
@@ -2316,18 +2344,17 @@ exports.processGetHistoryInBox = functions.firestore
         if (!userDoc.exists) {
           throw Error("userDocument does not exist when trying to get "+provider+" History!");
         }
-        const payload =
-          await requestForDateRange(
-              providersConnected,
-              userDoc,
-              start,
-              end,
-              getAllFlag);
+        const payload = await requestForDateRange(
+            providersConnected,
+            userDoc,
+            start,
+            end,
+            getAllFlag);
         // write the docs into the database and send to the developer.
-        for (let i = 0; i < payload.length; i++) {
-          await saveAndSendActivity(userDoc,
-              payload[i].sanitised,
-              payload[i].raw);
+        for (const activity of payload) {
+          await saveAndSendActivity([userDoc],
+              activity.sanitised,
+              activity.raw);
         }
         getHistoryInBox.delete(snap.ref);
       } catch (error) {
