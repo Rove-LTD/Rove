@@ -230,7 +230,7 @@ exports.getActivityList = functions.https.onRequest(async (req, res) => {
   providersConnected["strava"] = userDoc.data().hasOwnProperty("strava_id");
   // make the request for the services which are authenticated by the user
   try {
-    const payload = await requestForDateRange(providersConnected, userDoc, start, end);
+    const payload = await requestForDateRange(providersConnected, userDoc, start, end, false);
     url = "all checks passing";
     res.status(200);
     // write the docs into the database now and force a resend.
@@ -249,7 +249,7 @@ exports.getActivityList = functions.https.onRequest(async (req, res) => {
   // send to Dev first and then store all the activities.
 });
 
-async function requestForDateRange(providers, userDoc, start, end) {
+async function requestForDateRange(providers, userDoc, start, end, getAllFlag) {
   // we want to synchronously run these functions together
   // so I will create a .then for each to add to an integer.
   let numOfProviders = 0;
@@ -2292,6 +2292,7 @@ exports.processGetHistoryInBox = functions.firestore
       providersConnected[provider] = true;
       const start = new Date(Date.now());
       const end = new Date(Date.now() - 30*24*60*60*1000);
+      const getAllFlag = true;
       // return without processing if the configuration is set to
       // switch the process off
       if (configurations.InBoxRealTimeCheck == true) {
@@ -2320,7 +2321,8 @@ exports.processGetHistoryInBox = functions.firestore
               providersConnected,
               userDoc,
               start,
-              end);
+              end,
+              getAllFlag);
         // write the docs into the database and send to the developer.
         for (let i = 0; i < payload.length; i++) {
           await saveAndSendActivity(userDoc,
