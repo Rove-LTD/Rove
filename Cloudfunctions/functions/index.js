@@ -230,7 +230,7 @@ exports.getActivityList = functions.https.onRequest(async (req, res) => {
   providersConnected["strava"] = userDoc.data().hasOwnProperty("strava_id");
   // make the request for the services which are authenticated by the user
   try {
-    const payload = await requestForDateRange(providersConnected, userDoc, start, end);
+    const payload = await requestForDateRange(providersConnected, userDoc, start, end, false);
     url = "all checks passing";
     res.status(200);
     // write the docs into the database now and force a resend.
@@ -249,7 +249,7 @@ exports.getActivityList = functions.https.onRequest(async (req, res) => {
   // send to Dev first and then store all the activities.
 });
 
-async function requestForDateRange(providers, userDoc, start, end) {
+async function requestForDateRange(providers, userDoc, start, end, getAllFlag) {
   // we want to synchronously run these functions together
   // so I will create a .then for each to add to an integer.
   let numOfProviders = 0;
@@ -266,11 +266,11 @@ async function requestForDateRange(providers, userDoc, start, end) {
   // sadly Polar is not available to list activities.
   if (providers["wahoo"]) {
     numOfProviders ++;
-    activtyList = activtyList.concat(getWahooActivityList(start, end, userDoc));
+    activtyList = activtyList.concat(getWahooActivityList(start, end, userDoc, getAllFlag));
   }
   if (providers["polar"]) {
     numOfProviders ++;
-    activtyList = activtyList.concat(getPolarActivityList(start, end, userDoc));
+    activtyList = activtyList.concat(getPolarActivityList(start, end, userDoc, getAllFlag));
   }
   try {
     let returnList = await Promise.all(activtyList);
@@ -280,37 +280,44 @@ async function requestForDateRange(providers, userDoc, start, end) {
     throw err;
   }
 }
-async function getWahooActivityList(start, end, userDoc) {
+async function getWahooActivityList(start, end, userDoc, getAllFlag) {
+  const sanitisedList = [];
+  let listOfValidActivities = [];
   try {
     const accessToken = await oauthWahoo.getUserToken(userDoc);
+    let page = 1;
+    const perPage = 60;
     const options = {
-      url: "https://api.wahooligan.com/v1/workouts",
+      url: "https://api.wahooligan.com/v1/workouts?page="+page+"&per_page="+perPage,
       method: "GET",
       headers: {
         "Accept": "application/json",
         "Authorization": "Bearer " + accessToken,
       },
     };
-    let activityList = await got.get(options);
-    activityList = JSON.parse(activityList.body);
-    if (activityList.hasOwnProperty("workouts")) {
-      // delivers a list of the last 30 workouts...
-      // return a sanitised list
-      const sanitisedList = [];
-      for (let i = 0; i<activityList.workouts.length; i++) {
-        sanitisedList.push({"raw": activityList.workouts[i], "sanitised": filters.wahooSanitise(activityList.workouts[i])});
-        // now get detail samples
-        sanitisedList[i]["sanitised"]["samples"] = await getDetailedActivity(userDoc.data(), activityList.workouts[i]);
-      }
-      // now filter for start times
-      const startTime = start.getTime();
-      const endTime = end.getTime();
-      const listOfValidActivities = sanitisedList.filter((element)=>{
-        if (new Date(element.sanitised.start_time).getTime() > startTime && new Date(element.sanitised.start_time).getTime() < endTime) {
-          return element;
+    let activityList;
+    let totalProcessed = 0;
+    page = 1;
+    while (!activityList || activityList.total > totalProcessed) { // TODO: add time frame to this.
+      options.url = "https://api.wahooligan.com/v1/workouts?page="+page+"&per_page="+perPage;
+      activityList = await got.get(options);
+      activityList = JSON.parse(activityList.body);
+      if (activityList.hasOwnProperty("workouts")) {
+      // we have the first page of activities.
+      // process them and then get the next page
+        for (let i = 0; i<activityList.workouts.length; i++) {
+          sanitisedList.push({"raw": activityList.workouts[i], "sanitised": filters.wahooSanitise(activityList.workouts[i])});
+          // now get detail samples but only if getAllFlag set to false
+          if (!getAllFlag) {
+            sanitisedList[i]["sanitised"]["samples"] =
+                await getDetailedActivity(userDoc.data(),
+                    activityList.workouts[i],
+                    "wahoo");
+          }
         }
-      });
-      return listOfValidActivities;
+      }
+      totalProcessed = totalProcessed + activityList.workouts.length;
+      page = page+1;
     }
   } catch (error) {
     if (error == 401) { // unauthorised
@@ -318,8 +325,21 @@ async function getWahooActivityList(start, end, userDoc) {
     }
     throw (error);
   }
+  if (getAllFlag) {
+    listOfValidActivities = sanitisedList;
+  } else {
+    // now filter for start times
+    const startTime = start.getTime();
+    const endTime = end.getTime();
+    listOfValidActivities = sanitisedList.filter((element)=>{
+      if (new Date(element.sanitised.start_time).getTime() > startTime && new Date(element.sanitised.start_time).getTime() < endTime) {
+        return element;
+      }
+    });
+  }
+  return listOfValidActivities;
 }
-async function getPolarActivityList(start, end, userDoc) {
+async function getPolarActivityList(start, end, userDoc, getAllFlag) {
   const userToken = userDoc.data()["polar_access_token"];
   try {
     const headers = {
@@ -342,11 +362,17 @@ async function getPolarActivityList(start, end, userDoc) {
     }
     const startTime = start.getTime();
     const endTime = end.getTime();
-    const listOfValidActivities = sanitisedList.filter((element)=>{
-      if (new Date(element.sanitised.start_time).getTime() > startTime && new Date(element.sanitised.start_time).getTime() < endTime) {
-        return element;
-      }
-    });
+    let listOfValidActivities;
+    if (getAllFlag == true) {
+      // if the getAllFlag is true then don't filter for date ranges.
+      listOfValidActivities = sanitisedList;
+    } else {
+      listOfValidActivities = sanitisedList.filter((element)=>{
+        if (new Date(element.sanitised.start_time).getTime() > startTime && new Date(element.sanitised.start_time).getTime() < endTime) {
+          return element;
+        }
+      });
+    }
     return listOfValidActivities;
   } catch (error) {
     if (error == 401) { // unauthorised
@@ -619,7 +645,7 @@ async function deleteStravaActivity(userDoc, webhookCall) {
 
   // if all successful send to developers sendToDeauthoriseWebhook.
   // userId, provider, status: deauthorised
-  const response = await sendToDeauthoriseWebhook(userDoc, "strava", 0);
+  const response = await sendToDeauthoriseWebhook(userDoc, "strava");
   return response; // 200 success, 400 failure
 }
 
@@ -658,7 +684,7 @@ async function deleteGarminActivity(userDoc, webhookCall) {
     activities.forEach(async (doc)=>{
       await doc.ref.delete();
     });
-    return await sendToDeauthoriseWebhook(userDoc, "garmin", 0);
+    return await sendToDeauthoriseWebhook(userDoc, "garmin");
   } catch (error) {
     return 400;
   }
@@ -735,7 +761,7 @@ async function deletePolarActivity(userDoc, webhookCall) {
     activities.forEach(async (doc)=>{
       await doc.ref.delete();
     });
-    await sendToDeauthoriseWebhook(userDoc, "polar", 0);
+    await sendToDeauthoriseWebhook(userDoc, "polar");
     return 200;
   } catch (error) {
     return 400;
@@ -787,7 +813,7 @@ async function deleteWahooActivity(userDoc) {
     activities.forEach(async (doc)=>{
       await doc.ref.delete();
     });
-    await sendToDeauthoriseWebhook(userDoc, "wahoo", 0);
+    await sendToDeauthoriseWebhook(userDoc, "wahoo");
     return 200;
   } catch (error) {
     return 400;
@@ -835,7 +861,7 @@ async function deleteCorosActivity(userDoc) {
     activities.forEach(async (doc)=>{
       await doc.ref.delete();
     });
-    await sendToDeauthoriseWebhook(userDoc, "coros", 0);
+    await sendToDeauthoriseWebhook(userDoc, "coros");
     return 200;
   } catch (error) {
     return 400;
@@ -883,11 +909,10 @@ async function corosStoreTokens(tokens, userDoc) {
   return tokens["access_token"];
 }
 
-async function sendToDeauthoriseWebhook(userDoc, provider, triesSoFar) {
+async function sendToDeauthoriseWebhook(userDoc, provider) {
   // get endpoint
   // send message to endpoint
   // retry if do not get 200 ok back
-  const MaxRetries = 3;
   const devId = userDoc.data()["devId"];
   const userId = userDoc.data()["userId"];
   const datastring = {
@@ -902,6 +927,37 @@ async function sendToDeauthoriseWebhook(userDoc, provider, triesSoFar) {
     console.log("Cannot send deauthorise payload to "+devId+" endpoint not provided");
     return 400;
   }
+  const returncode = await sendToWebhook(datastring, 0, endpoint);
+  return returncode;
+}
+
+async function sendToAuthoriseWebhook(userId, devId, provider) {
+  // get endpoint
+  // send message to endpoint
+  // retry if do not get 200 ok back
+  const datastring = {
+    provider: provider,
+    status: "connected",
+    userId: userId,
+  };
+  const developerDoc = await db.collection("developers").doc(devId).get();
+  const endpoint = developerDoc.data()["authorise_endpoint"];
+  if (endpoint == undefined || endpoint == null) {
+    // cannot send to developer as endpoint does not exist
+    console.log("Cannot send authorise payload to "+devId+" endpoint not provided");
+    return 400;
+  }
+  const returncode = await sendToWebhook(datastring, 0, endpoint);
+  return returncode;
+}
+
+async function sendToWebhook(jsonData, triesSoFar, endpoint) {
+  // get endpoint
+  // send message to endpoint
+  // retry if do not get 200 ok back
+  const MaxRetries = 3;
+  const datastring = jsonData;
+
   const options = {
     method: "POST",
     url: endpoint,
@@ -919,10 +975,10 @@ async function sendToDeauthoriseWebhook(userDoc, provider, triesSoFar) {
     if (triesSoFar <= MaxRetries) {
       console.log("retrying sending to developer");
       await wait(waitTime[triesSoFar]);
-      return await sendToDeauthoriseWebhook(userDoc, provider, triesSoFar+1);
+      return await sendToWebhook(jsonData, triesSoFar+1, endpoint);
     } else {
       // max retries email developer
-      console.log("max retries on sending deauthorisation to developer reached - fail");
+      console.log("max retries, failed to send webhook to developer at: "+endpoint);
       return 400;
     }
   }
@@ -1050,6 +1106,7 @@ async function successDevCallback(transactionData) {
     }
     urlString = urlString+"userId="+transactionData.userId+"&provider="+transactionData.provider;
   }
+  await sendToAuthoriseWebhook(transactionData.userId, transactionData.devId, transactionData.provider);
   return urlString;
 }
 exports.garminDeregistrations = functions.https.onRequest(async (req, res) => {
@@ -1925,19 +1982,27 @@ async function saveAndSendActivity(userDocList,
     // firebase writes and developer sends.
     const localSanitisedActivity =
         JSON.parse(JSON.stringify(compressedSanitisedActivity));
-    const activityDoc = userDoc.ref
-        .collection("activities")
-        .doc(compressedSanitisedActivity.activity_id+
-            compressedSanitisedActivity.provider);
 
-    const doc = await activityDoc.get();
+    if (compressedSanitisedActivity.activity_id) {
+      const activityDoc = userDoc.ref
+          .collection("activities")
+          .doc(compressedSanitisedActivity.activity_id+
+              compressedSanitisedActivity.provider);
 
-    if (!doc.exists || resendFlag) {
-      await activityDoc.set({"sanitised": localSanitisedActivity, "raw": activity, "status": "send"});
+      const doc = await activityDoc.get();
+
+      if (!doc.exists || resendFlag) {
+        await activityDoc.set({"sanitised": localSanitisedActivity, "raw": activity, "status": "send"});
+      } else {
+        console.log("duplicate activity - not written or sent");
+      }
     } else {
-      console.log("duplicate activity - not written or sent");
+      // activity Id missing
+      console.log("activity_id missing one activity record not written for: "+
+          compressedSanitisedActivity.provider);
     }
   }
+  return;
 }
 
 exports.sendToDeveloper = functions
@@ -2290,10 +2355,15 @@ exports.processGetHistoryInBox = functions.firestore
       const userDocId = snap.data()["userDocId"];
       const providersConnected = {};
       providersConnected[provider] = true;
-      const start = new Date(Date.now());
-      const end = new Date(Date.now() - 30*24*60*60*1000);
+      const end = new Date(Date.now());
+      const start = new Date(Date.now() - 30*24*60*60*1000);
+      const validProviders = ["polar", "wahoo"];
+      // only process wahoo and polar in theis version
       // return without processing if the configuration is set to
       // switch the process off
+      if (!validProviders.includes(provider)) {
+        return;
+      }
       if (configurations.InBoxRealTimeCheck == true) {
         const historyInBoxConfig = await db
             .collection("realTimeConfigs")
@@ -2309,23 +2379,39 @@ exports.processGetHistoryInBox = functions.firestore
         }
       }
       try {
+        // get user document and developer document to check they
+        // exist and get the instructions on history
         const userDoc = await db.collection("users")
             .doc(userDocId)
             .get();
         if (!userDoc.exists) {
           throw Error("userDocument does not exist when trying to get "+provider+" History!");
         }
-        const payload =
+        const developerDoc = await db.collection("developers")
+            .doc(userDoc.data()["devId"])
+            .get();
+        if (!developerDoc.exists) {
+          throw Error("developerDocument does not exist when trying to get "+provider+" History!");
+        }
+        const getHistory = developerDoc.data()["get_history"];
+        if (getHistory) {
+          const getAllFlag = true;
+          // more complex rules on how far back to go
+          // could be added here but for now it is get all
+          // or get none.
+          const payload =
           await requestForDateRange(
               providersConnected,
               userDoc,
               start,
-              end);
-        // write the docs into the database and send to the developer.
-        for (let i = 0; i < payload.length; i++) {
-          await saveAndSendActivity(userDoc,
-              payload[i].sanitised,
-              payload[i].raw);
+              end,
+              getAllFlag);
+          // write the docs into the database and send to the developer.
+          for (const activity of payload) {
+            await saveAndSendActivity([userDoc],
+                activity.sanitised,
+                activity.raw);
+          }
         }
         getHistoryInBox.delete(snap.ref);
       } catch (error) {

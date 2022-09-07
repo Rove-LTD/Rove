@@ -6,12 +6,12 @@ const getHistoryInBox = {
     // TODO: don't write history inbox yet
     // put back in when needed
     const webhookDoc = db.collection("getHistoryInBox").doc();
-    /* await webhookDoc
+    await webhookDoc
         .set({
           timestamp: new Date().toISOString(),
           provider: provider,
           userDocId: userDocId,
-        }); */
+        });
     return webhookDoc;
   },
   delete: async function(webhookDoc) {
