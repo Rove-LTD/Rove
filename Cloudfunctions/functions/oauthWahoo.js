@@ -59,6 +59,13 @@ class OauthWahoo {
     return this.devDoc.data()["secret_lookup"];
   }
   /**
+   * @return {Boolean} get History flag
+   */
+  get getHistory() {
+    return this.devDoc.data()["get_history"];
+
+  }
+  /**
    *
    * @param {Object} data - the parsed JSON body returned from the provider
    * @param {Object} transactionData

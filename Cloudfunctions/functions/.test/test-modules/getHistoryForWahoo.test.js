@@ -37,7 +37,7 @@ const { onStabilityDigestPublished } = require('firebase-functions/v2/alerts/cra
 // ------------------------END OF STUB FUNCTIONS----------------------------//
 
 // --------------START CONNECTSERVICE TESTS----------------------------------//
-describe("Testing that the get History inBox processing works for wahoo: ", () => {
+describe.only("Testing that the get History inBox processing works for wahoo: ", () => {
     before ('set up the userIds in the test User doc', async () => {
         await admin.firestore()
         .collection("users")
@@ -49,7 +49,7 @@ describe("Testing that the get History inBox processing works for wahoo: ", () =
             "wahoo_access_token": "91XIohhVI_VVDyfKz9wX_1zrCWzLSLA7Vt1H4hHhow4",
             "wahoo_client_id":  "iA2JRS_dBkikcb0uEnHPtb6IDt1vDYNbityEEhp801I",
             "wahoo_refresh_token": "G8jSOlN6m49aQ_ZGrGs61PPixJ8beN6mn1t3QS7bKeo",
-            "wahoo_token_expires_at": 1662480782,
+            "wahoo_token_expires_at": new Date()/1000+6000,
             "wahoo_token_expires_in": "7200",
             "wahoo_connected": true
         }, {merge: true});
@@ -65,6 +65,49 @@ describe("Testing that the get History inBox processing works for wahoo: ", () =
         });
     });
 
+  it('Should not return a list of activities from db when developer get_history flag not set...', async () => {
+    // set the request object with the correct provider, developerId and userId
+    response1 = require("./wahooListPayload1.js")
+    response2 = require("./wahooListPayload2.js")
+    response3 = require("./wahooListPayload3.js")
+    historyInBox = {
+      "provider": "wahoo",
+      "timestamp": "2022-09-06T11:02:09.768Z",
+      "userDocId": testDev+testUser,
+    };
+    await admin.firestore()
+        .collection("getHistoryInBox")
+        .doc("wahooTestHistoryInBoxDoc")
+        .set(historyInBox);
+    
+    await admin.firestore()
+      .collection("developers")
+      .doc(testDev)
+      .set({"get_history": false}, {merge: true});
+
+    const stubbedGot = sinon.stub(got, "get");
+    stubbedGot.onCall(0).returns({body: JSON.stringify(response1.body)});
+    stubbedGot.onCall(1).returns({body: JSON.stringify(response2.body)});
+    stubbedGot.onCall(2).returns({body: JSON.stringify(response3.body)});
+    stubbedGot.onCall(3).returns("stop")
+    const snapshot = test.firestore.makeDocumentSnapshot(historyInBox, "getHistoryInBox/wahooTestHistoryInBoxDoc");
+    wrapped = test.wrap(myFunctions.processGetHistoryInBox);
+    await wrapped(snapshot, {params: {docId: "wahooTestHistoryInBoxDoc"}});
+
+    const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+    await wait(1000);
+    //now check the database was updated correctly
+   const testUserDocs = await admin.firestore()
+   .collection("users")
+   .doc(testDev+testUser)
+   .collection("activities")
+   .get();
+
+   const NumberOfActivities = testUserDocs.docs.length;
+   assert.equal(NumberOfActivities, 0, "too many Activities written");
+
+   sinon.restore();
+  })
   it('Should return a list of activities from db...', async () => {
     // set the request object with the correct provider, developerId and userId
     response1 = require("./wahooListPayload1.js")
@@ -79,6 +122,11 @@ describe("Testing that the get History inBox processing works for wahoo: ", () =
         .collection("getHistoryInBox")
         .doc("wahooTestHistoryInBoxDoc")
         .set(historyInBox);
+    
+    await admin.firestore()
+      .collection("developers")
+      .doc(testDev)
+      .set({"get_history": true}, {merge: true});
 
     const stubbedGot = sinon.stub(got, "get");
     stubbedGot.onCall(0).returns({body: JSON.stringify(response1.body)});
@@ -176,5 +224,6 @@ describe("Testing that the get History inBox processing works for wahoo: ", () =
 
    assert.deepEqual(sampleDoc.data(), expectedResults);
   })
+
 });
 
