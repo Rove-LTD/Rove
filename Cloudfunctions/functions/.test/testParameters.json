@@ -21,6 +21,7 @@
     "polar_webhook_id": "wPWwr1P7",
     "endpoint": "https://rovetest-beea7-default-rtdb.firebaseio.com/newmessage.json",
     "deauthorise_endpoint": "https://rovetest-beea7-default-rtdb.firebaseio.com/deauthMessage.json",
+    "authorise_endpoint": "https://rovetest-beea7-default-rtdb.firebaseio.com/authMessage.json",
     "callbackURL": "https://paulsTest.com/callbackURL"
   },
   "devTestNotionData": {

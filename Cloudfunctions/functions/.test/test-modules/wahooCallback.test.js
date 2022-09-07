@@ -30,7 +30,7 @@ myFunctions = require('../../index.js');
 const got = require('got');
 const getHistoryInBox = require('../../getHistoryInBox');
 //-------------TEST 2--- Test Callbacks from Strava-------
-describe("Testing that the Wahoo callbacks work: ", () => {
+describe.only("Testing that the Wahoo callbacks work: ", () => {
   before(async () => {
     // reset the user doc before testing polar
     await admin.firestore()
