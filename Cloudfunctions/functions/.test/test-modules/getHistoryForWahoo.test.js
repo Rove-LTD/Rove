@@ -37,7 +37,7 @@ const { onStabilityDigestPublished } = require('firebase-functions/v2/alerts/cra
 // ------------------------END OF STUB FUNCTIONS----------------------------//
 
 // --------------START CONNECTSERVICE TESTS----------------------------------//
-describe.only("Testing that the get History inBox processing works for wahoo: ", () => {
+describe("Testing that the get History inBox processing works for wahoo: ", () => {
     before ('set up the userIds in the test User doc', async () => {
         await admin.firestore()
         .collection("users")
