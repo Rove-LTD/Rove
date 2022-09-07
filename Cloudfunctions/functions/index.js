@@ -359,7 +359,7 @@ async function getPolarActivityList(start, end, userDoc, getAllFlag) {
     const endTime = end.getTime();
     let listOfValidActivities;
     if (getAllFlag == true) {
-      // if the get
+      // if the getAllFlag is true then don't filter for date ranges.
       listOfValidActivities = sanitisedList;
     } else {
       listOfValidActivities = sanitisedList.filter((element)=>{
@@ -2350,14 +2350,13 @@ exports.processGetHistoryInBox = functions.firestore
         if (!userDoc.exists) {
           throw Error("userDocument does not exist when trying to get "+provider+" History!");
         }
-
-        const payload = await requestForDateRange(
-            providersConnected,
-            userDoc,
-            start,
-            end,
-            getAllFlag);
-
+        const payload =
+          await requestForDateRange(
+              providersConnected,
+              userDoc,
+              start,
+              end,
+              getAllFlag);
         // write the docs into the database and send to the developer.
         for (const activity of payload) {
           await saveAndSendActivity([userDoc],
