@@ -311,7 +311,7 @@ async function getWahooActivityList(start, end, userDoc, getAllFlag) {
           if (!getAllFlag) {
             sanitisedList[i]["sanitised"]["samples"] =
                 await getDetailedActivity(userDoc.data(),
-                    activityList.workouts[i],
+                    sanitisedList[i]["sanitised"],
                     "wahoo");
           }
         }
@@ -414,7 +414,7 @@ async function getGarminActivityList(start, end, userDoc) {
   for (let i=0; i< activityList.length; i++) {
     listOfValidActivities.push({"raw": activityList[i], "sanitised": listOfSanitisedActivities[i]});
     // TODO: uncomment when detail needed
-    listOfValidActivities[i]["sanitised"]["samples"] = await getDetailedActivity(userDocData, activityList[i]);
+    listOfValidActivities[i]["sanitised"]["samples"] = await getDetailedActivity(userDocData, activityList[i], "garmin");
   }
   return listOfValidActivities;
 }
@@ -1195,9 +1195,8 @@ async function processGarminWebhook(webhookDoc) {
     userQuery.docs.forEach((doc)=> {
       userDocsList.push(doc);
     });
-    // TODO: uncomment when detail needed
-    // const samples = await getDetailedActivity(userDocsList[0].data(), webhookBody.activities[index], "garmin");
-    // sanitisedActivity["samples"] = samples;
+    const samples = await getDetailedActivity(userDocsList[0].data(), webhookBody.activities[index], "garmin");
+    sanitisedActivity["samples"] = samples;
     // save raw and sanitised activites as a backup for each user
     saveAndSendActivity(userDocsList,
         sanitisedActivity,

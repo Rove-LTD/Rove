@@ -205,7 +205,10 @@ it('Check that activities are correctly sanitised and concatonated...', async ()
     stubbedGot.withArgs(sinon.match({url: 'https://apis.garmin.com/wellness-api/rest/activityDetails?uploadStartTimeInSeconds=1659106036&uploadEndTimeInSeconds=1659192436'})).returns(garminDetail2)
     stubbedGot.withArgs(sinon.match({url: "https://api.wahooligan.com/v1/workouts?page=1&per_page=60"})).returns(wahooResponse);
     stubbedGot.withArgs(sinon.match({url: "https://www.polaraccesslink.com/v3/exercises"})).returns(polarResponse);
+    stubbedGot.withArgs(sinon.match({url: 'https://www.polaraccesslink.com/v3/exercises/ymeoBNZw/fit'})).returns(fitFileResponse);
+    stubbedGot.withArgs(sinon.match('https://cdn.wahooligan.com/wahoo-cloud/production/uploads/workout_file/file/7IrvLZe89WV4QuaEcaCaWA/2022-05-08-080131-ELEMNT_AE48-260-0.fit')).returns(fitFileResponse)
     stubbedGot.returns(fitFileResponse);
+
     res = {
         send: (JSON)=> {assert.equal(JSON, "OK");},
         status: (code)=>{assert.equal(code, 200);},
