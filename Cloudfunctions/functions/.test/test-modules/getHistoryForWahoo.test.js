@@ -37,7 +37,7 @@ const { onStabilityDigestPublished } = require('firebase-functions/v2/alerts/cra
 // ------------------------END OF STUB FUNCTIONS----------------------------//
 
 // --------------START CONNECTSERVICE TESTS----------------------------------//
-describe("Testing that the get History inBox processing works for wahoo: ", () => {
+describe.only("Testing that the get History inBox processing works for wahoo: ", () => {
     before ('set up the userIds in the test User doc', async () => {
         await admin.firestore()
         .collection("users")
@@ -49,7 +49,7 @@ describe("Testing that the get History inBox processing works for wahoo: ", () =
             "wahoo_access_token": "91XIohhVI_VVDyfKz9wX_1zrCWzLSLA7Vt1H4hHhow4",
             "wahoo_client_id":  "iA2JRS_dBkikcb0uEnHPtb6IDt1vDYNbityEEhp801I",
             "wahoo_refresh_token": "G8jSOlN6m49aQ_ZGrGs61PPixJ8beN6mn1t3QS7bKeo",
-            "wahoo_token_expires_at": 1662480782,
+            "wahoo_token_expires_at": new Date()/1000+6000,
             "wahoo_token_expires_in": "7200",
             "wahoo_connected": true
         }, {merge: true});
@@ -79,6 +79,11 @@ describe("Testing that the get History inBox processing works for wahoo: ", () =
         .collection("getHistoryInBox")
         .doc("wahooTestHistoryInBoxDoc")
         .set(historyInBox);
+    
+    await admin.firestore()
+      .collection("developers")
+      .doc(testDev)
+      .set({"get_history": true}, {merge: true});
 
     const stubbedGot = sinon.stub(got, "get");
     stubbedGot.onCall(0).returns({body: JSON.stringify(response1.body)});

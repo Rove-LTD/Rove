@@ -2321,7 +2321,6 @@ exports.processGetHistoryInBox = functions.firestore
       providersConnected[provider] = true;
       const end = new Date(Date.now());
       const start = new Date(Date.now() - 30*24*60*60*1000);
-      const getAllFlag = true;
       const validProviders = ["polar", "wahoo"];
       // only process wahoo and polar in theis version
       // return without processing if the configuration is set to
@@ -2344,24 +2343,39 @@ exports.processGetHistoryInBox = functions.firestore
         }
       }
       try {
+        // get user document and developer document to check they
+        // exist and get the instructions on history
         const userDoc = await db.collection("users")
             .doc(userDocId)
             .get();
         if (!userDoc.exists) {
           throw Error("userDocument does not exist when trying to get "+provider+" History!");
         }
-        const payload =
+        const developerDoc = await db.collection("developers")
+            .doc(userDoc.data()["devId"])
+            .get();
+        if (!developerDoc.exists) {
+          throw Error("developerDocument does not exist when trying to get "+provider+" History!");
+        }
+        const getHistory = developerDoc.data()["get_history"];
+        if (getHistory) {
+          const getAllFlag = true;
+          // more complex rules on how far back to go
+          // could be added here but for now it is get all
+          // or get none.
+          const payload =
           await requestForDateRange(
               providersConnected,
               userDoc,
               start,
               end,
               getAllFlag);
-        // write the docs into the database and send to the developer.
-        for (const activity of payload) {
-          await saveAndSendActivity([userDoc],
-              activity.sanitised,
-              activity.raw);
+          // write the docs into the database and send to the developer.
+          for (const activity of payload) {
+            await saveAndSendActivity([userDoc],
+                activity.sanitised,
+                activity.raw);
+          }
         }
         getHistoryInBox.delete(snap.ref);
       } catch (error) {
