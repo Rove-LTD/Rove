@@ -177,7 +177,7 @@ describe("Testing that the developer can call API to getActivityList() and recei
 
    assert.deepEqual(sanatisedActivity, expectedResults);
 })
-it('Check that activities are correctly sanitised and concatonated...', async () => {
+it.only('Check that activities are correctly sanitised and concatonated...', async () => {
     // set the request object with the correct provider, developerId and userId
     const req = {
         url: 'https://us-central1-rovetest-beea7.cloudfunctions.net/getActivityList?devId='+testDev+'&userId='+testUser+'&devKey=test-key&start=2022-07-27T09:15:33.000Z&end=2022-07-29T09:15:33.000Z',
@@ -196,10 +196,16 @@ it('Check that activities are correctly sanitised and concatonated...', async ()
     stubbedStrava.onFirstCall().returns(stravaResponse);
     const stubbedGot = sinon.stub(got, "get");
     stubbedGot.withArgs(sinon.match({url: 'https://apis.garmin.com/wellness-api/rest/activities?uploadStartTimeInSeconds=1658913333&uploadEndTimeInSeconds=1658999733'})).returns(garminResponse1);
-    stubbedGot.withArgs(sinon.match({url: "https://apis.garmin.com/wellness-api/rest/activities?uploadStartTimeInSeconds=1658999733&uploadEndTimeInSeconds=1659086133"})).returns(garminResponse2);
+    stubbedGot.withArgs(sinon.match({url: 'https://apis.garmin.com/wellness-api/rest/activities?uploadStartTimeInSeconds=1658999733&uploadEndTimeInSeconds=1659086133'})).returns(garminResponse2);
+    stubbedGot.withArgs(sinon.match({url: 'https://apis.garmin.com/wellness-api/rest/activityDetails?uploadStartTimeInSeconds=1659019636&uploadEndTimeInSeconds=1659106036'})).returns("garminDetail")
+    stubbedGot.withArgs(sinon.match({url: 'https://apis.garmin.com/wellness-api/rest/activityDetails?uploadStartTimeInSeconds=1659019636&uploadEndTimeInSeconds=1659106036'})).returns("garminDetail")
+
     stubbedGot.withArgs(sinon.match({url: "https://api.wahooligan.com/v1/workouts?page=1&per_page=60"})).returns(wahooResponse);
     stubbedGot.withArgs(sinon.match({url: "https://www.polaraccesslink.com/v3/exercises"})).returns(polarResponse);
-    stubbedGot.returns(fitFileResponse);
+    stubbedGot.withArgs(sinon.match({url: 'https://www.polaraccesslink.com/v3/exercises/ymeoBNZw/fit'})).returns(fitFileResponse);
+    stubbedGot.withArgs(sinon.match('https://cdn.wahooligan.com/wahoo-cloud/production/uploads/workout_file/file/7IrvLZe89WV4QuaEcaCaWA/2022-05-08-080131-ELEMNT_AE48-260-0.fit')).returns(fitFileResponse)
+
+
     res = {
         send: (JSON)=> {assert.equal(JSON, "OK");},
         status: (code)=>{assert.equal(code, 200);},
