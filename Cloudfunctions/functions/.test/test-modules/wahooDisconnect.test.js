@@ -29,7 +29,7 @@ myFunctions = require('../../index.js');
 // name as in the function we are testing
 const got = require('got');
 //-------------TEST 2--- Test Callbacks from Strava-------
-describe("Check the Wahoo Disconnect Service works: ", () => {
+describe.only("Check the Wahoo Disconnect Service works: ", () => {
   const now = new Date()/1000;
   const tokenFutureExpiryDate = now+1000;
   const tokenPastExpiryDate = now-1000;

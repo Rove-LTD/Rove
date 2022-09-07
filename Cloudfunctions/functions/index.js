@@ -311,7 +311,7 @@ async function getWahooActivityList(start, end, userDoc, getAllFlag) {
           if (!getAllFlag) {
             sanitisedList[i]["sanitised"]["samples"] =
                 await getDetailedActivity(userDoc.data(),
-                    sanitisedList[i]["sanitised"],
+                    activityList.workouts[i],
                     "wahoo");
           }
         }
@@ -414,7 +414,7 @@ async function getGarminActivityList(start, end, userDoc) {
   for (let i=0; i< activityList.length; i++) {
     listOfValidActivities.push({"raw": activityList[i], "sanitised": listOfSanitisedActivities[i]});
     // TODO: uncomment when detail needed
-    listOfValidActivities[i]["sanitised"]["samples"] = await getDetailedActivity(userDocData, activityList[i], "garmin");
+    listOfValidActivities[i]["sanitised"]["samples"] = await getDetailedActivity(userDocData, activityList[i]);
   }
   return listOfValidActivities;
 }
@@ -645,7 +645,7 @@ async function deleteStravaActivity(userDoc, webhookCall) {
 
   // if all successful send to developers sendToDeauthoriseWebhook.
   // userId, provider, status: deauthorised
-  const response = await sendToDeauthoriseWebhook(userDoc, "strava", 0);
+  const response = await sendToDeauthoriseWebhook(userDoc, "strava");
   return response; // 200 success, 400 failure
 }
 
@@ -684,7 +684,7 @@ async function deleteGarminActivity(userDoc, webhookCall) {
     activities.forEach(async (doc)=>{
       await doc.ref.delete();
     });
-    return await sendToDeauthoriseWebhook(userDoc, "garmin", 0);
+    return await sendToDeauthoriseWebhook(userDoc, "garmin");
   } catch (error) {
     return 400;
   }
@@ -761,7 +761,7 @@ async function deletePolarActivity(userDoc, webhookCall) {
     activities.forEach(async (doc)=>{
       await doc.ref.delete();
     });
-    await sendToDeauthoriseWebhook(userDoc, "polar", 0);
+    await sendToDeauthoriseWebhook(userDoc, "polar");
     return 200;
   } catch (error) {
     return 400;
@@ -813,7 +813,7 @@ async function deleteWahooActivity(userDoc) {
     activities.forEach(async (doc)=>{
       await doc.ref.delete();
     });
-    await sendToDeauthoriseWebhook(userDoc, "wahoo", 0);
+    await sendToDeauthoriseWebhook(userDoc, "wahoo");
     return 200;
   } catch (error) {
     return 400;
@@ -861,7 +861,7 @@ async function deleteCorosActivity(userDoc) {
     activities.forEach(async (doc)=>{
       await doc.ref.delete();
     });
-    await sendToDeauthoriseWebhook(userDoc, "coros", 0);
+    await sendToDeauthoriseWebhook(userDoc, "coros");
     return 200;
   } catch (error) {
     return 400;
@@ -909,11 +909,10 @@ async function corosStoreTokens(tokens, userDoc) {
   return tokens["access_token"];
 }
 
-async function sendToDeauthoriseWebhook(userDoc, provider, triesSoFar) {
+async function sendToDeauthoriseWebhook(userDoc, provider) {
   // get endpoint
   // send message to endpoint
   // retry if do not get 200 ok back
-  const MaxRetries = 3;
   const devId = userDoc.data()["devId"];
   const userId = userDoc.data()["userId"];
   const datastring = {
@@ -928,6 +927,37 @@ async function sendToDeauthoriseWebhook(userDoc, provider, triesSoFar) {
     console.log("Cannot send deauthorise payload to "+devId+" endpoint not provided");
     return 400;
   }
+  const returncode = await sendToWebhook(datastring, 0, endpoint);
+  return returncode;
+}
+
+async function sendToAuthoriseWebhook(userId, devId, provider) {
+  // get endpoint
+  // send message to endpoint
+  // retry if do not get 200 ok back
+  const datastring = {
+    provider: provider,
+    status: "connected",
+    userId: userId,
+  };
+  const developerDoc = await db.collection("developers").doc(devId).get();
+  const endpoint = developerDoc.data()["authorise_endpoint"];
+  if (endpoint == undefined || endpoint == null) {
+    // cannot send to developer as endpoint does not exist
+    console.log("Cannot send authorise payload to "+devId+" endpoint not provided");
+    return 400;
+  }
+  const returncode = await sendToWebhook(datastring, 0, endpoint);
+  return returncode;
+}
+
+async function sendToWebhook(jsonData, triesSoFar, endpoint) {
+  // get endpoint
+  // send message to endpoint
+  // retry if do not get 200 ok back
+  const MaxRetries = 3;
+  const datastring = jsonData;
+
   const options = {
     method: "POST",
     url: endpoint,
@@ -945,10 +975,10 @@ async function sendToDeauthoriseWebhook(userDoc, provider, triesSoFar) {
     if (triesSoFar <= MaxRetries) {
       console.log("retrying sending to developer");
       await wait(waitTime[triesSoFar]);
-      return await sendToDeauthoriseWebhook(userDoc, provider, triesSoFar+1);
+      return await sendToWebhook(jsonData, triesSoFar+1, endpoint);
     } else {
       // max retries email developer
-      console.log("max retries on sending deauthorisation to developer reached - fail");
+      console.log("max retries, failed to send webhook to developer at: "+endpoint);
       return 400;
     }
   }
@@ -1076,6 +1106,7 @@ async function successDevCallback(transactionData) {
     }
     urlString = urlString+"userId="+transactionData.userId+"&provider="+transactionData.provider;
   }
+  await sendToAuthoriseWebhook(transactionData.userId, transactionData.devId, transactionData.provider);
   return urlString;
 }
 exports.garminDeregistrations = functions.https.onRequest(async (req, res) => {
@@ -1164,8 +1195,9 @@ async function processGarminWebhook(webhookDoc) {
     userQuery.docs.forEach((doc)=> {
       userDocsList.push(doc);
     });
-    const samples = await getDetailedActivity(userDocsList[0].data(), webhookBody.activities[index], "garmin");
-    sanitisedActivity["samples"] = samples;
+    // TODO: uncomment when detail needed
+    // const samples = await getDetailedActivity(userDocsList[0].data(), webhookBody.activities[index], "garmin");
+    // sanitisedActivity["samples"] = samples;
     // save raw and sanitised activites as a backup for each user
     saveAndSendActivity(userDocsList,
         sanitisedActivity,

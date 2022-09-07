@@ -468,7 +468,6 @@ exports.jsonFitSanitise = function(jsonRecords) {
   records.forEach((_record) => {
     // if the record is outside the current start/stop window
     // if so then advance to the next window
-    const record = _record["data"];
     if ((record["timestamp"]).toISOString() > currEnd) {
       startIndex+=2;
       endIndex+=2;
@@ -476,6 +475,7 @@ exports.jsonFitSanitise = function(jsonRecords) {
       currEnd = events[endIndex]["data"]["timestamp"];
       timer += 1;
     }
+    const record = _record["data"];
     timer += ((record["timestamp"]).toISOString() - currStart)/1000;
     sanitisedSamples.push(
         {
