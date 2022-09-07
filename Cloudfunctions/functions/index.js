@@ -2350,7 +2350,6 @@ exports.processGetHistoryInBox = functions.firestore
         if (!userDoc.exists) {
           throw Error("userDocument does not exist when trying to get "+provider+" History!");
         }
-<<<<<<< HEAD
         const payload =
           await requestForDateRange(
               providersConnected,
@@ -2358,16 +2357,6 @@ exports.processGetHistoryInBox = functions.firestore
               start,
               end,
               getAllFlag);
-=======
-
-        const payload = await requestForDateRange(
-            providersConnected,
-            userDoc,
-            start,
-            end,
-            getAllFlag);
-
->>>>>>> main
         // write the docs into the database and send to the developer.
         for (const activity of payload) {
           await saveAndSendActivity([userDoc],
