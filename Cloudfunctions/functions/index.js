@@ -2262,15 +2262,14 @@ async function getGarminDetailedActivity(userDoc, activityDoc) {
           {from: startTime, to: startTime+24*60*60});
       const response = await got.get(options);
       const activityList = JSON.parse(response.body);
-      for (const _activity in activityList) {
-        if (activityList[_activity]["activityId"] == activityId) {
-          activity = filters.garminDetailedSanitise(activityList[_activity]);
+      for (const _activity of activityList) {
+        if (_activity["activityId"] == activityId) {
+          activity = filters.garminDetailedSanitise(_activity);
           return activity;
         }
       }
       startTime += 24*60*60;
     }
-    // let currentActivityList = await got.get(options);
   } catch (error) {
     console.log(error);
     return error;

@@ -177,7 +177,11 @@ describe("Testing that the developer can call API to getActivityList() and recei
 
    assert.deepEqual(sanatisedActivity, expectedResults);
 })
-it.only('Check that activities are correctly sanitised and concatonated...', async () => {
+it('Check that activities are correctly sanitised and concatonated...', async () => {
+  const garminBody = require('./garminRaw.json');
+  const garminBody2 = require('./garminRaw2.json');
+  const garminDetail = {body: JSON.stringify(garminBody)}
+  const garminDetail2 = {body: JSON.stringify(garminBody2)}
     // set the request object with the correct provider, developerId and userId
     const req = {
         url: 'https://us-central1-rovetest-beea7.cloudfunctions.net/getActivityList?devId='+testDev+'&userId='+testUser+'&devKey=test-key&start=2022-07-27T09:15:33.000Z&end=2022-07-29T09:15:33.000Z',
@@ -197,9 +201,8 @@ it.only('Check that activities are correctly sanitised and concatonated...', asy
     const stubbedGot = sinon.stub(got, "get");
     stubbedGot.withArgs(sinon.match({url: 'https://apis.garmin.com/wellness-api/rest/activities?uploadStartTimeInSeconds=1658913333&uploadEndTimeInSeconds=1658999733'})).returns(garminResponse1);
     stubbedGot.withArgs(sinon.match({url: 'https://apis.garmin.com/wellness-api/rest/activities?uploadStartTimeInSeconds=1658999733&uploadEndTimeInSeconds=1659086133'})).returns(garminResponse2);
-    stubbedGot.withArgs(sinon.match({url: 'https://apis.garmin.com/wellness-api/rest/activityDetails?uploadStartTimeInSeconds=1659019636&uploadEndTimeInSeconds=1659106036'})).returns("garminDetail")
-    stubbedGot.withArgs(sinon.match({url: 'https://apis.garmin.com/wellness-api/rest/activityDetails?uploadStartTimeInSeconds=1659019636&uploadEndTimeInSeconds=1659106036'})).returns("garminDetail")
-
+    stubbedGot.withArgs(sinon.match({url: 'https://apis.garmin.com/wellness-api/rest/activityDetails?uploadStartTimeInSeconds=1659019636&uploadEndTimeInSeconds=1659106036'})).returns(garminDetail)
+    stubbedGot.withArgs(sinon.match({url: 'https://apis.garmin.com/wellness-api/rest/activityDetails?uploadStartTimeInSeconds=1659106036&uploadEndTimeInSeconds=1659192436'})).returns(garminDetail2)
     stubbedGot.withArgs(sinon.match({url: "https://api.wahooligan.com/v1/workouts?page=1&per_page=60"})).returns(wahooResponse);
     stubbedGot.withArgs(sinon.match({url: "https://www.polaraccesslink.com/v3/exercises"})).returns(polarResponse);
     stubbedGot.withArgs(sinon.match({url: 'https://www.polaraccesslink.com/v3/exercises/ymeoBNZw/fit'})).returns(fitFileResponse);
@@ -214,14 +217,14 @@ it.only('Check that activities are correctly sanitised and concatonated...', asy
     await myFunctions.getActivityList(req, res);
 
     const gotCalls = stubbedGot.callCount;
-    assert.equal(gotCalls, 5, "too many or too few calls to 'GOT'");
+    assert.equal(gotCalls, 9, "too many or too few calls to 'GOT'");
 /*     for (let i=0; i < gotCalls; i++) {
       const args = stubbedGot.getCall(i).args
       console.log("arg "+i+": "+JSON.stringify(args));
     } */
     // wait for database to be updated async.
     const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
-    await wait(5000);
+    await wait(7000);
 
     //now check the database was updated correctly
     const testUserActivities = await admin.firestore()
