@@ -307,8 +307,13 @@ async function getWahooActivityList(start, end, userDoc, getAllFlag) {
       // process them and then get the next page
         for (let i = 0; i<activityList.workouts.length; i++) {
           sanitisedList.push({"raw": activityList.workouts[i], "sanitised": filters.wahooSanitise(activityList.workouts[i])});
-          // now get detail samples
-          sanitisedList[i]["sanitised"]["samples"] = await getDetailedActivity(userDoc.data(), activityList.workouts[i]);
+          // now get detail samples but only if getAllFlag set to false
+          if (!getAllFlag) {
+            sanitisedList[i]["sanitised"]["samples"] =
+                await getDetailedActivity(userDoc.data(),
+                    activityList.workouts[i],
+                    "wahoo");
+          }
         }
       }
       totalProcessed = totalProcessed + activityList.workouts.length;
