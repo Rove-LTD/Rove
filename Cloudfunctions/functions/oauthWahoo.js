@@ -63,7 +63,6 @@ class OauthWahoo {
    */
   get getHistory() {
     return this.devDoc.data()["get_history"];
-
   }
   /**
    *

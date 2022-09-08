@@ -311,7 +311,7 @@ async function getWahooActivityList(start, end, userDoc, getAllFlag) {
           if (!getAllFlag) {
             sanitisedList[i]["sanitised"]["samples"] =
                 await getDetailedActivity(userDoc.data(),
-                    activityList.workouts[i],
+                    sanitisedList[i]["sanitised"],
                     "wahoo");
           }
         }
@@ -414,7 +414,7 @@ async function getGarminActivityList(start, end, userDoc) {
   for (let i=0; i< activityList.length; i++) {
     listOfValidActivities.push({"raw": activityList[i], "sanitised": listOfSanitisedActivities[i]});
     // TODO: uncomment when detail needed
-    listOfValidActivities[i]["sanitised"]["samples"] = await getDetailedActivity(userDocData, activityList[i]);
+    listOfValidActivities[i]["sanitised"]["samples"] = await getDetailedActivity(userDocData, activityList[i], "garmin");
   }
   return listOfValidActivities;
 }
@@ -1195,9 +1195,8 @@ async function processGarminWebhook(webhookDoc) {
     userQuery.docs.forEach((doc)=> {
       userDocsList.push(doc);
     });
-    // TODO: uncomment when detail needed
-    // const samples = await getDetailedActivity(userDocsList[0].data(), webhookBody.activities[index], "garmin");
-    // sanitisedActivity["samples"] = samples;
+    const samples = await getDetailedActivity(userDocsList[0].data(), webhookBody.activities[index], "garmin");
+    sanitisedActivity["samples"] = samples;
     // save raw and sanitised activites as a backup for each user
     saveAndSendActivity(userDocsList,
         sanitisedActivity,
@@ -2258,13 +2257,17 @@ async function getPolarDetailedActivity(userDoc, activityDoc) {
 async function getWahooDetailedActivity(userDoc, activityDoc) {
   try { // or 'https' for https:// URLs
     const fileLocation = activityDoc["file"];
-    const fitFile = await got.get(fileLocation);
-    const buffer = fitFile.rawBody.buffer;
-    const jsonRaw = fitDecoder.fit2json(buffer);
-    const json = fitDecoder.parseRecords(jsonRaw);
-    const records = json.records;
-    const sanitised = filters.jsonFitSanitise(records);
-    return sanitised;
+    if (fileLocation) {
+      const fitFile = await got.get(fileLocation);
+      const buffer = fitFile.rawBody.buffer;
+      const jsonRaw = fitDecoder.fit2json(buffer);
+      const json = fitDecoder.parseRecords(jsonRaw);
+      const records = json.records;
+      const sanitised = filters.jsonFitSanitise(records);
+      return sanitised;
+    } else {
+      return;
+    }
   } catch (error) {
     console.log(error);
     return error;
@@ -2294,15 +2297,14 @@ async function getGarminDetailedActivity(userDoc, activityDoc) {
           {from: startTime, to: startTime+24*60*60});
       const response = await got.get(options);
       const activityList = JSON.parse(response.body);
-      for (const _activity in activityList) {
-        if (activityList[_activity]["activityId"] == activityId) {
-          activity = filters.garminDetailedSanitise(activityList[_activity]);
+      for (const _activity of activityList) {
+        if (_activity["activityId"] == activityId) {
+          activity = filters.garminDetailedSanitise(_activity);
           return activity;
         }
       }
       startTime += 24*60*60;
     }
-    // let currentActivityList = await got.get(options);
   } catch (error) {
     console.log(error);
     return error;
