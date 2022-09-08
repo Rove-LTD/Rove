@@ -19,7 +19,7 @@
 <script type="text/javascript">
 	const testDev = "paulsTestDev";
 	const devKey = "test-key"
-	const testUser = "testUser";
+	const testUser = "TestUser";
 	const redirectUrl = "https://bbc.co.uk"
     function signUpWith(provider) {
     	window.location.href = 
@@ -33,7 +33,7 @@
 		function signOutWith(provider) {
     	window.location.href = 
     	'https://us-central1-rove-26.cloudfunctions.net/disconnectService?userId='
-    	+testUser+
+    	+provider+testUser+
     	'&devId='+testDev+
     	'&devKey='+devKey+
     	'&provider='+provider;
