@@ -44,7 +44,7 @@ describe("Testing that the garmin Webhooks work: ", () => {
           "userId": testUser,
           "garmin_user_id" : "eb24e8e5-110d-4a87-b976-444f40ca27d4",
           "garmin_access_token": "test_garmin_access_token",
-          "garmin_client_id": "test client ID",
+          "garmin_client_id": "eb0a9a22-db68-4188-a913-77ee997924a8",
       });
       activityDocs = await admin.firestore()
           .collection("users")
@@ -144,8 +144,11 @@ describe("Testing that the garmin Webhooks work: ", () => {
     it('read webhookInBox event and process it successfully...', async () => {
 
         //set up the stubbed response to mimic garmin's response when called with the
+        const garminBody = require('./garminRaw3.json');
+        const garminResponse = {body: JSON.stringify(garminBody)};
         const stubbedWebhookInBox = sinon.stub(webhookInBox, "delete");
-
+        const stubbedGot = sinon.stub(got, "get");
+        stubbedGot.returns(garminResponse)
         const snapshot = test.firestore.makeDocumentSnapshot(successfulWebhookMessage, "webhookInBox/"+successfulWebhookMessageDoc);
 
         wrapped = test.wrap(myFunctions.processWebhookInBox);
@@ -180,6 +183,7 @@ describe("Testing that the garmin Webhooks work: ", () => {
                 avg_cadence: null,
                 elevation_gain: null,
                 elevation_loss: null,
+                samples: {"file": "samples/7698241609garmin"},
                 provider: "garmin",
                 version: "1.0"
             },
