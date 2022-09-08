@@ -2257,13 +2257,17 @@ async function getPolarDetailedActivity(userDoc, activityDoc) {
 async function getWahooDetailedActivity(userDoc, activityDoc) {
   try { // or 'https' for https:// URLs
     const fileLocation = activityDoc["file"];
-    const fitFile = await got.get(fileLocation);
-    const buffer = fitFile.rawBody.buffer;
-    const jsonRaw = fitDecoder.fit2json(buffer);
-    const json = fitDecoder.parseRecords(jsonRaw);
-    const records = json.records;
-    const sanitised = filters.jsonFitSanitise(records);
-    return sanitised;
+    if (fileLocation) {
+      const fitFile = await got.get(fileLocation);
+      const buffer = fitFile.rawBody.buffer;
+      const jsonRaw = fitDecoder.fit2json(buffer);
+      const json = fitDecoder.parseRecords(jsonRaw);
+      const records = json.records;
+      const sanitised = filters.jsonFitSanitise(records);
+      return sanitised;
+    } else {
+      return;
+    }
   } catch (error) {
     console.log(error);
     return error;
