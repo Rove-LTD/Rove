@@ -1943,10 +1943,17 @@ async function processPolarWebhook(webhookDoc) {
 
     const sanitisedActivity = filters.polarSanatise(activity);
     // add fit file URL to the sanitised activity
-    sanitisedActivity["file"] = downloadURL[0];
+    sanitisedActivity["file"] = {url: downloadURL[0]};
     // TODO: put back in when sanitisation of fit files is needed
-    // const samples = await getDetailedActivity(userDocsList[0].data(), activity, "polar").samples;
-    // sanitisedActivity["samples"] = samples;
+    const fitParser = new FitParser();
+    fitParser.parse(fitFile.rawBody, (error, jsonRaw)=>{
+      // Handle result of parse method
+      if (error) {
+        console.log(error);
+      } else {
+        sanitisedActivity["samples"] = filters.sanitisePolarFitFile(jsonRaw);
+      }
+    });
     // write sanitised information and raw information to each user and then
     // send to developer
     await saveAndSendActivity(userDocsList, sanitisedActivity, activity);
@@ -2235,7 +2242,7 @@ async function getPolarDetailedActivity(userDoc, activityDoc) {
           .file("public/polar"+exerciseId+".fit")
           .getSignedUrl(urlOptions);
       // add fit file URL to the sanitised activity
-      sanitised["file"] = downloadURL[0];
+      sanitised["file"] = {url: downloadURL[0]};
       const fitParser = new FitParser();
       fitParser.parse(fitFile.rawBody, (error, jsonRaw)=>{
         // Handle result of parse method

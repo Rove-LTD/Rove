@@ -122,7 +122,7 @@ describe("Testing that the Polar Webhooks work: ", () => {
         sinon.restore();
 
     });
-    it('read webhookInBox event and process it successfully...', async () => {
+    it.only('read webhookInBox event and process it successfully...', async () => {
 
         //set up the stubbed response to mimic Polar's response when called with the
         const polarExercisePayload = {
@@ -156,6 +156,7 @@ describe("Testing that the Polar Webhooks work: ", () => {
         }
         const fitFilePayload = {
             rawBody: Buffer.from("this file stuff"),
+            statusCode: 200,
          }; // TODO: make this an actual fit file payload
         stubbedPolarCall = sinon.stub(got, "get");
         stubbedPolarCall.onFirstCall().returns(polarExercisePayload);
