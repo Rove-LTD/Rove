@@ -412,6 +412,8 @@ async function getGarminActivityList(start, end, userDoc) {
   const listOfSanitisedActivities = filters.garminSanitise(activityList);
   const listOfValidActivities = [];
   for (let i=0; i< activityList.length; i++) {
+    activityList[i]["uploadStartTimeInSeconds"] = start.getTime();
+    activityList[i]["uploadEndTimeInSeconds"] = end.getTime();
     listOfValidActivities.push({"raw": activityList[i], "sanitised": listOfSanitisedActivities[i]});
     // TODO: uncomment when detail needed
     listOfValidActivities[i]["sanitised"]["samples"] = await getDetailedActivity(userDocData, activityList[i], "garmin");
