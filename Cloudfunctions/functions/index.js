@@ -2288,8 +2288,8 @@ async function getGarminDetailedActivity(userDoc, activityDoc) {
     const secrets = getSecrets.fromClientId("garmin", clientId);
     const consumerSecret = secrets.secret;
     const oAuthConsumerSecret = secrets.clientId;
-    let startTime = activityDoc["startTimeInSeconds"];
-    const endTime = startTime + 7*24*60*60;
+    let startTime = activityDoc["uploadStartTimeInSeconds"];
+    const endTime = activityDoc["uploadEndTimeInSeconds"];
     const activityId = activityDoc["activityId"];
     startTime += activityDoc["durationInSeconds"];
     let activity;
