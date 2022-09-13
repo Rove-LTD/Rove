@@ -1195,8 +1195,6 @@ async function processGarminWebhook(webhookDoc) {
     userQuery.docs.forEach((doc)=> {
       userDocsList.push(doc);
     });
-    const samples = await getDetailedActivity(userDocsList[0].data(), webhookBody.activities[index], "garmin");
-    sanitisedActivity["samples"] = samples;
     // save raw and sanitised activites as a backup for each user
     saveAndSendActivity(userDocsList,
         sanitisedActivity,
