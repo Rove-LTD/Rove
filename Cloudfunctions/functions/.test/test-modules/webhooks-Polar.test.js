@@ -9,6 +9,7 @@ const chai = require('chai');
 const assert = chai.assert;
 // Sinon is a library used for mocking or verifying function calls in JavaScript.
 const sinon = require('sinon');
+const fs = require('fs').promises;
 // -------------------END COMMON TEST SETUP---------------------------//
 
 // -----------INITIALISE THE ROVE TEST PARAMETERS----------------------------//
@@ -154,17 +155,19 @@ describe("Testing that the Polar Webhooks work: ", () => {
                 }
             }
         }
+        const file = await fs.readFile(".test/test-modules/PdpKk66q.fit");
+        const fitFileBuffer = new Buffer.from(file);
         const fitFilePayload = {
-            rawBody: Buffer.from("this file stuff"),
-            statusCode: 200,
-         }; // TODO: make this an actual fit file payload
+          statusCode: 200,
+          rawBody: fitFileBuffer,
+        }
         stubbedPolarCall = sinon.stub(got, "get");
         stubbedPolarCall.onFirstCall().returns(polarExercisePayload);
         const stubbedWebhookInBox = sinon.stub(webhookInBox, "delete");
         stubbedPolarCall.onSecondCall().returns(fitFilePayload);
         stubbedSaveFile = sinon.stub(admin.storage(), "bucket").returns({
           file: sinon.stub().returnsThis(),
-          save: sinon.stub().returns("fileData"),
+          save: sinon.stub().returns("someFileData"),
           getSignedUrl: sinon.stub().returns(["someURL"])
         });
         const snapshot = test.firestore.makeDocumentSnapshot(successfulWebhookMessage, "webhookInBox/"+successfulWebhookMessageDoc);
@@ -202,7 +205,8 @@ describe("Testing that the Polar Webhooks work: ", () => {
               elevation_gain: null,
               elevation_loss: null,
               provider: "polar",
-              file: "someURL",
+              file: {url: "someURL"},
+              samples: {},
               version: "1.0"
           },
           raw: polarExercisePayload.json(),

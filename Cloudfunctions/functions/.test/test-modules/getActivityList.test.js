@@ -199,10 +199,8 @@ it('Check that activities are correctly sanitised and concatonated...', async ()
     const stubbedStrava = sinon.stub(stravaApi.athlete, "listActivities");
     stubbedStrava.onFirstCall().returns(stravaResponse);
     const stubbedGot = sinon.stub(got, "get");
-    stubbedGot.withArgs(sinon.match({url: 'https://apis.garmin.com/wellness-api/rest/activities?uploadStartTimeInSeconds=1658913333&uploadEndTimeInSeconds=1658999733'})).returns(garminResponse1);
-    stubbedGot.withArgs(sinon.match({url: 'https://apis.garmin.com/wellness-api/rest/activities?uploadStartTimeInSeconds=1658999733&uploadEndTimeInSeconds=1659086133'})).returns(garminResponse2);
-    stubbedGot.withArgs(sinon.match({url: 'https://apis.garmin.com/wellness-api/rest/activityDetails?uploadStartTimeInSeconds=1659019636&uploadEndTimeInSeconds=1659106036'})).returns(garminDetail)
-    stubbedGot.withArgs(sinon.match({url: 'https://apis.garmin.com/wellness-api/rest/activityDetails?uploadStartTimeInSeconds=1659106036&uploadEndTimeInSeconds=1659192436'})).returns(garminDetail2)
+    stubbedGot.withArgs(sinon.match({url: 'https://apis.garmin.com/wellness-api/rest/activityDetails?uploadStartTimeInSeconds=1658913333&uploadEndTimeInSeconds=1658999733'})).returns(garminDetail);
+    stubbedGot.withArgs(sinon.match({url: 'https://apis.garmin.com/wellness-api/rest/activityDetails?uploadStartTimeInSeconds=1658999733&uploadEndTimeInSeconds=1659086133'})).returns(garminDetail2);
     stubbedGot.withArgs(sinon.match({url: "https://api.wahooligan.com/v1/workouts?page=1&per_page=60"})).returns(wahooResponse);
     stubbedGot.withArgs(sinon.match({url: "https://www.polaraccesslink.com/v3/exercises"})).returns(polarResponse);
     stubbedGot.withArgs(sinon.match({url: 'https://www.polaraccesslink.com/v3/exercises/ymeoBNZw/fit'})).returns(fitFileResponse);
@@ -217,7 +215,7 @@ it('Check that activities are correctly sanitised and concatonated...', async ()
     await myFunctions.getActivityList(req, res);
 
     const gotCalls = stubbedGot.callCount;
-    assert.equal(gotCalls, 9, "too many or too few calls to 'GOT'");
+    assert.equal(gotCalls, 6, "too many or too few calls to 'GOT'");
 /*     for (let i=0; i < gotCalls; i++) {
       const args = stubbedGot.getCall(i).args
       console.log("arg "+i+": "+JSON.stringify(args));

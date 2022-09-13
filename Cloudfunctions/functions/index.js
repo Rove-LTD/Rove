@@ -412,8 +412,6 @@ async function getGarminActivityList(start, end, userDoc) {
   const listOfSanitisedActivities = filters.garminSanitise(activityList);
   const listOfValidActivities = [];
   for (let i=0; i< activityList.length; i++) {
-    activityList[i]["uploadStartTimeInSeconds"] = start.getTime()/1000;
-    activityList[i]["uploadEndTimeInSeconds"] = end.getTime()/1000;
     listOfValidActivities.push({"raw": activityList[i], "sanitised": listOfSanitisedActivities[i]});
   }
   return listOfValidActivities;
@@ -1183,14 +1181,14 @@ async function processGarminWebhook(webhookDoc) {
     const userDocsList = [];
     const userQuery = await db.collection("users")
         .where("garmin_user_id", "==",
-            webhookBody.activities[index].userId)
+            webhookBody.activityDetails[index].userId)
         .where("garmin_access_token", "==",
-            webhookBody.activities[index].userAccessToken)
+            webhookBody.activityDetails[index].userAccessToken)
         .get();
 
     if (userQuery.docs.length == 0) {
       // there is an issue if there are no users with a userId in the DB.
-      throw Error("zero users registered to garmin webhook userId "+webhookBody.activities[index].userId);
+      throw Error("zero users registered to garmin webhook userId "+webhookBody.activityDetails[index].userId);
     }
     userQuery.docs.forEach((doc)=> {
       userDocsList.push(doc);
@@ -1198,7 +1196,7 @@ async function processGarminWebhook(webhookDoc) {
     // save raw and sanitised activites as a backup for each user
     saveAndSendActivity(userDocsList,
         sanitisedActivity,
-        webhookBody.activities[index]);
+        webhookBody.activityDetails[index]);
     index=index+1;
   }
   return;
@@ -1978,7 +1976,9 @@ async function saveAndSendActivity(userDocList,
   // the "samples" array by replacing it with a reference to a file
   // in storage.
   const compressedSanitisedActivity = await filters.compressSanitisedActivity(sanitisedActivity);
-  activity.samples = "too much data"; // to slim down the info saved/sent
+  if (activity.samples) {
+    activity.samples = "too much data"; // to slim down the info saved/sent
+  }
   for (const userDoc of userDocList) {
     // tag the sanitised activty with the userId
     compressedSanitisedActivity["userId"] = userDoc.data()["userId"];

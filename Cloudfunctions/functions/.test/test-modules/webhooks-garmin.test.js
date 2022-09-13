@@ -25,6 +25,8 @@ const devUserData = testParameters.devUserData
 const test = require('firebase-functions-test')(firebaseConfig, testParameters.testKeyFile);
 const admin = require("firebase-admin");
 myFunctions = require('../../index.js');
+const garminRawJson = require("./garminRawWebhook.json");
+
 // -----------END INITIALISE ROVE TEST PARAMETERS----------------------------//
 
 // ---------REQUIRE FUNCTONS TO BE STUBBED----------------------//
@@ -55,32 +57,21 @@ describe("Testing that the garmin Webhooks work: ", () => {
       activityDocs.forEach(async (doc)=>{
           await doc.ref.delete();
       });
-      const garminRawJson = require("./garminRawWebhook.json");
+      const successfulDetail = JSON.stringify(garminRawJson)
       successfulWebhookMessage = {
             provider: "garmin",
             method: "POST",
-            body: JSON.stringify(garminRawJson),
+            body: successfulDetail,
             status: "added before the tests to be successful",
         }
+        garminRawJson.activityDetails[0].userId = "incorrect_garmin_user";
+        const unsuccessfulDetail = JSON.stringify(garminRawJson);
+        garminRawJson.activityDetails[0].userId = "eb24e8e5-110d-4a87-b976-444f40ca27d4";
 
         unsuccessfulWebhookMessage = {
             provider: "garmin",
             method: "POST",
-            body: JSON.stringify({"activities":[{
-                "activeKilocalories": 391,
-                "activityId": 7698241609,
-                "activityName": "Indoor Cycling",
-                "activityType": "INDOOR_CYCLING",
-                "averageHeartRateInBeatsPerMinute": 139,
-                "deviceName": "forerunner935",
-                "durationInSeconds": 1811,
-                "maxHeartRateInBeatsPerMinute": 178,
-                "startTimeInSeconds": 1634907261,
-                "startTimeOffsetInSeconds": 3600,
-                "summaryId": "7698241609",
-                "userAccessToken": "test_garmin_access_token",
-                "userId": "incorrect_garmin_user",
-              }],}),
+            body: unsuccessfulDetail,
             status: "added before the tests to be successful",
         }
 
@@ -127,7 +118,7 @@ describe("Testing that the garmin Webhooks work: ", () => {
         sinon.restore();
 
     });
-    it.only('read webhookInBox event and process it successfully...', async () => {
+    it('read webhookInBox event and process it successfully...', async () => {
 
         //set up the stubbed response to mimic garmin's response when called with the
         const garminBody = require('./garminRaw3.json');
@@ -149,45 +140,33 @@ describe("Testing that the garmin Webhooks work: ", () => {
             .collection("users")
             .doc(testDev+testUser)
             .collection("activities")
-            .where("raw.activityId", "==", 7698241609)
+            .where("raw.activityId", "==", 9291942332)
             .get();
 
         const sanatisedActivity = testUserDocs.docs[0].data();
+        garminRawJson.activityDetails[0].samples = "too much data";
         const expectedResults = { // TODO:
             sanitised: {
+                "active_calories": 672,
+                "activity_duration": 3923,
+                "activity_id": 9291942332,
+                "activity_name": "Newcastle upon Tyne Cycling",
+                "activity_type": "CYCLING",
                 userId: testUser,
-                activity_id: 7698241609,
-                activity_name: "Indoor Cycling",
-                activity_type: "INDOOR_CYCLING",
-                distance: null, //float no trailing 0
-                avg_speed: null, //float
-                active_calories: 391,
-                activity_duration: 1811,
-                start_time: '2021-10-22T12:54:21.000Z', //ISO 8601 UTC
-                avg_heart_rate: 139,
-                max_heart_rate_bpm: 178,
+                distance: 29504, //float no trailing 0
+                avg_speed: 7.5, //float
+                active_calories: 672,
+                start_time: '2022-08-10T05:58:49.000Z', //ISO 8601 UTC
+                avg_heart_rate: 138,
+                max_heart_rate_bpm: 160,
                 avg_cadence: null,
-                elevation_gain: null,
-                elevation_loss: null,
-                samples: {"file": "samples/7698241609garmin"},
+                elevation_gain: 212,
+                elevation_loss: 203,
+                samples: {"file": "samples/9291942332garmin"},
                 provider: "garmin",
                 version: "1.0"
             },
-            raw: {
-                "activeKilocalories": 391,
-                "activityId": 7698241609,
-                "activityName": "Indoor Cycling",
-                "activityType": "INDOOR_CYCLING",
-                "averageHeartRateInBeatsPerMinute": 139,
-                "deviceName": "forerunner935",
-                "durationInSeconds": 1811,
-                "maxHeartRateInBeatsPerMinute": 178,
-                "startTimeInSeconds": 1634907261,
-                "startTimeOffsetInSeconds": 3600,
-                "summaryId": "7698241609",
-                "userAccessToken": "test_garmin_access_token",
-                "userId": "eb24e8e5-110d-4a87-b976-444f40ca27d4"
-                },
+            raw: garminRawJson.activityDetails[0],
             "status": "not tested",
             "timestamp": "not tested",
             "triesSoFar": "not tested",
