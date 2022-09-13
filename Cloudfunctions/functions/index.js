@@ -382,7 +382,7 @@ async function getPolarActivityList(start, end, userDoc, getAllFlag) {
   }
 }
 async function getGarminActivityList(start, end, userDoc) {
-  const url = "https://apis.garmin.com/wellness-api/rest/activities";
+  const url = "https://apis.garmin.com/wellness-api/rest/activityDetails";
   const userDocData = await userDoc.data();
   const clientId = userDocData["garmin_client_id"];
   const secrets = getSecrets.fromClientId("garmin", clientId);
