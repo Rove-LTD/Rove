@@ -1176,7 +1176,7 @@ async function processGarminWebhook(webhookDoc) {
   const webhookBody = JSON.parse(webhookDoc.data()["body"]);
   // 1) sanatise
   let sanitisedActivities = [{}];
-  sanitisedActivities = filters.garminSanitise(webhookBody.activities);
+  sanitisedActivities = filters.garminSanitise(webhookBody.activityDetails);
 
   // now for each sanitised activity send to relevent developer
   // users
@@ -1982,6 +1982,7 @@ async function saveAndSendActivity(userDocList,
   // the "samples" array by replacing it with a reference to a file
   // in storage.
   const compressedSanitisedActivity = await filters.compressSanitisedActivity(sanitisedActivity);
+  activity.samples = "too much data"; // to slim down the info saved/sent
   for (const userDoc of userDocList) {
     // tag the sanitised activty with the userId
     compressedSanitisedActivity["userId"] = userDoc.data()["userId"];

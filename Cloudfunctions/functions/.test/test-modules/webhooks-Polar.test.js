@@ -122,7 +122,7 @@ describe("Testing that the Polar Webhooks work: ", () => {
         sinon.restore();
 
     });
-    it.only('read webhookInBox event and process it successfully...', async () => {
+    it('read webhookInBox event and process it successfully...', async () => {
 
         //set up the stubbed response to mimic Polar's response when called with the
         const polarExercisePayload = {

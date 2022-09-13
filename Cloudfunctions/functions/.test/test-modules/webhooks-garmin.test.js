@@ -55,25 +55,11 @@ describe("Testing that the garmin Webhooks work: ", () => {
       activityDocs.forEach(async (doc)=>{
           await doc.ref.delete();
       });
-
+      const garminRawJson = require("./garminRawWebhook.json");
       successfulWebhookMessage = {
             provider: "garmin",
             method: "POST",
-            body: JSON.stringify({"activities":[{
-                "activeKilocalories": 391,
-                "activityId": 7698241609,
-                "activityName": "Indoor Cycling",
-                "activityType": "INDOOR_CYCLING",
-                "averageHeartRateInBeatsPerMinute": 139,
-                "deviceName": "forerunner935",
-                "durationInSeconds": 1811,
-                "maxHeartRateInBeatsPerMinute": 178,
-                "startTimeInSeconds": 1634907261,
-                "startTimeOffsetInSeconds": 3600,
-                "summaryId": "7698241609",
-                "userAccessToken": "test_garmin_access_token",
-                "userId": "eb24e8e5-110d-4a87-b976-444f40ca27d4"
-              }],}),
+            body: JSON.stringify(garminRawJson),
             status: "added before the tests to be successful",
         }
 
@@ -141,7 +127,7 @@ describe("Testing that the garmin Webhooks work: ", () => {
         sinon.restore();
 
     });
-    it('read webhookInBox event and process it successfully...', async () => {
+    it.only('read webhookInBox event and process it successfully...', async () => {
 
         //set up the stubbed response to mimic garmin's response when called with the
         const garminBody = require('./garminRaw3.json');
