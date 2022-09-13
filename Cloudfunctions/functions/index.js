@@ -382,7 +382,7 @@ async function getPolarActivityList(start, end, userDoc, getAllFlag) {
   }
 }
 async function getGarminActivityList(start, end, userDoc) {
-  const url = "https://apis.garmin.com/wellness-api/rest/activities";
+  const url = "https://apis.garmin.com/wellness-api/rest/activityDetails";
   const userDocData = await userDoc.data();
   const clientId = userDocData["garmin_client_id"];
   const secrets = getSecrets.fromClientId("garmin", clientId);
@@ -413,8 +413,6 @@ async function getGarminActivityList(start, end, userDoc) {
   const listOfValidActivities = [];
   for (let i=0; i< activityList.length; i++) {
     listOfValidActivities.push({"raw": activityList[i], "sanitised": listOfSanitisedActivities[i]});
-    // TODO: uncomment when detail needed
-    listOfValidActivities[i]["sanitised"]["samples"] = await getDetailedActivity(userDocData, activityList[i], "garmin");
   }
   return listOfValidActivities;
 }
@@ -1174,7 +1172,7 @@ async function processGarminWebhook(webhookDoc) {
   const webhookBody = JSON.parse(webhookDoc.data()["body"]);
   // 1) sanatise
   let sanitisedActivities = [{}];
-  sanitisedActivities = filters.garminSanitise(webhookBody.activities);
+  sanitisedActivities = filters.garminSanitise(webhookBody.activityDetails);
 
   // now for each sanitised activity send to relevent developer
   // users
@@ -1183,24 +1181,22 @@ async function processGarminWebhook(webhookDoc) {
     const userDocsList = [];
     const userQuery = await db.collection("users")
         .where("garmin_user_id", "==",
-            webhookBody.activities[index].userId)
+            webhookBody.activityDetails[index].userId)
         .where("garmin_access_token", "==",
-            webhookBody.activities[index].userAccessToken)
+            webhookBody.activityDetails[index].userAccessToken)
         .get();
 
     if (userQuery.docs.length == 0) {
       // there is an issue if there are no users with a userId in the DB.
-      throw Error("zero users registered to garmin webhook userId "+webhookBody.activities[index].userId);
+      throw Error("zero users registered to garmin webhook userId "+webhookBody.activityDetails[index].userId);
     }
     userQuery.docs.forEach((doc)=> {
       userDocsList.push(doc);
     });
-    const samples = await getDetailedActivity(userDocsList[0].data(), webhookBody.activities[index], "garmin");
-    sanitisedActivity["samples"] = samples;
     // save raw and sanitised activites as a backup for each user
     saveAndSendActivity(userDocsList,
         sanitisedActivity,
-        webhookBody.activities[index]);
+        webhookBody.activityDetails[index]);
     index=index+1;
   }
   return;
@@ -1943,10 +1939,17 @@ async function processPolarWebhook(webhookDoc) {
 
     const sanitisedActivity = filters.polarSanatise(activity);
     // add fit file URL to the sanitised activity
-    sanitisedActivity["file"] = downloadURL[0];
+    sanitisedActivity["file"] = {url: downloadURL[0]};
     // TODO: put back in when sanitisation of fit files is needed
-    // const samples = await getDetailedActivity(userDocsList[0].data(), activity, "polar").samples;
-    // sanitisedActivity["samples"] = samples;
+    const fitParser = new FitParser();
+    fitParser.parse(fitFile.rawBody, (error, jsonRaw)=>{
+      // Handle result of parse method
+      if (error) {
+        console.log(error);
+      } else {
+        sanitisedActivity["samples"] = filters.sanitisePolarFitFile(jsonRaw);
+      }
+    });
     // write sanitised information and raw information to each user and then
     // send to developer
     await saveAndSendActivity(userDocsList, sanitisedActivity, activity);
@@ -1973,6 +1976,9 @@ async function saveAndSendActivity(userDocList,
   // the "samples" array by replacing it with a reference to a file
   // in storage.
   const compressedSanitisedActivity = await filters.compressSanitisedActivity(sanitisedActivity);
+  if (activity.samples) {
+    activity.samples = "too much data"; // to slim down the info saved/sent
+  }
   for (const userDoc of userDocList) {
     // tag the sanitised activty with the userId
     compressedSanitisedActivity["userId"] = userDoc.data()["userId"];
@@ -2235,7 +2241,7 @@ async function getPolarDetailedActivity(userDoc, activityDoc) {
           .file("public/polar"+exerciseId+".fit")
           .getSignedUrl(urlOptions);
       // add fit file URL to the sanitised activity
-      sanitised["file"] = downloadURL[0];
+      sanitised["file"] = {url: downloadURL[0]};
       const fitParser = new FitParser();
       fitParser.parse(fitFile.rawBody, (error, jsonRaw)=>{
         // Handle result of parse method
@@ -2281,8 +2287,8 @@ async function getGarminDetailedActivity(userDoc, activityDoc) {
     const secrets = getSecrets.fromClientId("garmin", clientId);
     const consumerSecret = secrets.secret;
     const oAuthConsumerSecret = secrets.clientId;
-    let startTime = activityDoc["startTimeInSeconds"];
-    const endTime = startTime + 7*24*60*60;
+    let startTime = activityDoc["uploadStartTimeInSeconds"];
+    const endTime = activityDoc["uploadEndTimeInSeconds"];
     const activityId = activityDoc["activityId"];
     startTime += activityDoc["durationInSeconds"];
     let activity;
