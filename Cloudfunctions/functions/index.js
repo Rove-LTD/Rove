@@ -415,8 +415,6 @@ async function getGarminActivityList(start, end, userDoc) {
     activityList[i]["uploadStartTimeInSeconds"] = start.getTime()/1000;
     activityList[i]["uploadEndTimeInSeconds"] = end.getTime()/1000;
     listOfValidActivities.push({"raw": activityList[i], "sanitised": listOfSanitisedActivities[i]});
-    // TODO: uncomment when detail needed
-    listOfValidActivities[i]["sanitised"]["samples"] = await getDetailedActivity(userDocData, activityList[i], "garmin");
   }
   return listOfValidActivities;
 }
