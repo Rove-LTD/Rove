@@ -154,7 +154,7 @@ describe("Testing that the garmin Webhooks work: ", () => {
                 "activity_type": "CYCLING",
                 userId: testUser,
                 distance: 29504, //float no trailing 0
-                avg_speed: 7.5, //float
+                avg_speed: 7.52, //float
                 active_calories: 672,
                 start_time: '2022-08-10T05:58:49.000Z', //ISO 8601 UTC
                 avg_heart_rate: 138,
