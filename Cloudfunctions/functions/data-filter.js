@@ -208,7 +208,7 @@ exports.garminSanitise = function(activities) {
     let summaryActivities = [{}];
     for (let i=0; i<activities.length; i++) {
       let summaryActivity = {};
-        if (activities[i]["activityType"] == "RUNNING") {
+        if (activities[i].summary["activityType"] == "RUNNING") {
             summaryActivity = {
             "activity_id" : activities[i]["activityId"],
             "activity_name": activities[i].summary["activityName"],
@@ -238,7 +238,7 @@ exports.garminSanitise = function(activities) {
                 "activity_duration": activities[i].summary["durationInSeconds"],
                 "start_time": new Date(activities[i].summary["startTimeInSeconds"]*1000).toISOString(),
                 "avg_heart_rate": activities[i].summary["averageHeartRateInBeatsPerMinute"],
-                "avg_cadence": null,
+                "avg_cadence": activities[i].summary["averageBikeCadenceInRoundsPerMinute"],
                 "elevation_gain": activities[i].summary["totalElevationGainInMeters"],
                 "elevation_loss" : activities[i].summary["totalElevationLossInMeters"],
                 "max_heart_rate_bpm": activities[i].summary["maxHeartRateInBeatsPerMinute"],
@@ -277,8 +277,8 @@ exports.garminSanitise = function(activities) {
                 "avg_heart_rate": activities[i].summary["averageHeartRateInBeatsPerMinute"],
                 "max_heart_rate_bpm": activities[i].summary["maxHeartRateInBeatsPerMinute"],
                 "avg_cadence": null,
-                "elevation_gain": null,
-                "elevation_loss" : null,
+                "elevation_gain": parseFloat(activities[i].summary["totalElevationGainInMeters"].toFixed(1)),
+                "elevation_loss" : parseFloat(activities[i].summary["totalElevationLossInMeters"].toFixed(1)),
                 "provider" : "garmin",
                 "version": "1.0",
                 };
