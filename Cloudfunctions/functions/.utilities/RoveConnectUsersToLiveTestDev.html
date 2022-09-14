@@ -12,9 +12,13 @@
 <input type="submit" value="Start" onclick="signOutWith('garmin')">
 <h5>Disconnect with polar!</h5>
 <input type="submit" value="Start" onclick="signOutWith('polar')">
-
+<h5>Disconnect with polar using Fetch!</h5>
+<input type="submit" value="Start" onclick="fetchSignOutWith('polar')">
 <h5>Error Message</h5>
-<body error>errorMessage goes here</body>
+<body>
+	 <p id="error">errorMessage goes here</p>
+	<p id="data">data returned goes here</p>	
+</body>
 
 <script type="text/javascript">
 	const testDev = "paulsTestDev";
@@ -37,5 +41,23 @@
     	'&devId='+testDev+
     	'&devKey='+devKey+
     	'&provider='+provider;
+    }
+		async function fetchSignOutWith(provider) {
+			var html;
+			const url = 
+    	'https://us-central1-rove-26.cloudfunctions.net/disconnectService?userId='
+    	+provider+testUser+
+    	'&devId='+testDev+
+    	'&devKey='+devKey+
+    	'&provider='+provider;
+			const options = {method: 'GET'};
+			try {
+				response = await fetch(url, options);
+				html = response.body;
+			} catch (err) {
+				html = err;
+			}
+
+			document.getElementById("data").innerHTML=html
     }
 </script>
