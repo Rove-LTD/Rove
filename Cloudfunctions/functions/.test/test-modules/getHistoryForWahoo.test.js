@@ -95,7 +95,7 @@ describe("Testing that the get History inBox processing works for wahoo: ", () =
     await wrapped(snapshot, {params: {docId: "wahooTestHistoryInBoxDoc"}});
 
     const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
-    await wait(1000);
+    await wait(2000);
     //now check the database was updated correctly
    const testUserDocs = await admin.firestore()
    .collection("users")

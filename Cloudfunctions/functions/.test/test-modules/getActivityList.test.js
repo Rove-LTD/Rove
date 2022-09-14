@@ -222,7 +222,7 @@ it('Check that activities are correctly sanitised and concatonated...', async ()
     } */
     // wait for database to be updated async.
     const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
-    await wait(7000);
+    await wait(8000);
 
     //now check the database was updated correctly
     const testUserActivities = await admin.firestore()
