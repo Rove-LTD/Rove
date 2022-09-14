@@ -95,6 +95,10 @@ describe("Check the garmin Disconnect Service works: ", () => {
       },
       send: (message) => {
         assert.equal(message, "error: the userId was not authorised for this provider");
+      },
+      set: (accessControl, star)=>{
+        assert.equal(accessControl, "Access-Control-Allow-Origin");
+        assert.equal(star, "*");
       }
     }
 
@@ -152,6 +156,10 @@ describe("Check the garmin Disconnect Service works: ", () => {
       },
       send: (message) => {
         assert.equal(message, "error: unexpected problem");
+      },
+      set: (accessControl, star)=>{
+        assert.equal(accessControl, "Access-Control-Allow-Origin");
+        assert.equal(star, "*");
       }
     }
 
@@ -207,6 +215,10 @@ describe("Check the garmin Disconnect Service works: ", () => {
       },
       send: (message) => {
         assert.equal(message, '{"status":"disconnected"}')
+      },
+      set: (accessControl, star)=>{
+        assert.equal(accessControl, "Access-Control-Allow-Origin");
+        assert.equal(star, "*");
       }
     }
 
@@ -263,6 +275,10 @@ describe("Check the garmin Disconnect Service works: ", () => {
       },
       send: (message) => {
         assert.equal(message, '{"status":"disconnected"}')
+      },
+      set: (accessControl, star)=>{
+        assert.equal(accessControl, "Access-Control-Allow-Origin");
+        assert.equal(star, "*");
       }
     }
 
@@ -320,6 +336,14 @@ describe("Check the garmin Disconnect Service works: ", () => {
 
       sendStatus: (code) => {
         assert.equal(code, 200);
+      },
+      set: (accessControl, star)=>{
+        assert.equal(accessControl, "Access-Control-Allow-Origin");
+        assert.equal(star, "*");
+      },
+      set: (accessControl, star)=>{
+        assert.equal(accessControl, "Access-Control-Allow-Origin");
+        assert.equal(star, "*");
       }
     }
 

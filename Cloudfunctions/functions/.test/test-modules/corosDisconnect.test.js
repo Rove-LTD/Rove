@@ -100,6 +100,10 @@ describe("Check the coros Disconnect Service works: ", () => {
       },
       send: (message) => {
         assert.equal(message, "error: the userId was not authorised for this provider");
+      },
+      set: (accessControl, star)=>{
+        assert.equal(accessControl, "Access-Control-Allow-Origin");
+        assert.equal(star, "*");
       }
     }
 
@@ -158,6 +162,10 @@ describe("Check the coros Disconnect Service works: ", () => {
       },
       send: (message) => {
         assert.equal(message, "error: unexpected problem");
+      },
+      set: (accessControl, star)=>{
+        assert.equal(accessControl, "Access-Control-Allow-Origin");
+        assert.equal(star, "*");
       }
     }
 
@@ -216,6 +224,10 @@ describe("Check the coros Disconnect Service works: ", () => {
       },
       send: (message) => {
         assert.equal(message, '{"status":"disconnected"}')
+      },
+      set: (accessControl, star)=>{
+        assert.equal(accessControl, "Access-Control-Allow-Origin");
+        assert.equal(star, "*");
       }
     }
 
@@ -276,6 +288,10 @@ describe("Check the coros Disconnect Service works: ", () => {
       },
       send: (message) => {
         assert.equal(message, '{"status":"disconnected"}')
+      },
+      set: (accessControl, star)=>{
+        assert.equal(accessControl, "Access-Control-Allow-Origin");
+        assert.equal(star, "*");
       }
     }
 
@@ -363,6 +379,10 @@ describe("Check the coros Disconnect Service works: ", () => {
         },
         send: (message) => {
           assert.equal(message, '{"status":"disconnected"}')
+        },
+        set: (accessControl, star)=>{
+          assert.equal(accessControl, "Access-Control-Allow-Origin");
+          assert.equal(star, "*");
         }
       }
 

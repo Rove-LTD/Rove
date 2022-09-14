@@ -41,6 +41,10 @@ const strava = require("strava-v3");
       },
       send: (message) => {
         assert.equal(message, "error: the developerId was badly formatted, missing or not authorised")
+      },
+      set: (accessControl, star)=>{
+        assert.equal(accessControl, "Access-Control-Allow-Origin");
+        assert.equal(star, "*");
       }
     }
     
@@ -57,7 +61,11 @@ const strava = require("strava-v3");
         assert.equal(code, 400);
       },
       send: (message) => {
-        assert.equal(message, "error: the userId was badly formatted or does not exist")
+        assert.equal(message, "error: the userId was badly formatted or does not exist");
+      },
+      set: (accessControl, star)=>{
+        assert.equal(accessControl, "Access-Control-Allow-Origin");
+        assert.equal(star, "*");
       }
     }
     
@@ -75,6 +83,10 @@ const strava = require("strava-v3");
       },
       send: (message) => {
         assert.equal(message, "error: the developerId parameter is missing")
+      },
+      set: (accessControl, star)=>{
+        assert.equal(accessControl, "Access-Control-Allow-Origin");
+        assert.equal(star, "*");
       }
     }
     
@@ -92,6 +104,10 @@ const strava = require("strava-v3");
       },
       send: (message) => {
         assert.equal(message, "error: the userId parameter is missing")
+      },
+      set: (accessControl, star)=>{
+        assert.equal(accessControl, "Access-Control-Allow-Origin");
+        assert.equal(star, "*");
       }
     }
     
@@ -108,6 +124,10 @@ const strava = require("strava-v3");
       },
       send: (message) => {
         assert.equal(message, "error: the provider was badly formatted, missing or not supported")
+      },
+      set: (accessControl, star)=>{
+        assert.equal(accessControl, "Access-Control-Allow-Origin");
+        assert.equal(star, "*");
       }
     }
     
@@ -124,6 +144,10 @@ const strava = require("strava-v3");
       },
       send: (message) => {
         assert.equal(message, "error: the provider was badly formatted, missing or not supported")
+      },
+      set: (accessControl, star)=>{
+        assert.equal(accessControl, "Access-Control-Allow-Origin");
+        assert.equal(star, "*");
       }
     }
     

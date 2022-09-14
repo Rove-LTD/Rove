@@ -70,6 +70,10 @@ const webhookInBox = require('../../webhookInBox');
     };
     res = {
       sendStatus: (code)=> {assert.equal(code, 200);},
+      set: (accessControl, star)=>{
+        assert.equal(accessControl, "Access-Control-Allow-Origin");
+        assert.equal(star, "*");
+      }
     }
 
     // set up stubbed functions - we dont write to the inBox
@@ -153,6 +157,10 @@ const webhookInBox = require('../../webhookInBox');
       },
       send: (message) => {
         assert.equal(message, '')
+      },
+      set: (accessControl, star)=>{
+        assert.equal(accessControl, "Access-Control-Allow-Origin");
+        assert.equal(star, "*");
       }
     }
 
@@ -216,6 +224,10 @@ const webhookInBox = require('../../webhookInBox');
         },
         send: (message) => {
           assert.equal(message, '')
+        },
+        set: (accessControl, star)=>{
+          assert.equal(accessControl, "Access-Control-Allow-Origin");
+          assert.equal(star, "*");
         }
       }
 
