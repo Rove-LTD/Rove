@@ -21,13 +21,13 @@
 </body>
 
 <script type="text/javascript">
-	const testDev = "paulsTestDev";
+	const testDev = "paulsWahooTestDev";
 	const devKey = "test-key"
 	const testUser = "TestUser";
 	const redirectUrl = "https://bbc.co.uk"
     function signUpWith(provider) {
     	window.location.href = 
-    	'https://us-central1-rove-26.cloudfunctions.net/connectService?userId='
+    	'https://us-central1-rovetest-beea7.cloudfunctions.net/connectService?userId='
     	+provider+testUser+
     	'&devId='+testDev+
     	'&devKey='+devKey+
@@ -36,7 +36,7 @@
     }
 		function signOutWith(provider) {
     	window.location.href = 
-    	'https://us-central1-rove-26.cloudfunctions.net/disconnectService?userId='
+    	'https://us-central1-rovetest-beea7.cloudfunctions.net/disconnectService?userId='
     	+provider+testUser+
     	'&devId='+testDev+
     	'&devKey='+devKey+
@@ -45,7 +45,7 @@
 		async function fetchSignOutWith(provider) {
 			var html;
 			const url = 
-    	'https://us-central1-rove-26.cloudfunctions.net/disconnectService?userId='
+    	'https://us-central1-rovetest-beea7.cloudfunctions.net/disconnectService?userId='
     	+provider+testUser+
     	'&devId='+testDev+
     	'&devKey='+devKey+
@@ -53,11 +53,11 @@
 			const options = {method: 'GET'};
 			try {
 				response = await fetch(url, options);
-				html = response.body;
+				html = await response.json();
 			} catch (err) {
-				html = err;
+				html = "error: "+err.toString();
 			}
 
-			document.getElementById("data").innerHTML=html
+			document.getElementById("data").innerHTML=html;
     }
 </script>
