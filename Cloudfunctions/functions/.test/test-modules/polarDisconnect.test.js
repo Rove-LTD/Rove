@@ -65,6 +65,10 @@ const got = require('got');
       },
       send: (message) => {
         assert.equal(message, "error: unexpected problem");
+      },
+      set: (accessControl, star)=>{
+        assert.equal(accessControl, "Access-Control-Allow-Origin");
+        assert.equal(star, "*");
       }
     }
 
@@ -122,6 +126,10 @@ const got = require('got');
       },
       send: (message) => {
         assert.equal(message, '{"status":"disconnected"}')
+      },
+      set: (accessControl, star)=>{
+        assert.equal(accessControl, "Access-Control-Allow-Origin");
+        assert.equal(star, "*");
       }
     }
 
