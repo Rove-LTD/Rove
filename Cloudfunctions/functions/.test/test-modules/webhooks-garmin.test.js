@@ -118,7 +118,7 @@ describe("Testing that the garmin Webhooks work: ", () => {
         sinon.restore();
 
     });
-    it('read webhookInBox event and process it successfully...', async () => {
+    it.only('read webhookInBox event and process it successfully...', async () => {
 
         //set up the stubbed response to mimic garmin's response when called with the
         const garminBody = require('./garminRaw3.json');
