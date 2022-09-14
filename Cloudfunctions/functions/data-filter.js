@@ -190,8 +190,8 @@ exports.stravaSanitise = function(activities) {
       "start_time" : new Date(activities[i]["start_date_local"]).toISOString(),
       "avg_heart_rate" : activities[i]["average_heartrate"],
       "avg_cadence" : activities[i]["average_cadence"],
-      "elevation_gain" : activities[i]["elev_high"],
-      "elevation_loss" : activities[i]["elev_low"],
+      "elevation_gain" : activities[i]["total_elevation_gain"],
+      "elevation_loss" : null,
       "provider" : "strava",
       "version": "1.0"
       };

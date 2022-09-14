@@ -104,8 +104,8 @@ const webhookInBox = require('../../webhookInBox');
         avg_heart_rate: null,
        // max_heart_rate_bpm: null,
         avg_cadence: 78.5,
-        elevation_gain: 446.6,
-        elevation_loss: 17.2,
+        elevation_gain: 516,
+        elevation_loss: null,
         provider: "strava",
         version: "1.0",
     }
