@@ -159,7 +159,7 @@ describe("Testing that the garmin Webhooks work: ", () => {
                 start_time: '2022-08-10T05:58:49.000Z', //ISO 8601 UTC
                 avg_heart_rate: 138,
                 max_heart_rate_bpm: 160,
-                avg_cadence: null,
+                avg_cadence: 71,
                 elevation_gain: 212,
                 elevation_loss: 203,
                 samples: {"file": "samples/9291942332garmin"},
