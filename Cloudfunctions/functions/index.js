@@ -1175,7 +1175,7 @@ exports.garminWebhook = functions.https.onRequest(async (request, response) => {
       // the message will trigger an asynchronous process
     } catch (err) {
       response.sendStatus(400);
-      console.log("Error saving webhook message - returned status 400");
+      console.log("Error saving webhook message - "+err.errorMessage);
     }
   } else {
     response.sendStatus(401);

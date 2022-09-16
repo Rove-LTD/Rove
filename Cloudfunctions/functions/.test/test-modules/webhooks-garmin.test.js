@@ -26,6 +26,7 @@ const test = require('firebase-functions-test')(firebaseConfig, testParameters.t
 const admin = require("firebase-admin");
 myFunctions = require('../../index.js');
 const garminRawJson = require("./garminRawWebhook.json");
+const garminRawJson3 = require("./garminRawWebhook3.json");
 
 // -----------END INITIALISE ROVE TEST PARAMETERS----------------------------//
 
@@ -64,6 +65,12 @@ describe("Testing that the garmin Webhooks work: ", () => {
             body: successfulDetail,
             status: "added before the tests to be successful",
         }
+        const livedetail = JSON.stringify(garminRawJson3)
+        await admin.firestore()
+                .collection("webhookInBox")
+                .doc()
+                .set({body: livedetail}, {merge: true})
+
         garminRawJson.activityDetails[0].userId = "incorrect_garmin_user";
         const unsuccessfulDetail = JSON.stringify(garminRawJson);
         garminRawJson.activityDetails[0].userId = "eb24e8e5-110d-4a87-b976-444f40ca27d4";
@@ -79,27 +86,13 @@ describe("Testing that the garmin Webhooks work: ", () => {
     after('clean-up the webhookInbox documents',async ()=>{
 
     })
-    it('Webhooks should log event and repond with status 200...', async () => {
+    it.only('Webhooks should log event and repond with status 200...', async () => {
       // set the request object with the webHook payload
       const req = {
         debug: true,
         url: "https://us-central1-rovetest-beea7.cloudfunctions.net/garminWebhook",
         method: "POST",
-        body: {"activities":[{
-            "activeKilocalories": 391,
-            "activityId": 7698241609,
-            "activityName": "Indoor Cycling",
-            "activityType": "INDOOR_CYCLING",
-            "averageHeartRateInBeatsPerMinute": 139,
-            "deviceName": "forerunner935",
-            "durationInSeconds": 1811,
-            "maxHeartRateInBeatsPerMinute": 178,
-            "startTimeInSeconds": 1634907261,
-            "startTimeOffsetInSeconds": 3600,
-            "summaryId": "7698241609",
-            "userAccessToken": "test_garmin_access_token",
-            "userId": "eb24e8e5-110d-4a87-b976-444f40ca27d4"
-          }],}
+        body: garminRawJson3
         };
         res = {
             sendStatus: (code)=>{assert.equal(code, 200);},
@@ -107,8 +100,8 @@ describe("Testing that the garmin Webhooks work: ", () => {
 
         // set up stubs so that WebhookInBox is not written to
         // this would trigger the function in the online environment
-        const stubbedWebhookInBox = sinon.stub(webhookInBox, "push");
-        stubbedWebhookInBox.onCall().returns("testDoc");
+        //const stubbedWebhookInBox = sinon.stub(webhookInBox, "push");
+        //stubbedWebhookInBox.onCall().returns("testDoc");
 
         await myFunctions.garminWebhook(req, res);
 
