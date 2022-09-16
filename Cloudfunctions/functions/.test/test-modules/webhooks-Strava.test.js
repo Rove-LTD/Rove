@@ -141,7 +141,7 @@ describe("Testing that the strava Webhooks work: ", () => {
                 activity_name: "Happy Friday",
                 activity_type: "Ride",
                 distance: 28099, //float no trailing 0
-                avg_speed: 6.7, //float
+                avg_speed: 6.679, //float
                 active_calories: 781,
                 activity_duration: 4207,
                 start_time: '2018-02-16T06:52:54.000Z', //ISO 8601 UTC
