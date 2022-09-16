@@ -118,14 +118,10 @@ describe("Testing that the garmin Webhooks work: ", () => {
         sinon.restore();
 
     });
-    it('read webhookInBox event and process it successfully...', async () => {
+    it.only('read webhookInBox event and process it successfully...', async () => {
 
         //set up the stubbed response to mimic garmin's response when called with the
-        const garminBody = require('./garminRaw3.json');
-        const garminResponse = {body: JSON.stringify(garminBody)};
         const stubbedWebhookInBox = sinon.stub(webhookInBox, "delete");
-        const stubbedGot = sinon.stub(got, "get");
-        stubbedGot.returns(garminResponse)
         const snapshot = test.firestore.makeDocumentSnapshot(successfulWebhookMessage, "webhookInBox/"+successfulWebhookMessageDoc);
 
         wrapped = test.wrap(myFunctions.processWebhookInBox);
@@ -212,7 +208,7 @@ describe("Testing that the garmin Webhooks work: ", () => {
         assert.equal(stubbedWebhookInBox.notCalled, true);
         sinon.restore();
     });
-    it('read webhook inbox message and error if no users that match garmin_id...', async () => {
+    it.only('read webhook inbox message and error if no users that match garmin_id...', async () => {
 
     const data = unsuccessfulWebhookMessage;
 

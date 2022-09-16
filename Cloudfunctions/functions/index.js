@@ -1175,7 +1175,7 @@ exports.garminWebhook = functions.https.onRequest(async (request, response) => {
       // the message will trigger an asynchronous process
     } catch (err) {
       response.sendStatus(400);
-      console.log("Error saving webhook message - returned status 400");
+      console.log("Error saving webhook message - "+err.message);
     }
   } else {
     response.sendStatus(401);
@@ -1184,7 +1184,7 @@ exports.garminWebhook = functions.https.onRequest(async (request, response) => {
 });
 
 async function processGarminWebhook(webhookDoc) {
-  const webhookBody = JSON.parse(webhookDoc.data()["body"]);
+  const webhookBody = JSON.parse(await webhookInBox.getBody(webhookDoc));
   // 1) sanatise
   let sanitisedActivities = [{}];
   sanitisedActivities = filters.garminSanitise(webhookBody.activityDetails);
@@ -2632,5 +2632,3 @@ async function createTransactionWithParameters(parameters) {
 // Utility Functions and Constants -----------------------------
 const waitTime = {0: 0, 1: 1, 2: 10, 3: 60}; // time in minutes
 const wait = (mins) => new Promise((resolve) => setTimeout(resolve, mins*60*1000));
-
-
