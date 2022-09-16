@@ -7,8 +7,8 @@ const webhookInBox = {
     let body =JSON.stringify(request.body);
     let storageUsed = false;
     const webhookDoc = db.collection("webhookInBox").doc();
-    if (body > 1048487) {
-      body = storeBody(body, webhookDoc);
+    if (body.length > 1048487) {
+      body = await storeBody(body, webhookDoc);
       storageUsed = true;
     }
     await webhookDoc

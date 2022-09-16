@@ -65,11 +65,6 @@ describe("Testing that the garmin Webhooks work: ", () => {
             body: successfulDetail,
             status: "added before the tests to be successful",
         }
-        const livedetail = JSON.stringify(garminRawJson3)
-        await admin.firestore()
-                .collection("webhookInBox")
-                .doc()
-                .set({body: livedetail}, {merge: true})
 
         garminRawJson.activityDetails[0].userId = "incorrect_garmin_user";
         const unsuccessfulDetail = JSON.stringify(garminRawJson);
