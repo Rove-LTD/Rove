@@ -25,7 +25,7 @@ const webhookInBox = {
   },
   getBody: async function(webhookDoc) {
     let body;
-    if (webhookDoc.data["storageUsed"]) {
+    if (webhookDoc.data()["storage_used"]) {
       const bodyRef = webhookDoc.data()["body"].file;
       // get the data from storage file and replace
       // into the rawBody property
@@ -39,6 +39,7 @@ const webhookInBox = {
   },
   delete: async function(webhookDoc) {
     await webhookDoc.delete();
+    //await also delete the file in the bucket
   },
   writeError: async function(webhookDoc, error) {
     console.log(error.message);

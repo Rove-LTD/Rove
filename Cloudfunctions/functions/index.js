@@ -236,7 +236,7 @@ exports.getActivityList = functions.https.onRequest(async (req, res) => {
     // write the docs into the database now and force a resend.
     const resendFlag = true;
     for (let i = 0; i < payload.length; i++) {
-      saveAndSendActivity([userDoc],
+      await saveAndSendActivity([userDoc],
           payload[i].sanitised,
           payload[i].raw,
           resendFlag);
@@ -1209,7 +1209,7 @@ async function processGarminWebhook(webhookDoc) {
       userDocsList.push(doc);
     });
     // save raw and sanitised activites as a backup for each user
-    saveAndSendActivity(userDocsList,
+    await saveAndSendActivity(userDocsList,
         sanitisedActivity,
         webhookBody.activityDetails[index]);
     index=index+1;
@@ -1848,7 +1848,7 @@ async function processCorosWebhook(webhookDoc) {
   }
   // save raw and sanitised activites as a backup for each user
   for (let i = 0; i<sanitisedActivities.length; i++) {
-    saveAndSendActivity(userDocsList,
+    await saveAndSendActivity(userDocsList,
         sanitisedActivities[i],
         webhookBody);
   }
