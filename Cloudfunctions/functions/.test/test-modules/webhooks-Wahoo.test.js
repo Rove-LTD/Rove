@@ -134,7 +134,7 @@ describe("Testing that the Wahoo Webhooks work: ", () => {
         wrapped = test.wrap(myFunctions.processWebhookInBox);
         await wrapped(snapshot);
         // check the webhookInBox function was called with the correct args
-        assert(stubbedWebhookInBox.calledOnceWith(snapshot.ref), "webhookInBox called incorrectly");
+        assert(stubbedWebhookInBox.calledOnceWith(snapshot), "webhookInBox called incorrectly");
         // give the sendToDeveloper function a chance to run
         const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
         await wait(1000);
@@ -242,7 +242,7 @@ describe("Testing that the Wahoo Webhooks work: ", () => {
         // check webhookInBox called with the correct parameters
         assert(stubbedWebhookInBox.calledOnce, "webhookInBox called too many times");
         assert.equal(args[1].message, "don't recognise the wahoo event_type: incorrect");
-        assert.equal(args[0], snapshot.ref);
+        assert.equal(args[0], snapshot);
         sinon.restore();
     });
 }); //End TEST

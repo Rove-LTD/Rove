@@ -124,7 +124,7 @@ describe("Testing that the strava Webhooks work: ", () => {
         await wait(1000);
         // check the webhookInBox function was called with the correct args
         args = stubbedWebhookInBox.getCall(0).args;
-        assert(stubbedWebhookInBox.calledOnceWith(snapshot.ref), "webhookInBox called incorrectly with: "+args);
+        assert(stubbedWebhookInBox.calledOnceWith(snapshot), "webhookInBox called incorrectly with: "+args);
         //now check the database was updated correctly
         const testUserDocs = await admin.firestore()
             .collection("users")
@@ -219,7 +219,7 @@ describe("Testing that the strava Webhooks work: ", () => {
     // check webhookInBox called with the correct parameters
     assert(stubbedWebhookInBox.calledOnce, "webhookInBox called too many times");
     assert.equal(args[1].message, "zero users registered to strava webhook owner_id incorrect_strava_id");
-    assert.equal(args[0], snapshot.ref);
+    assert.equal(args[0], snapshot);
     sinon.restore();
     });
 }); //End TEST
