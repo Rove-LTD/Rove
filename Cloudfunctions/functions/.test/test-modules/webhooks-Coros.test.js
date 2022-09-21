@@ -125,7 +125,7 @@ describe("Testing that the Coros Webhooks work: ", () => {
         // check the webhookInBox function was called with the correct args
         const deleteCall = stubbedWebhookInBox.getCall(0);
         const writeErrorCall = stubbedWebhookInBoxWriteError.getCall(0);
-        assert(stubbedWebhookInBox.calledOnceWith(snapshot.ref), "webhookInBox called incorrectly with: "+deleteCall.args);
+        assert(stubbedWebhookInBox.calledOnceWith(snapshot), "webhookInBox called incorrectly with: "+deleteCall.args);
         //now check the database was updated correctly
        const sampleActivityDoc = await admin.firestore()
        .collection("users")
@@ -222,7 +222,7 @@ describe("Testing that the Coros Webhooks work: ", () => {
         // check webhookInBox called with the correct parameters
         assert(stubbedWebhookInBox.calledOnce, "webhookInBox called too many times");
         assert.equal(args[1].message, "Cant sanitise message: Cannot read property '0' of undefined");
-        assert.equal(args[0], snapshot.ref);
+        assert.equal(args[0], snapshot);
         sinon.restore();
     });
 }); //End TEST
