@@ -1773,9 +1773,9 @@ exports.processWebhookInBox = functions.firestore
           case "coros":
             await processCorosWebhook(snap);
         }
-        webhookInBox.delete(snap.ref);
+        webhookInBox.delete(snap);
       } catch (error) {
-        webhookInBox.writeError(snap.ref, error);
+        webhookInBox.writeError(snap, error);
       }
       return;
     });

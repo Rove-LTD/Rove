@@ -79,7 +79,7 @@ const webhookInBox = require('../../webhookInBox');
     await wrapped(snapshot);
 
     // check the webhookInBox function was called with the correct args
-    stubbedWebhookInBox.calledOnceWith(snapshot.ref);
+    stubbedWebhookInBox.calledOnceWith(snapshot);
     const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
     await wait(2000);
     //now check the database was updated correctly

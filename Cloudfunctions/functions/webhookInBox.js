@@ -38,12 +38,18 @@ const webhookInBox = {
     return body;
   },
   delete: async function(webhookDoc) {
-    await webhookDoc.delete();
-    //await also delete the file in the bucket
+    if (webhookDoc.data()["storage_used"]) {
+      const bodyRef = webhookDoc.data()["body"].file;
+      // delete the data from storage file
+      const bucket = storage.bucket();
+      const file = bucket.file(bodyRef);
+      await file.delete();
+    }
+    await webhookDoc.ref.delete();
   },
   writeError: async function(webhookDoc, error) {
     console.log(error.message);
-    await webhookDoc.set({status: "error: "+error.message}, {merge: true});
+    await webhookDoc.ref.set({status: "error: "+error.message}, {merge: true});
   },
 };
 /**

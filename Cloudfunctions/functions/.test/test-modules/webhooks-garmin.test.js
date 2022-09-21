@@ -81,7 +81,7 @@ describe("Testing that the garmin Webhooks work: ", () => {
     after('clean-up the webhookInbox documents',async ()=>{
 
     })
-    it.only('Webhooks should log event and repond with status 200...', async () => {
+    it('Webhooks should log large event and repond status 200 and then process it...', async () => {
       // set the request object with the webHook payload
       let inBoxDocs = await admin.firestore().collection("webhookInBox")
       .where("secret_lookups", "==", "d3dd1cc9-06b2-4b3e-9eb4-8a40cbd8e53f")
@@ -127,7 +127,7 @@ describe("Testing that the garmin Webhooks work: ", () => {
         wrapped = test.wrap(myFunctions.processWebhookInBox);
         await wrapped(snapshot);
         // check the webhookInBox function was called with the correct args
-        assert(spyWebhookInBoxDelete.calledOnceWith(snapshot.ref), "webhookInBox called incorrectly");
+        assert(spyWebhookInBoxDelete.calledOnceWith(snapshot), "webhookInBox called incorrectly");
         // give the sendToDeveloper function a chance to run
         const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
         await wait(1000);
@@ -173,7 +173,7 @@ describe("Testing that the garmin Webhooks work: ", () => {
         sinon.restore();
 
     });
-    it.only('read webhookInBox event and process it successfully...', async () => {
+    it('read webhookInBox small event and process it successfully...', async () => {
 
         //set up the stubbed response to mimic garmin's response when called with the
         const stubbedWebhookInBox = sinon.stub(webhookInBox, "delete");
@@ -182,7 +182,7 @@ describe("Testing that the garmin Webhooks work: ", () => {
         wrapped = test.wrap(myFunctions.processWebhookInBox);
         await wrapped(snapshot);
         // check the webhookInBox function was called with the correct args
-        assert(stubbedWebhookInBox.calledOnceWith(snapshot.ref), "webhookInBox called incorrectly");
+        assert(stubbedWebhookInBox.calledOnceWith(snapshot), "webhookInBox called incorrectly");
         // give the sendToDeveloper function a chance to run
         const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
         await wait(1000);
@@ -262,7 +262,7 @@ describe("Testing that the garmin Webhooks work: ", () => {
         assert.equal(stubbedWebhookInBox.notCalled, true);
         sinon.restore();
     });
-    it.only('read webhook inbox message and error if no users that match garmin_id...', async () => {
+    it('read webhook inbox message and error if no users that match garmin_id...', async () => {
 
     const data = unsuccessfulWebhookMessage;
 
@@ -275,7 +275,7 @@ describe("Testing that the garmin Webhooks work: ", () => {
     // check webhookInBox called with the correct parameters
     assert(stubbedWebhookInBox.calledOnce, "webhookInBox called too many times");
     assert.equal(args[1].message, "zero users registered to garmin webhook userId incorrect_garmin_user");
-    assert.equal(args[0], snapshot.ref);
+    assert.equal(args[0], snapshot);
     sinon.restore();
     });
 }); //End TEST
