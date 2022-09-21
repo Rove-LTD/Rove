@@ -178,7 +178,7 @@ describe("Testing that the Polar Webhooks work: ", () => {
         const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
         await wait(1000);
         // check the webhookInBox function was called with the correct args
-        assert(stubbedWebhookInBox.calledOnceWith(snapshot.ref), "webhookInBox called incorrectly");
+        assert(stubbedWebhookInBox.calledOnceWith(snapshot), "webhookInBox called incorrectly");
         //now check the database was updated correctly
      const testUserDocs = await admin.firestore()
      .collection("users")
@@ -299,7 +299,7 @@ describe("Testing that the Polar Webhooks work: ", () => {
     // check webhookInBox called with the correct parameters
     assert(stubbedWebhookInBox.calledOnce, "webhookInBox called too many times");
     assert.equal(args[1].message, "zero users registered to polar webhook user_id incorrect_test_user");
-    assert.equal(args[0], snapshot.ref);
+    assert.equal(args[0], snapshot);
     sinon.restore();
     });
     it.skip('NO STUBBS so SKIPPED - read a specific webhookInBox event and process it without stubbing...', async () => {

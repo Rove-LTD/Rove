@@ -120,7 +120,7 @@ const webhookInBox = require('../../webhookInBox');
     const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
     await wait(1000);
     // check the webhookInBox function was called with the correct args
-    assert(stubbedWebhookInBox.calledOnceWith(snapshot.ref), "webhookInBox called incorrectly");
+    assert(stubbedWebhookInBox.calledOnceWith(snapshot), "webhookInBox called incorrectly");
     // check the wahoo fields were deleted from the database
     // check the wahoo activities were deleted from the database only for this user
     const userDoc = await admin.firestore()

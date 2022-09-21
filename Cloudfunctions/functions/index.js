@@ -236,7 +236,7 @@ exports.getActivityList = functions.https.onRequest(async (req, res) => {
     // write the docs into the database now and force a resend.
     const resendFlag = true;
     for (let i = 0; i < payload.length; i++) {
-      saveAndSendActivity([userDoc],
+      await saveAndSendActivity([userDoc],
           payload[i].sanitised,
           payload[i].raw,
           resendFlag);
@@ -1175,7 +1175,7 @@ exports.garminWebhook = functions.https.onRequest(async (request, response) => {
       // the message will trigger an asynchronous process
     } catch (err) {
       response.sendStatus(400);
-      console.log("Error saving webhook message - returned status 400");
+      console.log("Error saving webhook message - "+err.message);
     }
   } else {
     response.sendStatus(401);
@@ -1184,7 +1184,7 @@ exports.garminWebhook = functions.https.onRequest(async (request, response) => {
 });
 
 async function processGarminWebhook(webhookDoc) {
-  const webhookBody = JSON.parse(webhookDoc.data()["body"]);
+  const webhookBody = JSON.parse(await webhookInBox.getBody(webhookDoc));
   // 1) sanatise
   let sanitisedActivities = [{}];
   sanitisedActivities = filters.garminSanitise(webhookBody.activityDetails);
@@ -1209,7 +1209,7 @@ async function processGarminWebhook(webhookDoc) {
       userDocsList.push(doc);
     });
     // save raw and sanitised activites as a backup for each user
-    saveAndSendActivity(userDocsList,
+    await saveAndSendActivity(userDocsList,
         sanitisedActivity,
         webhookBody.activityDetails[index]);
     index=index+1;
@@ -1773,9 +1773,9 @@ exports.processWebhookInBox = functions.firestore
           case "coros":
             await processCorosWebhook(snap);
         }
-        webhookInBox.delete(snap.ref);
+        webhookInBox.delete(snap);
       } catch (error) {
-        webhookInBox.writeError(snap.ref, error);
+        webhookInBox.writeError(snap, error);
       }
       return;
     });
@@ -1848,7 +1848,7 @@ async function processCorosWebhook(webhookDoc) {
   }
   // save raw and sanitised activites as a backup for each user
   for (let i = 0; i<sanitisedActivities.length; i++) {
-    saveAndSendActivity(userDocsList,
+    await saveAndSendActivity(userDocsList,
         sanitisedActivities[i],
         webhookBody);
   }
@@ -2632,5 +2632,3 @@ async function createTransactionWithParameters(parameters) {
 // Utility Functions and Constants -----------------------------
 const waitTime = {0: 0, 1: 1, 2: 10, 3: 60}; // time in minutes
 const wait = (mins) => new Promise((resolve) => setTimeout(resolve, mins*60*1000));
-
-

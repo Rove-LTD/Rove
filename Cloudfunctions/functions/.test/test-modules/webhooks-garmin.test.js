@@ -26,6 +26,7 @@ const test = require('firebase-functions-test')(firebaseConfig, testParameters.t
 const admin = require("firebase-admin");
 myFunctions = require('../../index.js');
 const garminRawJson = require("./garminRawWebhook.json");
+const garminRawJson3 = require("./garminRawWebhook3.json");
 
 // -----------END INITIALISE ROVE TEST PARAMETERS----------------------------//
 
@@ -64,6 +65,7 @@ describe("Testing that the garmin Webhooks work: ", () => {
             body: successfulDetail,
             status: "added before the tests to be successful",
         }
+
         garminRawJson.activityDetails[0].userId = "incorrect_garmin_user";
         const unsuccessfulDetail = JSON.stringify(garminRawJson);
         garminRawJson.activityDetails[0].userId = "eb24e8e5-110d-4a87-b976-444f40ca27d4";
@@ -79,27 +81,21 @@ describe("Testing that the garmin Webhooks work: ", () => {
     after('clean-up the webhookInbox documents',async ()=>{
 
     })
-    it('Webhooks should log event and repond with status 200...', async () => {
+    it('Webhooks should log large event and repond status 200 and then process it...', async () => {
       // set the request object with the webHook payload
+      let inBoxDocs = await admin.firestore().collection("webhookInBox")
+      .where("secret_lookups", "==", "d3dd1cc9-06b2-4b3e-9eb4-8a40cbd8e53f")
+      .get();
+
+      for (const doc of inBoxDocs.docs) {
+        await doc.ref.delete();
+      };
+
       const req = {
         debug: true,
         url: "https://us-central1-rovetest-beea7.cloudfunctions.net/garminWebhook",
         method: "POST",
-        body: {"activities":[{
-            "activeKilocalories": 391,
-            "activityId": 7698241609,
-            "activityName": "Indoor Cycling",
-            "activityType": "INDOOR_CYCLING",
-            "averageHeartRateInBeatsPerMinute": 139,
-            "deviceName": "forerunner935",
-            "durationInSeconds": 1811,
-            "maxHeartRateInBeatsPerMinute": 178,
-            "startTimeInSeconds": 1634907261,
-            "startTimeOffsetInSeconds": 3600,
-            "summaryId": "7698241609",
-            "userAccessToken": "test_garmin_access_token",
-            "userId": "eb24e8e5-110d-4a87-b976-444f40ca27d4"
-          }],}
+        body: garminRawJson3
         };
         res = {
             sendStatus: (code)=>{assert.equal(code, 200);},
@@ -107,31 +103,31 @@ describe("Testing that the garmin Webhooks work: ", () => {
 
         // set up stubs so that WebhookInBox is not written to
         // this would trigger the function in the online environment
-        const stubbedWebhookInBox = sinon.stub(webhookInBox, "push");
-        stubbedWebhookInBox.onCall().returns("testDoc");
+        const spyWebhookInBox = sinon.spy(webhookInBox, "push");
+        //stubbedWebhookInBox.onCall().returns("testDoc");
 
         await myFunctions.garminWebhook(req, res);
 
         // check the webhookInBox was called correctly
-        assert(stubbedWebhookInBox.calledOnceWithExactly(req, "garmin", "d3dd1cc9-06b2-4b3e-9eb4-8a40cbd8e53f"),
+        assert(spyWebhookInBox.calledOnceWithExactly(req, "garmin", "d3dd1cc9-06b2-4b3e-9eb4-8a40cbd8e53f"),
                 "webhookInBox called with wrong args");
+        
+        inBoxDocs = await admin.firestore().collection("webhookInBox")
+                .where("secret_lookups", "==", "d3dd1cc9-06b2-4b3e-9eb4-8a40cbd8e53f")
+                .get()
         sinon.restore();
 
-    });
-    it('read webhookInBox event and process it successfully...', async () => {
-
-        //set up the stubbed response to mimic garmin's response when called with the
-        const garminBody = require('./garminRaw3.json');
-        const garminResponse = {body: JSON.stringify(garminBody)};
-        const stubbedWebhookInBox = sinon.stub(webhookInBox, "delete");
-        const stubbedGot = sinon.stub(got, "get");
-        stubbedGot.returns(garminResponse)
-        const snapshot = test.firestore.makeDocumentSnapshot(successfulWebhookMessage, "webhookInBox/"+successfulWebhookMessageDoc);
+        assert.equal(inBoxDocs.docs.length,1);
+        assert.include(inBoxDocs.docs[0].data()["body"].file, "webhookBody/");
+        const newWebhookMessage = inBoxDocs.docs[0].data();
+        const newWebhookMessageId = inBoxDocs.docs[0].id;
+        const spyWebhookInBoxDelete = sinon.spy(webhookInBox, "delete");
+        const snapshot = test.firestore.makeDocumentSnapshot(newWebhookMessage, "webhookInBox/"+newWebhookMessageId);
 
         wrapped = test.wrap(myFunctions.processWebhookInBox);
         await wrapped(snapshot);
         // check the webhookInBox function was called with the correct args
-        assert(stubbedWebhookInBox.calledOnceWith(snapshot.ref), "webhookInBox called incorrectly");
+        assert(spyWebhookInBoxDelete.calledOnceWith(snapshot), "webhookInBox called incorrectly");
         // give the sendToDeveloper function a chance to run
         const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
         await wait(1000);
@@ -144,12 +140,66 @@ describe("Testing that the garmin Webhooks work: ", () => {
             .get();
 
         const sanatisedActivity = testUserDocs.docs[0].data();
+        garminRawJson3.activityDetails[0].samples = "too much data";
+        const expectedResults = { // TODO:
+            sanitised: {
+                "active_calories": 707,
+                "activity_duration": 3634,
+                "activity_id": 9291942332,
+                "activity_name": "Siena Running",
+                "activity_type": "RUNNING",
+                userId: testUser,
+                distance: 9392, //float no trailing 0
+                avg_speed: 2.584, //float
+                start_time: '2022-09-15T05:29:14.000Z', //ISO 8601 UTC
+                avg_heart_rate: 141,
+                max_heart_rate_bpm: 173,
+                avg_cadence: 150.79688,
+                elevation_gain: 307.7665,
+                elevation_loss: 302.7325,
+                samples: {"file": "samples/9291942332garmin"},
+                provider: "garmin",
+                version: "1.0"
+            },
+            raw: garminRawJson3.activityDetails[0],
+            "status": "not tested",
+            "timestamp": "not tested",
+            "triesSoFar": "not tested",
+        }
+        sanatisedActivity.status = "not tested";
+        sanatisedActivity.timestamp = "not tested";
+        sanatisedActivity.triesSoFar = "not tested";
+        assert.deepEqual(sanatisedActivity, expectedResults);
+        sinon.restore();
+
+    });
+    it('read webhookInBox small event and process it successfully...', async () => {
+
+        //set up the stubbed response to mimic garmin's response when called with the
+        const stubbedWebhookInBox = sinon.stub(webhookInBox, "delete");
+        const snapshot = test.firestore.makeDocumentSnapshot(successfulWebhookMessage, "webhookInBox/"+successfulWebhookMessageDoc);
+
+        wrapped = test.wrap(myFunctions.processWebhookInBox);
+        await wrapped(snapshot);
+        // check the webhookInBox function was called with the correct args
+        assert(stubbedWebhookInBox.calledOnceWith(snapshot), "webhookInBox called incorrectly");
+        // give the sendToDeveloper function a chance to run
+        const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+        await wait(1000);
+         //now check the database was updated correctly
+        const testUserDocs = await admin.firestore()
+            .collection("users")
+            .doc(testDev+testUser)
+            .collection("activities")
+            .where("raw.activityId", "==", 9291942331)
+            .get();
+
+        const sanatisedActivity = testUserDocs.docs[0].data();
         garminRawJson.activityDetails[0].samples = "too much data";
         const expectedResults = { // TODO:
             sanitised: {
-                "active_calories": 672,
                 "activity_duration": 3923,
-                "activity_id": 9291942332,
+                "activity_id": 9291942331,
                 "activity_name": "Newcastle upon Tyne Cycling",
                 "activity_type": "CYCLING",
                 userId: testUser,
@@ -162,7 +212,7 @@ describe("Testing that the garmin Webhooks work: ", () => {
                 avg_cadence: 71,
                 elevation_gain: 212,
                 elevation_loss: 203,
-                samples: {"file": "samples/9291942332garmin"},
+                samples: {"file": "samples/9291942331garmin"},
                 provider: "garmin",
                 version: "1.0"
             },
@@ -225,7 +275,7 @@ describe("Testing that the garmin Webhooks work: ", () => {
     // check webhookInBox called with the correct parameters
     assert(stubbedWebhookInBox.calledOnce, "webhookInBox called too many times");
     assert.equal(args[1].message, "zero users registered to garmin webhook userId incorrect_garmin_user");
-    assert.equal(args[0], snapshot.ref);
+    assert.equal(args[0], snapshot);
     sinon.restore();
     });
 }); //End TEST
