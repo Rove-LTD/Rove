@@ -516,50 +516,58 @@ exports.jsonFitSanitise = function(jsonRecords) {
   sanitisedData["samples"]= sanitisedSamples;
   return sanitisedData;
 }
-exports.garminDailiesSanitise = function(garminDaily) {
-  sanitisedDaily = {
-    "date": garminDaily.calendarDate,// string "yyyy-mm-dd"
-    "startTimeInSeconds": garminDaily.startTimeInSeconds,// integer
-    "steps": garminDaily.steps,// integer
-    "distanceInMeters": garminDaily.distanceInMeters,// integer
-    "activeTimeSeconds": garminDaily.activeTimeInSeconds,// integer
-    "activeCalories": garminDaily.activeKilocalories,// integer
-    "bmrCalories": garminDaily.bmrKilocalories,// integer
-    "floorsClimbed": garminDaily.floorsClimbed,// integer
-    "minHeartRate": garminDaily.minHeartRateInBeatsPerMinute,// integer
-    "maxHeartRate": garminDaily.maxHeartRateInBeatsPerMinute,// integer
-    "aveHeartRate": garminDaily.averageHeartRateInBeatsPerMinute,// integer
-    "restingHeartRate": garminDaily.restingHeartRateInBeatsPerMinute,// integer
-    // "timeOffsetHeartRate": garminDaily.,// map of seconds and HR, not sent to spreadsheets
-  }
-  for (const prop in sanitisedDaily) {
-    if (Object.prototype.hasOwnProperty.call(sanitisedDaily, prop)) {
-      if (sanitisedDaily[prop] == undefined) {
-        sanitisedDaily[prop] = null;
+exports.garminDailiesSanitise = function(garminDailies) {
+  sanitisedDailies = []
+  garminDailies.forEach((garminDaily) => {
+    sanitisedDaily = {
+      "date": garminDaily.calendarDate,// string "yyyy-mm-dd"
+      "startTimeInSeconds": garminDaily.startTimeInSeconds,// integer
+      "steps": garminDaily.steps,// integer
+      "distanceInMeters": garminDaily.distanceInMeters,// integer
+      "activeTimeSeconds": garminDaily.activeTimeInSeconds,// integer
+      "activeCalories": garminDaily.activeKilocalories,// integer
+      "bmrCalories": garminDaily.bmrKilocalories,// integer
+      "floorsClimbed": garminDaily.floorsClimbed,// integer
+      "minHeartRate": garminDaily.minHeartRateInBeatsPerMinute,// integer
+      "maxHeartRate": garminDaily.maxHeartRateInBeatsPerMinute,// integer
+      "aveHeartRate": garminDaily.averageHeartRateInBeatsPerMinute,// integer
+      "restingHeartRate": garminDaily.restingHeartRateInBeatsPerMinute,// integer
+      // "timeOffsetHeartRate": garminDaily.,// map of seconds and HR, not sent to spreadsheets
+    }
+    for (const prop in sanitisedDaily) {
+      if (Object.prototype.hasOwnProperty.call(sanitisedDaily, prop)) {
+        if (sanitisedDaily[prop] == undefined) {
+          sanitisedDaily[prop] = null;
+        }
       }
     }
-  }
-  return sanitisedDaily
+    sanitisedDailies.push(sanitisedDaily);
+  })
+  return sanitisedDailies
 }
-exports.garminSleepSanitise = function(garminSleep) {
-  sanitisedSleep = {
-    "id": garminSleep.summaryId,// string, unique id for summary
-    "date": garminSleep.calendarDate,// string, "yyy-mm-dd"
-    "startTime": garminSleep.startTimeInSeconds,// int, start time of the sleep seconds from epoch
-    "duration": garminSleep.durationInSeconds,// int, total time in seconds of sleep
-    "unmeasurable": garminSleep.unmeasurableSleepDurationInSeconds,// int, unmeasurable duration in seconds
-    "deep": garminSleep.deepSleepDurationInSeconds,// int, deep duration in seconds
-    "light": garminSleep.lightSleepDurationInSeconds,// int, light duration in seconds
-    "rem": garminSleep.remSleepInSeconds,// int, rem duration in seconds
-  }
-  for (const prop in sanitisedSleep) {
-    if (Object.prototype.hasOwnProperty.call(sanitisedSleep, prop)) {
-      if (sanitisedSleep[prop] == undefined) {
-        sanitisedSleep[prop] = null;
+exports.garminSleepSanitise = function(garminSleeps) {
+  sanitisedSleeps = []
+  garminSleeps.forEach((garminSleep) => {
+    sanitisedSleep = {
+      "id": garminSleep.summaryId,// string, unique id for summary
+      "date": garminSleep.calendarDate,// string, "yyy-mm-dd"
+      "startTime": garminSleep.startTimeInSeconds,// int, start time of the sleep seconds from epoch
+      "duration": garminSleep.durationInSeconds,// int, total time in seconds of sleep
+      "unmeasurable": garminSleep.unmeasurableSleepDurationInSeconds,// int, unmeasurable duration in seconds
+      "deep": garminSleep.deepSleepDurationInSeconds,// int, deep duration in seconds
+      "light": garminSleep.lightSleepDurationInSeconds,// int, light duration in seconds
+      "rem": garminSleep.remSleepInSeconds,// int, rem duration in seconds
+    }
+    for (const prop in sanitisedSleep) {
+      if (Object.prototype.hasOwnProperty.call(sanitisedSleep, prop)) {
+        if (sanitisedSleep[prop] == undefined) {
+          sanitisedSleep[prop] = null;
+        }
       }
     }
-  }
-  return sanitisedSleep
+    sanitisedSleeps.push(sanitisedSleep)
+  })
+  return sanitisedSleeps
 }
 /**
  * @param {Map} sanitisedActivity
