@@ -1259,11 +1259,11 @@ async function processGarminWebhook(webhookDoc) {
       messageType = "activities";
       break;
     case "garminDailies":
-      sanitisedActivities = filters.garminSanitise(webhookBody.dailies);
+      sanitisedActivities = filters.garminDailiesSanitise(webhookBody.dailies);
       messageType = "dailySummaries";
       break;
     case "garminSleeps":
-      sanitisedActivities = filters.garminSanitise(webhookBody.sleeps);
+      sanitisedActivities = filters.garminSleepSanitise(webhookBody.sleeps);
       messageType = "sleeps";
       break;
     default:
@@ -2105,6 +2105,7 @@ async function saveAndSendActivity(userDocList,
       return;
     }
     if (!doc.exists || resendFlag) {
+      localSanitisedActivity["messageType"] = messageType;
       await doc.ref.set({"sanitised": localSanitisedActivity, "raw": activity, "status": "send"});
     } else {
       console.log("duplicate activity - not written or sent");
