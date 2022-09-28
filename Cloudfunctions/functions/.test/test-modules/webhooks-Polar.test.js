@@ -190,6 +190,7 @@ describe("Testing that the Polar Webhooks work: ", () => {
      const sanatisedActivity = testUserDocs.docs[0].data();
      const expectedResults = { // TODO:
           sanitised: {
+              messageType: "activities",
               userId: testUser,
               activity_id: 1937529874,
               activity_name: "WATERSPORTS_WATERSKI",

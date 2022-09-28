@@ -144,7 +144,9 @@ describe("Testing that the Coros Webhooks work: ", () => {
        const sanatisedActivity = sampleActivityDoc.data();
        const expectedResults = {
             raw: JSON.parse(successfulWebhookMessage.body),
-            sanitised: {"activity_id": "418173292602490880",
+            sanitised: {
+                "messageType": "activities",
+                "activity_id": "418173292602490880",
                 "active_calories": 220000,
                 "activity_duration_in_seconds": 2200,
                 "activity_name": "Coros Multisport",

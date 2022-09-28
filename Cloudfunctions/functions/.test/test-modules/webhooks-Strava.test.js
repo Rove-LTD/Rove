@@ -136,6 +136,7 @@ describe("Testing that the strava Webhooks work: ", () => {
         const sanatisedActivity = testUserDocs.docs[0].data();
         const expectedResults = {
             sanitised: {
+                "messageType": "activities",
                 userId: testUser,
                 activity_id: 12345678987654321,
                 activity_name: "Happy Friday",

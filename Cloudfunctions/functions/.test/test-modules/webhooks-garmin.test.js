@@ -143,6 +143,7 @@ describe("Testing that the garmin Webhooks work: ", () => {
         garminRawJson3.activityDetails[0].samples = "too much data";
         const expectedResults = { // TODO:
             sanitised: {
+                "messageType": "activities",
                 "active_calories": 707,
                 "activity_duration": 3634,
                 "activity_id": 9291942332,
@@ -198,6 +199,7 @@ describe("Testing that the garmin Webhooks work: ", () => {
         garminRawJson.activityDetails[0].samples = "too much data";
         const expectedResults = { // TODO:
             sanitised: {
+                "messageType": "activities",
                 "activity_duration": 3923,
                 "activity_id": 9291942331,
                 "activity_name": "Newcastle upon Tyne Cycling",
