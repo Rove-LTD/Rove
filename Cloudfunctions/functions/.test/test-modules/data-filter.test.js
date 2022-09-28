@@ -35,11 +35,11 @@ describe("Testing that the data filters sanitisations work: ", () => {
       assert.deepEqual(output, ExpWahooInput1);
 
     });
-    it.only('Garmin Sleep', () => {
+    it('Garmin Sleep', () => {
       output = filter.garminSleepSanitise(garminSleepInput);
       assert.deepEqual(output, expGarminSleepInput)
     });
-    it.only('Garmin Dailies', () => {
+    it('Garmin Dailies', () => {
       output = filter.garminDailiesSanitise(garminDailyInput);
       assert.deepEqual(output, expGarminDailyInput)
     });
