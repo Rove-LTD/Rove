@@ -1822,7 +1822,7 @@ async function processCorosWebhook(webhookDoc) {
   const userDocsList = [];
 
   const userQuery = await db.collection("users")
-      .where("coros_user_id", "==", webhookBody.sportDataList[0].openId)
+      .where("coros_id", "==", webhookBody.sportDataList[0].openId)
       .where("coros_client_id", "==", clientId)
       .get();
 
@@ -1833,7 +1833,7 @@ async function processCorosWebhook(webhookDoc) {
   if (userDocsList.length == 0) {
     // there is an issue if there are no users with a userId in the DB.
     console.log("error: zero users registered to coros webhook: " + webhookBody.sportDataList[0].openId);
-    throw Error("zero users registered to coros webhook owner_id "+webhookBody.user.id);
+    throw Error("zero users registered to coros webhook owner_id "+webhookBody.user.coros_id);
   }
 
   // now we have a list of user Id's that are interested in this

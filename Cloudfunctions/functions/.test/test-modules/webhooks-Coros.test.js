@@ -36,7 +36,7 @@ const corosPushBad = JSON.stringify(require("./corosBad.json"));
 const got = require('got');
 const webhookInBox = require('../../webhookInBox');
 //-------------TEST --- webhooks-------
-describe("Testing that the Coros Webhooks work: ", () => {
+describe.only("Testing that the Coros Webhooks work: ", () => {
     before ('set up the userIds in the test User doc', async () => {
       await admin.firestore()
       .collection("users")
@@ -44,7 +44,7 @@ describe("Testing that the Coros Webhooks work: ", () => {
       .set({
           "devId": testDev,
           "userId": testUser,
-          "coros_user_id": "42dbb958c5a146f29ce9f89e05e5195a",
+          "coros_id": "42dbb958c5a146f29ce9f89e05e5195a",
           "coros_client_id": "e8925760066a490b9d26187f731020f8",
       }, {merge: true});
 
