@@ -244,7 +244,7 @@ describe("Testing that the Coros Webhooks work: ", () => {
         args = stubbedWebhookInBox.getCall(0).args; //this first call
         // check webhookInBox called with the correct parameters
         assert(stubbedWebhookInBox.calledOnce, "webhookInBox called too many times");
-        assert.equal(args[1].message, "Cant sanitise message: Cannot read properties of undefined (reading '0')");
+        assert.equal(args[1].message, "Cant sanitise message: Cannot read property '0' of undefined");
         assert.equal(args[0], snapshot);
         sinon.restore();
     });
