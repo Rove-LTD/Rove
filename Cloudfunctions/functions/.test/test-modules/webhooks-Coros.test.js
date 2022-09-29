@@ -109,9 +109,7 @@ describe("Testing that the Coros Webhooks work: ", () => {
             "webhookInBox called with wrong args: "+args);
     });
     it('read webhookInBox event and process it successfully...', async () => {
-
         const snapshot = test.firestore.makeDocumentSnapshot(successfulWebhookMessage, "webhookInBox/"+successfulWebhookMessageDoc);
-
         // set up stubs so that WebhookInBox is not deleted as the record
         // will not be there - it was not written
         const stubbedWebhookInBox = sinon.stub(webhookInBox, "delete");
@@ -143,29 +141,52 @@ describe("Testing that the Coros Webhooks work: ", () => {
   
        const sanatisedActivity = sampleActivityDoc.data();
        const expectedResults = {
-            raw: JSON.parse(successfulWebhookMessage.body),
-            sanitised: {
-                "messageType": "activities",
-                "activity_id": "418173292602490880",
-                "active_calories": 220000,
-                "activity_duration_in_seconds": 2200,
-                "activity_name": "Coros Multisport",
-                "activity_type": 1,
-                "average_pace_in_meters_per_second": 0,
-                "distance_in_meters": 22000,
-                "file": {"url": null},
-                "provider": "coros",
-                "start_time": "2018-04-01T09:49:38.000Z",
-                "userId": testParameters.testUser,
+        sanitised: {
+          messageType: "activities",
+          activity_duration_in_seconds: 10,
+          distance_in_meters: 0,
+          activity_name: "Coros Run",
+          active_calories: 0,
+          activity_type: 1,
+          provider: "coros",
+          file: {
+            url: "https://d31oxp44ddzkyk.cloudfront.net/fit/446778769355587584/446779547004731393.fit",
+          },
+          average_pace_in_meters_per_second: 0,
+          start_time: "2022-09-28T16:43:00.000Z",
+          userId: testParameters.testUser,
+          activity_id: "418173292602490880",
+        },
+        status: "send",
+        raw: {
+          sportDataList: [
+            {
+              startTimezone: 4,
+              deviceName: "COROS APEX PRO",
+              step: 0,
+              subMode: 1,
+              calorie: 0,
+              elevGain: 0,
+              fitUrl: "https://d31oxp44ddzkyk.cloudfront.net/fit/446778769355587584/446779547004731393.fit",
+              avgHeartRate: 54,
+              avgFrequency: 0,
+              labelId: "418173292602490880",
+              avgSpeed: 0,
+              duration: 10,
+              distance: 0,
+              openId: "42dbb958c5a146f29ce9f89e05e5195a",
+              mode: 8,
+              endTime: 1664383391,
+              endTimezone: 4,
+              startTime: 1664383380,
             },
-            "status": "send",
-            "timestamp": "not tested",
-            "triesSoFar": "not tested",
-        }
-        sanatisedActivity.timestamp = "not tested";
-        sanatisedActivity.triesSoFar = "not tested";
+          ],
+        },
+      }
+        // sanatisedActivity.timestamp = "not tested";
+        // sanatisedActivity.triesSoFar = "not tested";
         assert.deepEqual(sanatisedActivity, expectedResults);
-        assert.equal(testActivityDocs.docs.length, 3, "not enough activity records written");
+        assert.equal(testActivityDocs.docs.length, 1, "not enough activity records written");
        sinon.restore();
       });
     it.skip('NOT IMPLEMENTED YET - Webhooks should repond with status 401 if method incorrect...', async () => {
@@ -223,7 +244,7 @@ describe("Testing that the Coros Webhooks work: ", () => {
         args = stubbedWebhookInBox.getCall(0).args; //this first call
         // check webhookInBox called with the correct parameters
         assert(stubbedWebhookInBox.calledOnce, "webhookInBox called too many times");
-        assert.equal(args[1].message, "Cant sanitise message: Cannot read property '0' of undefined");
+        assert.equal(args[1].message, "Cant sanitise message: Cannot read properties of undefined (reading '0')");
         assert.equal(args[0], snapshot);
         sinon.restore();
     });
