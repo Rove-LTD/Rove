@@ -108,7 +108,7 @@ describe("Testing that the Coros Webhooks work: ", () => {
     assert(stubbedWebhookInBox.calledOnceWith(req, "coros", "e8925760066a490b9d26187f731020f8"),
             "webhookInBox called with wrong args: "+args);
     });
-    it.only('read webhookInBox event and process it successfully...', async () => {
+    it('read webhookInBox event and process it successfully...', async () => {
         const snapshot = test.firestore.makeDocumentSnapshot(successfulWebhookMessage, "webhookInBox/"+successfulWebhookMessageDoc);
         // set up stubs so that WebhookInBox is not deleted as the record
         // will not be there - it was not written
