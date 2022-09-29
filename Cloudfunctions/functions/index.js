@@ -2069,8 +2069,8 @@ async function processPolarWebhook(webhookDoc) {
  * - when saving to the Activity Record the "session" array
  * is saved in storage and replaced with the storage id
  * @param {Array<FirebaseFirestore>} userDocList
- * @param {Map} sanitisedActivity
- * @param {Map} activity
+ * @param {Map} sanitisedActivity the sanitised activity message
+ * @param {Map} activity the raw activity message
  * @param {Boolean} resendFlag set to true if activity should be resent
  * @param {String} messageType set to "activities", "dailySummaries" or "sleeps"
  */
@@ -2104,11 +2104,21 @@ async function saveAndSendActivity(userDocList,
       // when the activity_id is not there
       return;
     }
-    if (!doc.exists || resendFlag) {
-      localSanitisedActivity["messageType"] = messageType;
-      await doc.ref.set({"sanitised": localSanitisedActivity, "raw": activity, "status": "send"});
-    } else {
-      console.log("duplicate activity - not written or sent");
+    localSanitisedActivity["messageType"] = messageType;
+    if (messageType == "activities" || messageType == "dailySummaries") {
+      if (!doc.exists || resendFlag) {
+        await doc.ref.set({
+          "sanitised": localSanitisedActivity,
+          "raw": activity, "status": "send",
+        });
+      } else {
+        console.log("duplicate activity - not written or sent");
+      }
+    } else if (messageType == "sleeps") {
+      await doc.ref.set({
+        "sanitised": localSanitisedActivity,
+        "raw": activity, "status": "send",
+      });
     }
   }
   return;
@@ -2143,11 +2153,12 @@ async function getDoc(userDoc, messageType, message) {
 exports.sendToDeveloper = functions
     .runWith({failurePolicy: false})
     .firestore
-    .document("users/{userDocId}/activities/{activityId}")
+    .document("users/{userDocId}/{messageType}/{activityId}")
     .onWrite(async (changeSnap, context) => {
       const beforeData = changeSnap.before.data();
       const afterData = changeSnap.after.data();
       const userDocId = context.params.userDocId;
+      const messageType = context.params.messageType;
       const activityDocId = context.params.activityId;
       const retryStatuses = ["retry", "resend", "send"];
       try {
@@ -2172,7 +2183,7 @@ exports.sendToDeveloper = functions
               activityDocId);
           await db.collection("users")
               .doc(userDocId)
-              .collection("activities")
+              .collection(messageType)
               .doc(activityDocId)
               .set(update, {merge: true});
         } else {
@@ -2185,7 +2196,7 @@ exports.sendToDeveloper = functions
         // record the error for analysis
         await db.collection("users")
             .doc(userDocId)
-            .collection("activities")
+            .collection(messageType)
             .doc(activityDocId)
             .set({"status": "error",
               "errorMessage": err.message,
@@ -2234,7 +2245,30 @@ async function sendToDeveloperEndPoint(beforeData,
       await filters
           .uncompressSanitisedActivity(afterData["sanitised"]);
   const datastring = {"sanitised": uncompressSanitisedActivity, "raw": afterData["raw"]};
-  const endpoint = developerDoc.data()["endpoint"];
+  // set up the right endpoint depending on messageType
+  // and default to the general endpoint if a more
+  // specific one is not set.
+  let endpoint;
+  switch (afterData.sanitised.messageType) {
+    case "activities":
+      endpoint = developerDoc.data()["activity_endpoint"];
+      break;
+    case "sleeps":
+      endpoint = developerDoc.data()["sleep_endpoint"];
+      break;
+    case "dailySummaries":
+      endpoint = developerDoc.data()["dailySummary_endpoint"];
+      break;
+    default:
+      endpoint = developerDoc.data()["endpoint"];
+      break;
+  }
+  // if the more specific endpoint was not present default to
+  // the general endpoint.
+  if (!endpoint) {
+    endpoint = developerDoc.data()["endpoint"];
+  }
+
   const userData = userDoc.data();
   // check if the user is from notion.
   if (userData["userId"] == "notion") {

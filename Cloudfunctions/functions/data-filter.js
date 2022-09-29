@@ -520,6 +520,7 @@ exports.garminDailiesSanitise = function(garminDailies) {
   sanitisedDailies = []
   garminDailies.forEach((garminDaily) => {
     sanitisedDaily = {
+      "id": garminDaily.summaryId,
       "date": garminDaily.calendarDate,// string "yyyy-mm-dd"
       "startTimeInSeconds": garminDaily.startTimeInSeconds,// integer
       "steps": garminDaily.steps,// integer
