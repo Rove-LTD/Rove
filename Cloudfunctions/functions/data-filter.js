@@ -52,7 +52,7 @@ exports.corosSanatise = function (a) {
       "activity_name": "Coros " + corosSportLookup[a.mode][0],
       "activity_type": corosSportLookup[a.mode][1],
       "distance_in_meters": a["distance"],
-      "active_calories": a["calorie"],
+      "active_calories": a["calorie"]/1000,
       "start_time": new Date(a["startTime"]*1000).toISOString(),
       "provider": "coros",
       "average_pace_in_meters_per_second": (a["avgSpeed"]>0 ? 
