@@ -92,6 +92,7 @@ const webhookInBox = require('../../webhookInBox');
 
    const sanatisedActivity = testUserDocs.docs[0].data();
    const expectedResults = { // TODO:
+        messageType: "activities",
         userId: "notion",
         activity_id: 12345678987654321,
         activity_name: "Happy Friday",

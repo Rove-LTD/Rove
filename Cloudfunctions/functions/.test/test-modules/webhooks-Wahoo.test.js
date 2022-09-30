@@ -149,6 +149,7 @@ describe("Testing that the Wahoo Webhooks work: ", () => {
        const sanatisedActivity = testUserDocs.docs[0].data();
        const expectedResults = {
             sanitised: {
+                messageType: "activities",
                 userId: testUser,
                 activity_id: 140473420,
                 activity_name: "Cycling",

@@ -195,6 +195,7 @@ describe("Testing that the get History inBox processing works for wahoo: ", () =
         "workout_type_id": 61,
       },
       "sanitised": {
+        "messageType": "activities",
         "active_calories": "700.28",
         "activity_duration": "3657.0",
         "activity_id": 100118152,

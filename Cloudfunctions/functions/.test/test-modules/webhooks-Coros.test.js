@@ -142,6 +142,7 @@ describe("Testing that the Coros Webhooks work: ", () => {
        const sanatisedActivity = sampleActivityDoc.data();
        const expectedResults = {
         sanitised: {
+          messageType: "activities",
           activity_duration_in_seconds: 10,
           distance_in_meters: 0,
           activity_name: "Coros Run",
@@ -153,7 +154,7 @@ describe("Testing that the Coros Webhooks work: ", () => {
           },
           average_pace_in_meters_per_second: 0,
           start_time: "2022-09-28T16:43:00.000Z",
-          userId: "paulsTestUser",
+          userId: testParameters.testUser,
           activity_id: "418173292602490880",
         },
         status: "send",
@@ -243,7 +244,7 @@ describe("Testing that the Coros Webhooks work: ", () => {
         args = stubbedWebhookInBox.getCall(0).args; //this first call
         // check webhookInBox called with the correct parameters
         assert(stubbedWebhookInBox.calledOnce, "webhookInBox called too many times");
-        assert.equal(args[1].message, "Cant sanitise message: Cannot read properties of undefined (reading '0')");
+        assert.equal(args[1].message, "Cant sanitise message: Cannot read property '0' of undefined");
         assert.equal(args[0], snapshot);
         sinon.restore();
     });
