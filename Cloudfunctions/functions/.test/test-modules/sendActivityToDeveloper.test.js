@@ -70,6 +70,7 @@ describe("Testing that sending webhook messages to developers work: ", () => {
       activityDoc1 = {
         sanitised: {
             userId: testUser,
+            messageType: "activities",
             activity_id: 140473422,
             activity_name: "Cycling",
             activity_type: "BIKING",
@@ -97,9 +98,59 @@ describe("Testing that sending webhook messages to developers work: ", () => {
         raw: JSON.parse(successfulWebhookMessage1.body),
         status: "resend"
       }
+      const successfulSleepMessage1 = {
+        provider: "garmin",
+        body: '{"summaryId": "EXAMPLE_567890", "calendarDate": "2016-01-10", "durationInSeconds": 15264, "startTimeInSeconds": 1452419581, "startTimeOffsetInSeconds": 7200, "unmeasurableSleepDurationInSeconds": 0, "deepSleepDurationInSeconds": 11231, "lightSleepDurationInSeconds": 3541, "remSleepInSeconds": 0, "awakeDurationInSeconds": 492, "sleepLevelsMap": {"deep": [ {"startTimeInSeconds": 1452419581,"endTimeInSeconds": 1452478724}], "light": [{"startTimeInSeconds": 1452478725,"endTimeInSeconds": 1452479725}, {"startTimeInSeconds": 1452481725,"endTimeInSeconds": 1452484266} ]},"validation": "DEVICE"}',
+        method: "POST",
+        secret_lookups: "test-garmin-lookup",
+        status: "added before the tests to be successful",
+      }
+      sleepDoc1 = {
+        sanitised: {
+            "messageType": "sleeps",
+            "date": "2016-01-10",
+            "deep": 11231,
+            "duration": 15264,
+            "id": "EXAMPLE_567890",
+            "light": 3541,
+            "rem": 0,
+            "startTime": 1452419581,
+            "unmeasurable": 0,
+        },
+        raw: JSON.parse(successfulSleepMessage1.body),
+        status: "resend"
+      }
+      const successfulDailyMessage1 = {
+        provider: "garmin",
+        body: '{"summaryId": " EXAMPLE_67891", "calendarDate": "2016-01-11", "activityType": "WALKING", "activeKilocalories": 321, "bmrKilocalories": 1731, "steps": 4210, "distanceInMeters": 3146.5, "durationInSeconds": 86400, "activeTimeInSeconds": 12240, "startTimeInSeconds": 1452470400, "startTimeOffsetInSeconds": 3600, "moderateIntensityDurationInSeconds": 81870, "vigorousIntensityDurationInSeconds": 4530, "floorsClimbed": 8, "minHeartRateInBeatsPerMinute": 59, "averageHeartRateInBeatsPerMinute": 64, "maxHeartRateInBeatsPerMinute": 112, "timeOffsetHeartRateSamples": {"15": 75, "30": 75, "3180": 76, "3195": 65, "3210": 65, "3225": 73, "3240": 74, "3255": 74},"averageStressLevel": 43, "maxStressLevel": 87, "stressDurationInSeconds": 13620, "restStressDurationInSeconds": 7600, "activityStressDurationInSeconds": 3450, "lowStressDurationInSeconds": 6700, "mediumStressDurationInSeconds": 4350, "highStressDurationInSeconds": 108000, "stressQualifier": "stressful_awake", "stepsGoal": 4500, "intensityDurationGoalInSeconds": 1500, "floorsClimbedGoal": 18}',
+        method: "POST",
+        secret_lookups: "test-garmin-lookup",
+        status: "added before the tests to be successful",
+      }
+      dailyDoc1 = {
+        sanitised: {
+            "id": "EXAMPLE_67891",
+            "messageType": "dailySummaries",
+            "activeCalories": 321,
+            "activeTimeSeconds": 12240,
+            "aveHeartRate": 64,
+            "bmrCalories": 1731,
+            "date": "2016-01-11",
+            "distanceInMeters": 3146.5,
+            "floorsClimbed": 8,
+            "maxHeartRate": 112,
+            "minHeartRate": 59,
+            "restingHeartRate": null,
+            "startTimeInSeconds": 1452470400,
+            "steps": 4210,
+        },
+        raw: JSON.parse(successfulDailyMessage1.body),
+        status: "resend"
+      }
       activityDoc2 = {
         sanitised: {
             userId: testUser,
+            messageType: "activities",
             activity_id: 140473426,
             activity_name: "Cycling",
             activity_type: "BIKING",
@@ -130,6 +181,7 @@ describe("Testing that sending webhook messages to developers work: ", () => {
       activityDoc3 = {
         sanitised: {
             userId: testNotionUser,
+            messageType: "activities",
             activity_id: 140473430,
             activity_name: "Cycling",
             activity_type: "BIKING",
@@ -167,7 +219,7 @@ describe("Testing that sending webhook messages to developers work: ", () => {
             "suppress_webhook": false
         }, {merge: true});
     })
-    it('Check sending webhook message to developers works...', async ()=>{
+    it('Check sending activity webhook message to developers works...', async ()=>{
       // set up the activities in the database
       await admin.firestore()
           .collection("users")
@@ -182,13 +234,15 @@ describe("Testing that sending webhook messages to developers work: ", () => {
 
         gotPostSpy = sinon.spy(got, "post");
         wrapped = test.wrap(myFunctions.sendToDeveloper);
-        await wrapped(snapshot, {params: {userDocId: testDev+testUser, activityId: activityDoc1.sanitised.activity_id+"wahoo"}});
+        await wrapped(snapshot, {params: {userDocId: testDev+testUser,
+          messageType: "activities",
+          activityId: activityDoc1.sanitised.activity_id+"wahoo"}});
         // now check the got call was correct information
         let args = gotPostSpy.getCall(0).args[0]
         args.body = JSON.parse(args.body);
         expectedOptions = {
             method: "POST",
-            url: devTestData.endpoint,
+            url: devTestData.activity_endpoint,
             headers: {
             "Accept": "application/json",
             "Content-type": "application/json",
@@ -215,6 +269,106 @@ describe("Testing that sending webhook messages to developers work: ", () => {
       assert.deepEqual(sanatisedActivity, activityDoc1);
       sinon.restore();
     })
+    it('Check sending sleep webhook message to developers works...', async ()=>{
+      // set up the activities in the database
+      await admin.firestore()
+          .collection("users")
+          .doc(testDev+testUser)
+          .collection("sleeps")
+          .doc(sleepDoc1.sanitised.id+"garmin")
+          .set(sleepDoc1);
+
+        const snapshotBefore = test.firestore.makeDocumentSnapshot(sleepDoc1, "users/"+testDev+testUser+"/sleeps/"+sleepDoc1.sanitised.id+"garmin");
+        const snapshotAfter = test.firestore.makeDocumentSnapshot(sleepDoc1, "users/"+testDev+testUser+"/sleeps/"+sleepDoc1.sanitised.id+"garmin");
+        const snapshot = test.makeChange(snapshotBefore, snapshotAfter);
+
+        gotPostSpy = sinon.spy(got, "post");
+        wrapped = test.wrap(myFunctions.sendToDeveloper);
+        await wrapped(snapshot, {params: {userDocId: testDev+testUser,
+          messageType: "sleeps",
+          activityId: sleepDoc1.sanitised.id+"garmin"}});
+        // now check the got call was correct information
+        let args = gotPostSpy.getCall(0).args[0]
+        args.body = JSON.parse(args.body);
+        expectedOptions = {
+            method: "POST",
+            url: devTestData.sleep_endpoint,
+            headers: {
+            "Accept": "application/json",
+            "Content-type": "application/json",
+            },
+            body: {sanitised: sleepDoc1.sanitised,
+              raw: sleepDoc1.raw,},
+        };
+        assert.deepEqual(args, expectedOptions, "the wrong info was sent to the developer endpoint");
+        //now check the database was updated correctly
+       const testUserDoc = await admin.firestore()
+          .collection("users")
+          .doc(testDev+testUser)
+          .collection("sleeps")
+          .doc(sleepDoc1.sanitised.id+"garmin")
+          .get();
+  
+       // actual results
+       const sanatisedActivity = testUserDoc.data();
+       sanatisedActivity.timestamp = "not tested";
+       // expected results
+       sleepDoc1.status = "sent";
+       sleepDoc1.timestamp = "not tested";
+
+      assert.deepEqual(sanatisedActivity, sleepDoc1);
+      sinon.restore();
+    })
+    it('Check sending dayly webhook message to developers works...', async ()=>{
+      // set up the activities in the database
+      await admin.firestore()
+          .collection("users")
+          .doc(testDev+testUser)
+          .collection("dailySummaries")
+          .doc(dailyDoc1.sanitised.id+"garmin")
+          .set(dailyDoc1);
+
+        const snapshotBefore = test.firestore.makeDocumentSnapshot(dailyDoc1, "users/"+testDev+testUser+"/dailySummaries/"+dailyDoc1.sanitised.id+"garmin");
+        const snapshotAfter = test.firestore.makeDocumentSnapshot(dailyDoc1, "users/"+testDev+testUser+"/dailySummaries/"+dailyDoc1.sanitised.id+"garmin");
+        const snapshot = test.makeChange(snapshotBefore, snapshotAfter);
+
+        gotPostSpy = sinon.spy(got, "post");
+        wrapped = test.wrap(myFunctions.sendToDeveloper);
+        await wrapped(snapshot, {params: {userDocId: testDev+testUser,
+          messageType: "dailySummaries",
+          activityId: dailyDoc1.sanitised.id+"garmin"}});
+        // now check the got call was correct information
+        let args = gotPostSpy.getCall(0).args[0]
+        args.body = JSON.parse(args.body);
+        expectedOptions = {
+            method: "POST",
+            url: devTestData.dailySummary_endpoint,
+            headers: {
+            "Accept": "application/json",
+            "Content-type": "application/json",
+            },
+            body: {sanitised: dailyDoc1.sanitised,
+              raw: dailyDoc1.raw,},
+        };
+        assert.deepEqual(args, expectedOptions, "the wrong info was sent to the developer endpoint");
+        //now check the database was updated correctly
+       const testUserDoc = await admin.firestore()
+          .collection("users")
+          .doc(testDev+testUser)
+          .collection("dailySummaries")
+          .doc(dailyDoc1.sanitised.id+"garmin")
+          .get();
+  
+       // actual results
+       const sanatisedActivity = testUserDoc.data();
+       sanatisedActivity.timestamp = "not tested";
+       // expected results
+       dailyDoc1.status = "sent";
+       dailyDoc1.timestamp = "not tested";
+
+      assert.deepEqual(sanatisedActivity, dailyDoc1);
+      sinon.restore();
+    })
     it('Check that webhook messages are suppressed ...', async () => {
 
         await admin.firestore()
@@ -237,7 +391,9 @@ describe("Testing that sending webhook messages to developers work: ", () => {
         const snapshot = test.makeChange(snapshotBefore, snapshotAfter);
 
         wrapped = test.wrap(myFunctions.sendToDeveloper);
-        await wrapped(snapshot, {params: {userDocId: testDev+testUser, activityId: activityDoc2.sanitised.activity_id+"wahoo"}});
+        await wrapped(snapshot, {params: {userDocId: testDev+testUser,
+          messageType: "activities",
+          activityId: activityDoc2.sanitised.activity_id+"wahoo"}});
 
         //now check the database was updated correctly
         const testUserDoc = await admin.firestore()
@@ -285,14 +441,16 @@ describe("Testing that sending webhook messages to developers work: ", () => {
 
       // call sendToDeveloper function
       wrapped = test.wrap(myFunctions.sendToDeveloper);
-      await wrapped(snapshot, {params: {userDocId: testDev+testUser, activityId: activityDoc1.sanitised.activity_id+"wahoo"}});
+      await wrapped(snapshot, {params: {userDocId: testDev+testUser,
+        messageType: "activities",
+        activityId: activityDoc1.sanitised.activity_id+"wahoo"}});
 
       // now check the got call was correct information
       let args = gotPostSpy.getCall(0).args[0]
       args.body = JSON.parse(args.body);
       expectedOptions = {
           method: "POST",
-          url: devTestData.endpoint,
+          url: devTestData.activity_endpoint,
           headers: {
           "Accept": "application/json",
           "Content-type": "application/json",
@@ -340,7 +498,9 @@ describe("Testing that sending webhook messages to developers work: ", () => {
             stubbedNotion.onCall().returns("successful value");
             // call sendToDeveloper function
             wrapped = test.wrap(myFunctions.sendToDeveloper);
-            await wrapped(snapshot, {params: {userDocId: testNotionDev+testNotionUser, activityId: activityDoc3.sanitised.activity_id+"wahoo"}});
+            await wrapped(snapshot, {params: {userDocId: testNotionDev+testNotionUser,
+              messageType: "activities",
+              activityId: activityDoc3.sanitised.activity_id+"wahoo"}});
       
             // now check the got call was correct information
             let args = stubbedNotion.getCall(0).args;

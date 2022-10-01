@@ -239,7 +239,8 @@ exports.getActivityList = functions.https.onRequest(async (req, res) => {
       await saveAndSendActivity([userDoc],
           payload[i].sanitised,
           payload[i].raw,
-          resendFlag);
+          resendFlag,
+          "activities");
     }
     res.send("OK");
   } catch (error) {
@@ -1152,6 +1153,69 @@ exports.garminDeregistrations = functions.https.onRequest(async (req, res) => {
   }
 });
 
+exports.garminDailies = functions.https.onRequest(async (request, response) => {
+  if (!request.debug) {
+    functions.logger.info("----> garmin "+request.method+" Dailies event received!", {
+      body: request.body,
+    });
+  }
+  if (request.method === "POST") {
+    // check the webhook token is correct
+    const secrets = configurations.providerConfigs.garmin[0];
+    if (secrets == undefined) { // TODO put in validation function
+      console.log("Garmin Webhook event recieved that did not have the correct validation");
+      response.status(401);
+      response.send("NOT AUTHORISED");
+      return;
+    }
+    // save the webhook message and asynchronously process
+    try {
+      const webhookDoc = await webhookInBox.push(request, "garminDailies", secrets.clientId);
+      response.sendStatus(200);
+      // now we have saved the request and returned ok to the provider
+      // the message will trigger an asynchronous process
+    } catch (err) {
+      response.sendStatus(400);
+      console.log("Error saving garmin Dailies webhook message - "+err.message);
+    }
+  } else {
+    response.sendStatus(401);
+    console.log("unknown method from Garmin Dailies Webhook");
+  }
+});
+
+exports.garminSleeps = functions.https.onRequest(async (request, response) => {
+  if (!request.debug) {
+    functions.logger.info("----> garmin "+request.method+" Sleeps event received!", {
+      body: request.body,
+    });
+  }
+  if (request.method === "POST") {
+    // check the webhook token is correct
+    const secrets = configurations.providerConfigs.garmin[0];
+    if (secrets == undefined) { // TODO put in validation function
+      console.log("Garmin Webhook event recieved that did not have the correct validation");
+      response.status(401);
+      response.send("NOT AUTHORISED");
+      return;
+    }
+    // save the webhook message and asynchronously process
+    try {
+      const webhookDoc = await webhookInBox.push(request, "garminSleeps", secrets.clientId);
+      response.sendStatus(200);
+      // now we have saved the request and returned ok to the provider
+      // the message will trigger an asynchronous process
+    } catch (err) {
+      response.sendStatus(400);
+      console.log("Error saving garmin Sleeps webhook message - "+err.message);
+    }
+  } else {
+    response.sendStatus(401);
+    console.log("unknown method from Garmin Sleeps Webhook");
+  }
+});
+
+
 exports.garminWebhook = functions.https.onRequest(async (request, response) => {
   if (!request.debug) {
     functions.logger.info("----> garmin "+request.method+" webhook event received!", {
@@ -1184,10 +1248,28 @@ exports.garminWebhook = functions.https.onRequest(async (request, response) => {
 });
 
 async function processGarminWebhook(webhookDoc) {
+  const source = webhookDoc.data()["provider"];
+  let messageType;
   const webhookBody = JSON.parse(await webhookInBox.getBody(webhookDoc));
   // 1) sanatise
   let sanitisedActivities = [{}];
-  sanitisedActivities = filters.garminSanitise(webhookBody.activityDetails);
+  switch (source) {
+    case "garmin":
+      sanitisedActivities = filters.garminSanitise(webhookBody.activityDetails);
+      messageType = "activities";
+      break;
+    case "garminDailies":
+      sanitisedActivities = filters.garminDailiesSanitise(webhookBody.dailies);
+      messageType = "dailySummaries";
+      break;
+    case "garminSleeps":
+      sanitisedActivities = filters.garminSleepSanitise(webhookBody.sleeps);
+      messageType = "sleeps";
+      break;
+    default:
+      // there is an issue if the source not set correctly.
+      throw Error("Garmin source of: "+source+" not correct must be one of 'garmin', 'garminDailies', or 'garminSleeps'.");
+  }
 
   // now for each sanitised activity send to relevent developer
   // users
@@ -1208,10 +1290,13 @@ async function processGarminWebhook(webhookDoc) {
     userQuery.docs.forEach((doc)=> {
       userDocsList.push(doc);
     });
-    // save raw and sanitised activites as a backup for each user
+    // save raw and sanitised activites as a backup for each user and send to
+    // developers webhook
     await saveAndSendActivity(userDocsList,
         sanitisedActivity,
-        webhookBody.activityDetails[index]);
+        webhookBody.activityDetails[index],
+        false,
+        messageType);
     index=index+1;
   }
   return;
@@ -1622,7 +1707,7 @@ exports.stravaWebhook = functions.https.onRequest(async (request, response) => {
 });
 
 async function processStravaWebhook(webhookDoc) {
-  const webhookBody = JSON.parse(webhookDoc.data()["body"]);
+  const webhookBody = JSON.parse(await webhookInBox.getBody(webhookDoc));
   const clientId = webhookDoc.data()["secret_lookups"];
   const secrets = getSecrets.fromClientId("strava", clientId);
   const userDocsList = [];
@@ -1695,7 +1780,8 @@ async function processStravaWebhook(webhookDoc) {
   }
   await saveAndSendActivity(userDocsList,
       sanitisedActivity[0],
-      activity);
+      activity, false,
+      "activities");
 }
 
 exports.wahooWebhook = functions.https.onRequest(async (request, response) => {
@@ -1768,6 +1854,8 @@ exports.processWebhookInBox = functions.firestore
             await processPolarWebhook(snap);
             break;
           case "garmin":
+          case "garminDailies":
+          case "garminSleeps":
             await processGarminWebhook(snap);
             break;
           case "coros":
@@ -1781,7 +1869,7 @@ exports.processWebhookInBox = functions.firestore
     });
 async function processWahooWebhook(webhookDoc) {
   const provider = "wahoo";
-  const webhookBody = JSON.parse(webhookDoc.data()["body"]);
+  const webhookBody = JSON.parse(await webhookInBox.getBody(webhookDoc));
   const secrets = getSecrets.fromClientId(provider, webhookDoc.data()["secret_lookups"]);
   const userDocsList = [];
   const devDocsList = [];
@@ -1812,12 +1900,13 @@ async function processWahooWebhook(webhookDoc) {
   // save raw and sanitised activites as a backup for each user
   await saveAndSendActivity(userDocsList,
       sanitisedActivity,
-      webhookBody);
+      webhookBody, false,
+      "activities");
   return;
 }
 
 async function processCorosWebhook(webhookDoc) {
-  const webhookBody = JSON.parse(webhookDoc.data()["body"]);
+  const webhookBody = JSON.parse(await webhookInBox.getBody(webhookDoc));
   const clientId = webhookDoc.data()["secret_lookups"];
   const userDocsList = [];
 
@@ -1850,7 +1939,8 @@ async function processCorosWebhook(webhookDoc) {
   for (let i = 0; i<sanitisedActivities.length; i++) {
     await saveAndSendActivity(userDocsList,
         sanitisedActivities[i],
-        webhookBody);
+        webhookBody, false,
+        "activities");
   }
   return;
 }
@@ -1897,7 +1987,7 @@ exports.polarWebhook = functions.https.onRequest(async (request, response) => {
 });
 
 async function processPolarWebhook(webhookDoc) {
-  const webhookBody = JSON.parse(webhookDoc.data()["body"]);
+  const webhookBody = JSON.parse(await webhookInBox.getBody(webhookDoc));
   const clientId = webhookDoc.data()["secret_lookups"];
   if (webhookBody.event === "PING") {
     console.log("polar webhook message event = PING, do nothing");
@@ -1967,7 +2057,7 @@ async function processPolarWebhook(webhookDoc) {
     });
     // write sanitised information and raw information to each user and then
     // send to developer
-    await saveAndSendActivity(userDocsList, sanitisedActivity, activity);
+    await saveAndSendActivity(userDocsList, sanitisedActivity, activity, false, "activities");
   } else {
     throw Error("Polar activity type "+webhookBody.event+" not supported");
   }
@@ -1979,16 +2069,19 @@ async function processPolarWebhook(webhookDoc) {
  * - when saving to the Activity Record the "session" array
  * is saved in storage and replaced with the storage id
  * @param {Array<FirebaseFirestore>} userDocList
- * @param {Map} sanitisedActivity
- * @param {Map} activity
+ * @param {Map} sanitisedActivity the sanitised activity message
+ * @param {Map} activity the raw activity message
  * @param {Boolean} resendFlag set to true if activity should be resent
+ * @param {String} messageType set to "activities", "dailySummaries" or "sleeps"
  */
 async function saveAndSendActivity(userDocList,
     sanitisedActivity,
     activity,
-    resendFlag) {
+    resendFlag,
+    messageType) {
   // create a version of the sanitised activity that compresses
-  // the "samples" array by replacing it with a reference to a file
+  // the "samples" array if it is there
+  // by replacing it with a reference to a file
   // in storage.
   const compressedSanitisedActivity = await filters.compressSanitisedActivity(sanitisedActivity);
   if (activity.samples) {
@@ -2003,36 +2096,69 @@ async function saveAndSendActivity(userDocList,
     const localSanitisedActivity =
         JSON.parse(JSON.stringify(compressedSanitisedActivity));
 
-    if (compressedSanitisedActivity.activity_id) {
-      const activityDoc = userDoc.ref
-          .collection("activities")
-          .doc(compressedSanitisedActivity.activity_id+
-              compressedSanitisedActivity.provider);
+    const doc = await getDoc(userDoc, messageType, compressedSanitisedActivity);
 
-      const doc = await activityDoc.get();
-
+    if (doc.invalid) {
+      // document not valid return without
+      // action as this can sometimes happen
+      // when the activity_id is not there
+      return;
+    }
+    localSanitisedActivity["messageType"] = messageType;
+    if (messageType == "activities" || messageType == "dailySummaries") {
       if (!doc.exists || resendFlag) {
-        await activityDoc.set({"sanitised": localSanitisedActivity, "raw": activity, "status": "send"});
+        await doc.ref.set({
+          "sanitised": localSanitisedActivity,
+          "raw": activity, "status": "send",
+        });
       } else {
         console.log("duplicate activity - not written or sent");
       }
-    } else {
-      // activity Id missing
-      console.log("activity_id missing one activity record not written for: "+
-          compressedSanitisedActivity.provider);
+    } else if (messageType == "sleeps") {
+      await doc.ref.set({
+        "sanitised": localSanitisedActivity,
+        "raw": activity, "status": "send",
+      });
     }
   }
   return;
 }
 
+async function getDoc(userDoc, messageType, message) {
+  let id;
+  switch (messageType) {
+    case "sleeps":
+    case "dailySummaries":
+      id = "summaryId";
+      break;
+    case "activities":
+      id = "activity_id";
+      break;
+    default:
+      throw Error("invalid messageType!! must be sleeps, dailySummaries, activities");
+  }
+  if (message[id]) {
+    const activityDoc = userDoc.ref
+        .collection(messageType)
+        .doc(message[id]+
+          message.provider);
+
+    return await activityDoc.get();
+  } else {
+    console.log("activity_id missing one activity record not written for: "+
+    message.provider);
+    return {invalid: true};
+  }
+}
 exports.sendToDeveloper = functions
     .runWith({failurePolicy: false})
     .firestore
-    .document("users/{userDocId}/activities/{activityId}")
+    .document("users/{userDocId}/{messageType}/{activityId}")
     .onWrite(async (changeSnap, context) => {
       const beforeData = changeSnap.before.data();
       const afterData = changeSnap.after.data();
       const userDocId = context.params.userDocId;
+      const messageType = context.params.messageType;
       const activityDocId = context.params.activityId;
       const retryStatuses = ["retry", "resend", "send"];
       try {
@@ -2057,7 +2183,7 @@ exports.sendToDeveloper = functions
               activityDocId);
           await db.collection("users")
               .doc(userDocId)
-              .collection("activities")
+              .collection(messageType)
               .doc(activityDocId)
               .set(update, {merge: true});
         } else {
@@ -2070,7 +2196,7 @@ exports.sendToDeveloper = functions
         // record the error for analysis
         await db.collection("users")
             .doc(userDocId)
-            .collection("activities")
+            .collection(messageType)
             .doc(activityDocId)
             .set({"status": "error",
               "errorMessage": err.message,
@@ -2119,7 +2245,30 @@ async function sendToDeveloperEndPoint(beforeData,
       await filters
           .uncompressSanitisedActivity(afterData["sanitised"]);
   const datastring = {"sanitised": uncompressSanitisedActivity, "raw": afterData["raw"]};
-  const endpoint = developerDoc.data()["endpoint"];
+  // set up the right endpoint depending on messageType
+  // and default to the general endpoint if a more
+  // specific one is not set.
+  let endpoint;
+  switch (afterData.sanitised.messageType) {
+    case "activities":
+      endpoint = developerDoc.data()["activity_endpoint"];
+      break;
+    case "sleeps":
+      endpoint = developerDoc.data()["sleep_endpoint"];
+      break;
+    case "dailySummaries":
+      endpoint = developerDoc.data()["dailySummary_endpoint"];
+      break;
+    default:
+      endpoint = developerDoc.data()["endpoint"];
+      break;
+  }
+  // if the more specific endpoint was not present default to
+  // the general endpoint.
+  if (!endpoint) {
+    endpoint = developerDoc.data()["endpoint"];
+  }
+
   const userData = userDoc.data();
   // check if the user is from notion.
   if (userData["userId"] == "notion") {
@@ -2433,7 +2582,7 @@ exports.processGetHistoryInBox = functions.firestore
           for (const activity of payload) {
             await saveAndSendActivity([userDoc],
                 activity.sanitised,
-                activity.raw);
+                activity.raw, false, "activities");
           }
         }
         getHistoryInBox.delete(snap.ref);
