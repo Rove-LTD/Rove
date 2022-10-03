@@ -19,7 +19,9 @@ const testDev = testParameters.testDev
 const unsuccessfulWebhookMessageDoc = "unsuccessfulTestWebhookMessageDoc";
 const successfulWebhookMessageDoc = "successfulTestWebhookMessageDoc";
 const successfulDailyWebhookMessageDoc = "successfulTestWebhookDailyMessageDoc";
+const successfulSleepWebhookMessageDoc = "successfulTestWebhookSleepMessageDoc";
 let successfulDailyWebhookMessage;
+let successfulSleepWebhookMessage;
 let successfulWebhookMessage;
 let unsuccessfulWebhookMessage;
 const devTestData = testParameters.devTestData
@@ -29,6 +31,7 @@ const admin = require("firebase-admin");
 myFunctions = require('../../index.js');
 const garminRawJson = require("./garminRawWebhook.json");
 const garminRawDailyJson = require("./garminRawDailyWebhook.json"); //TODO: create file with the webhook body in it
+const garminRawSleepJson = require("./garminRawSleepsWebhook.json"); //TODO: create file with the webhook body in it
 const garminRawJson3 = require("./garminRawWebhook3.json");
 
 // -----------END INITIALISE ROVE TEST PARAMETERS----------------------------//
@@ -72,6 +75,16 @@ describe("Testing that the garmin Webhooks work: ", () => {
             await doc.ref.delete();
         };
 
+        activitySleepDocs = await admin.firestore()
+        .collection("users")
+        .doc(testDev+testUser)
+        .collection("sleeps")
+        .get();
+    
+        for (const doc of activitySleepDocs.docs) {
+            await doc.ref.delete();
+        };
+
         const successfulDetail = JSON.stringify(garminRawJson)
         successfulWebhookMessage = {
             provider: "garmin",
@@ -85,6 +98,14 @@ describe("Testing that the garmin Webhooks work: ", () => {
             provider: "garminDailies",
             method: "POST",
             body: successfulDailyDetail,
+            status: "added before the tests to be successful",
+        }
+
+        const successfulSleepDetail = JSON.stringify(garminRawSleepJson)
+        successfulSleepWebhookMessage = {
+            provider: "garminSleeps",
+            method: "POST",
+            body: successfulSleepDetail,
             status: "added before the tests to be successful",
         }
 
@@ -251,7 +272,7 @@ describe("Testing that the garmin Webhooks work: ", () => {
         assert.deepEqual(sanatisedActivity, expectedResults);
         sinon.restore();
       });
-    it.only('read webhookInBox daily event and process it successfully...', async () => {
+    it('read webhookInBox daily event and process it successfully...', async () => {
 
     //set up the stubbed response to mimic garmin's response when called with the
     const stubbedWebhookInBox = sinon.stub(webhookInBox, "delete");
@@ -307,6 +328,56 @@ describe("Testing that the garmin Webhooks work: ", () => {
     assert.deepEqual(sanatisedActivity.sanitised, expectedResults.sanitised);
     sinon.restore();
     });
+    it('read webhookInBox sleep event and process it successfully...', async () => {
+
+        //set up the stubbed response to mimic garmin's response when called with the
+        const stubbedWebhookInBox = sinon.stub(webhookInBox, "delete");
+        const snapshot = test.firestore.makeDocumentSnapshot(successfulSleepWebhookMessage, "webhookInBox/"+successfulSleepWebhookMessageDoc);
+    
+        wrapped = test.wrap(myFunctions.processWebhookInBox);
+        await wrapped(snapshot);
+        // check the webhookInBox function was called with the correct args
+        assert(stubbedWebhookInBox.calledOnceWith(snapshot), "webhookInBox called incorrectly");
+        // give the sendToDeveloper function a chance to run
+        const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+        await wait(1000);
+            //now check the database was updated correctly
+        const testUserDocs = await admin.firestore()
+            .collection("users")
+            .doc(testDev+testUser)
+            .collection("sleeps")
+            .where("raw.summaryId", "==", "x35e229f-6338d570-5dc0") //TODO: put in the summary id of the test case
+            .get();
+        
+        // check sanitised data is correct: TODO: extend to raw data
+        
+        const sanatisedActivity = testUserDocs.docs[0].data();
+        const expectedResults = {
+            sanitised: {
+                "messageType": "sleeps",
+                "date": "2022-10-02",
+                "deep": 1980,
+                "duration": 24000,
+                "id": "x35e229f-6338d570-5dc0",
+                "light": 21600,
+                "rem": 420,
+                "startTime": 1664669040,
+                "unmeasurable": null,
+                "userId": "paulsTestUser",
+                provider: "garmin",
+                version: "1.0",
+            },
+            raw: garminRawDailyJson.dailies[0],
+            "status": "not tested",
+            "timestamp": "not tested",
+            "triesSoFar": "not tested",
+        }
+        sanatisedActivity.status = "not tested";
+        sanatisedActivity.timestamp = "not tested";
+        sanatisedActivity.triesSoFar = "not tested";
+        assert.deepEqual(sanatisedActivity.sanitised, expectedResults.sanitised);
+        sinon.restore();
+        });
     it('Webhooks should repond with status 401 if method incorrect...', async () => {
         // set the request object with the correct provider, developerId and userId
         const req = {
