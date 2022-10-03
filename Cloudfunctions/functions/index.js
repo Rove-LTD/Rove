@@ -1250,6 +1250,7 @@ exports.garminWebhook = functions.https.onRequest(async (request, response) => {
 async function processGarminWebhook(webhookDoc) {
   const source = webhookDoc.data()["provider"];
   let messageType;
+  let subProperty;
   const webhookBody = JSON.parse(await webhookInBox.getBody(webhookDoc));
   // 1) sanatise
   let sanitisedActivities = [{}];
@@ -1257,14 +1258,17 @@ async function processGarminWebhook(webhookDoc) {
     case "garmin":
       sanitisedActivities = filters.garminSanitise(webhookBody.activityDetails);
       messageType = "activities";
+      subProperty = "activityDetails";
       break;
     case "garminDailies":
       sanitisedActivities = filters.garminDailiesSanitise(webhookBody.dailies);
       messageType = "dailySummaries";
+      subProperty = "dailies";
       break;
     case "garminSleeps":
       sanitisedActivities = filters.garminSleepSanitise(webhookBody.sleeps);
       messageType = "sleeps";
+      subProperty = "sleeps";
       break;
     default:
       // there is an issue if the source not set correctly.
@@ -1276,16 +1280,16 @@ async function processGarminWebhook(webhookDoc) {
   let index = 0;
   for (const sanitisedActivity of sanitisedActivities) {
     const userDocsList = [];
+    const userId = webhookBody[subProperty][index].userId;
+    const userAccessToken = webhookBody[subProperty][index].userAccessToken;
     const userQuery = await db.collection("users")
-        .where("garmin_user_id", "==",
-            webhookBody.activityDetails[index].userId)
-        .where("garmin_access_token", "==",
-            webhookBody.activityDetails[index].userAccessToken)
+        .where("garmin_user_id", "==", userId)
+        .where("garmin_access_token", "==", userAccessToken)
         .get();
 
     if (userQuery.docs.length == 0) {
       // there is an issue if there are no users with a userId in the DB.
-      throw Error("zero users registered to garmin webhook userId "+webhookBody.activityDetails[index].userId);
+      throw Error("zero users registered to garmin webhook userId "+ userId);
     }
     userQuery.docs.forEach((doc)=> {
       userDocsList.push(doc);
@@ -1294,7 +1298,7 @@ async function processGarminWebhook(webhookDoc) {
     // developers webhook
     await saveAndSendActivity(userDocsList,
         sanitisedActivity,
-        webhookBody.activityDetails[index],
+        webhookBody[subProperty][index],
         false,
         messageType);
     index=index+1;
@@ -2129,7 +2133,7 @@ async function getDoc(userDoc, messageType, message) {
   switch (messageType) {
     case "sleeps":
     case "dailySummaries":
-      id = "summaryId";
+      id = "id";
       break;
     case "activities":
       id = "activity_id";

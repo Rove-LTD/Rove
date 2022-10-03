@@ -18,6 +18,8 @@ const testUser = testParameters.testUser
 const testDev = testParameters.testDev
 const unsuccessfulWebhookMessageDoc = "unsuccessfulTestWebhookMessageDoc";
 const successfulWebhookMessageDoc = "successfulTestWebhookMessageDoc";
+const successfulDailyWebhookMessageDoc = "successfulTestWebhookDailyMessageDoc";
+let successfulDailyWebhookMessage;
 let successfulWebhookMessage;
 let unsuccessfulWebhookMessage;
 const devTestData = testParameters.devTestData
@@ -26,6 +28,7 @@ const test = require('firebase-functions-test')(firebaseConfig, testParameters.t
 const admin = require("firebase-admin");
 myFunctions = require('../../index.js');
 const garminRawJson = require("./garminRawWebhook.json");
+const garminRawDailyJson = require("./garminRawDailyWebhook.json"); //TODO: create file with the webhook body in it
 const garminRawJson3 = require("./garminRawWebhook3.json");
 
 // -----------END INITIALISE ROVE TEST PARAMETERS----------------------------//
@@ -39,30 +42,49 @@ const webhookInBox = require('../../webhookInBox');
 //-------------TEST --- webhooks-------
 describe("Testing that the garmin Webhooks work: ", () => {
     before ('set up the userIds in the test User doc', async () => {
-      await admin.firestore()
-      .collection("users")
-      .doc(testDev+testUser)
-      .set({
-          "devId": testDev,
-          "userId": testUser,
-          "garmin_user_id" : "eb24e8e5-110d-4a87-b976-444f40ca27d4",
-          "garmin_access_token": "test_garmin_access_token",
-          "garmin_client_id": "eb0a9a22-db68-4188-a913-77ee997924a8",
-      });
-      activityDocs = await admin.firestore()
-          .collection("users")
-          .doc(testDev+testUser)
-          .collection("activities")
-          .get();
-      
-      activityDocs.forEach(async (doc)=>{
-          await doc.ref.delete();
-      });
-      const successfulDetail = JSON.stringify(garminRawJson)
-      successfulWebhookMessage = {
+        await admin.firestore()
+        .collection("users")
+        .doc(testDev+testUser)
+        .set({
+            "devId": testDev,
+            "userId": testUser,
+            "garmin_user_id" : "eb24e8e5-110d-4a87-b976-444f40ca27d4",
+            "garmin_access_token": "test_garmin_access_token",
+            "garmin_client_id": "eb0a9a22-db68-4188-a913-77ee997924a8",
+        });
+        activityDocs = await admin.firestore()
+            .collection("users")
+            .doc(testDev+testUser)
+            .collection("activities")
+            .get();
+        
+        activityDocs.forEach(async (doc)=>{
+            await doc.ref.delete();
+        });
+
+        activityDailyDocs = await admin.firestore()
+        .collection("users")
+        .doc(testDev+testUser)
+        .collection("dailySummaries")
+        .get();
+    
+        for (const doc of activityDailyDocs.docs) {
+            await doc.ref.delete();
+        };
+
+        const successfulDetail = JSON.stringify(garminRawJson)
+        successfulWebhookMessage = {
             provider: "garmin",
             method: "POST",
             body: successfulDetail,
+            status: "added before the tests to be successful",
+        }
+        
+        const successfulDailyDetail = JSON.stringify(garminRawDailyJson)
+        successfulDailyWebhookMessage = {
+            provider: "garminDailies",
+            method: "POST",
+            body: successfulDailyDetail,
             status: "added before the tests to be successful",
         }
 
@@ -229,6 +251,62 @@ describe("Testing that the garmin Webhooks work: ", () => {
         assert.deepEqual(sanatisedActivity, expectedResults);
         sinon.restore();
       });
+    it.only('read webhookInBox daily event and process it successfully...', async () => {
+
+    //set up the stubbed response to mimic garmin's response when called with the
+    const stubbedWebhookInBox = sinon.stub(webhookInBox, "delete");
+    const snapshot = test.firestore.makeDocumentSnapshot(successfulDailyWebhookMessage, "webhookInBox/"+successfulDailyWebhookMessageDoc);
+
+    wrapped = test.wrap(myFunctions.processWebhookInBox);
+    await wrapped(snapshot);
+    // check the webhookInBox function was called with the correct args
+    assert(stubbedWebhookInBox.calledOnceWith(snapshot), "webhookInBox called incorrectly");
+    // give the sendToDeveloper function a chance to run
+    const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+    await wait(1000);
+        //now check the database was updated correctly
+    const testUserDocs = await admin.firestore()
+        .collection("users")
+        .doc(testDev+testUser)
+        .collection("dailySummaries")
+        .where("raw.summaryId", "==", "x35e229f-63322ef0-8520-6") //TODO: put in the summary id of the test case
+        .get();
+    
+    // check sanitised data is correct: TODO: extend to raw data
+    
+    const sanatisedActivity = testUserDocs.docs[0].data();
+    const expectedResults = {
+        sanitised: {
+            "messageType": "dailySummaries",
+            "restingHeartRate": 53,
+            "startTimeInSeconds": 1664233200,
+            "steps": 392,
+            "activeCalories": 24,
+            "activeTimeSeconds": 1101,
+            "aveHeartRate": 58,
+            "bmrCalories": 893,
+            "date": "2022-09-27",
+            "distanceInMeters": 319,
+            "floorsClimbed": 1,
+            "id": "x35e229f-63322ef0-8520-6",
+            "maxHeartRate": 138,
+            "messageType": "dailySummaries",
+            "minHeartRate": 46,
+            "userId": "paulsTestUser",
+            provider: "garmin",
+            version: "1.0",
+        },
+        raw: garminRawDailyJson.dailies[0],
+        "status": "not tested",
+        "timestamp": "not tested",
+        "triesSoFar": "not tested",
+    }
+    sanatisedActivity.status = "not tested";
+    sanatisedActivity.timestamp = "not tested";
+    sanatisedActivity.triesSoFar = "not tested";
+    assert.deepEqual(sanatisedActivity.sanitised, expectedResults.sanitised);
+    sinon.restore();
+    });
     it('Webhooks should repond with status 401 if method incorrect...', async () => {
         // set the request object with the correct provider, developerId and userId
         const req = {
