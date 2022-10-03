@@ -520,6 +520,7 @@ exports.garminDailiesSanitise = function(garminDailies) {
   sanitisedDailies = []
   garminDailies.forEach((garminDaily) => {
     sanitisedDaily = {
+      "provider": "garmin",
       "id": garminDaily.summaryId,
       "date": garminDaily.calendarDate,// string "yyyy-mm-dd"
       "startTimeInSeconds": garminDaily.startTimeInSeconds,// integer
@@ -532,8 +533,9 @@ exports.garminDailiesSanitise = function(garminDailies) {
       "minHeartRate": garminDaily.minHeartRateInBeatsPerMinute,// integer
       "maxHeartRate": garminDaily.maxHeartRateInBeatsPerMinute,// integer
       "aveHeartRate": garminDaily.averageHeartRateInBeatsPerMinute,// integer
-      "restingHeartRate": garminDaily.restingHeartRateInBeatsPerMinute,// integer
+      "restingHeartRate": garminDaily.restingHeartRateInBeatsPerMinute,//integer
       // "timeOffsetHeartRate": garminDaily.,// map of seconds and HR, not sent to spreadsheets
+      "version": "1.0",
     }
     for (const prop in sanitisedDaily) {
       if (Object.prototype.hasOwnProperty.call(sanitisedDaily, prop)) {
@@ -550,6 +552,7 @@ exports.garminSleepSanitise = function(garminSleeps) {
   sanitisedSleeps = []
   garminSleeps.forEach((garminSleep) => {
     sanitisedSleep = {
+      "provider": "garmin",
       "id": garminSleep.summaryId,// string, unique id for summary
       "date": garminSleep.calendarDate,// string, "yyy-mm-dd"
       "startTime": garminSleep.startTimeInSeconds,// int, start time of the sleep seconds from epoch
@@ -558,6 +561,7 @@ exports.garminSleepSanitise = function(garminSleeps) {
       "deep": garminSleep.deepSleepDurationInSeconds,// int, deep duration in seconds
       "light": garminSleep.lightSleepDurationInSeconds,// int, light duration in seconds
       "rem": garminSleep.remSleepInSeconds,// int, rem duration in seconds
+      "version": "1.0",
     }
     for (const prop in sanitisedSleep) {
       if (Object.prototype.hasOwnProperty.call(sanitisedSleep, prop)) {

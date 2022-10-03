@@ -47,6 +47,10 @@ const webhookInBox = {
     }
     await webhookDoc.ref.delete();
   },
+  rewrite: async function(webhookDoc) {
+    // TODO: create a rewrite function so that
+    // we can ask for webhookDocs to be retried.
+  },
   writeError: async function(webhookDoc, error) {
     console.log(error.message);
     await webhookDoc.ref.set({status: "error: "+error.message}, {merge: true});
