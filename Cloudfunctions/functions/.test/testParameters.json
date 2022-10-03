@@ -22,7 +22,7 @@
     "endpoint": "https://rovetest-beea7-default-rtdb.firebaseio.com/newmessage3.json",
     "activity_endpoint": "https://rovetest-beea7-default-rtdb.firebaseio.com/activityTest.json",
     "sleep_endpoint": "https://rovetest-beea7-default-rtdb.firebaseio.com/sleepTest.json",
-    "dailySummary_endpoint": "https://rovetest-beea7-default-rtdb.firebaseio.com/dailySummaryTest.json",
+    "dailySummary_endpoint": "https://hooks.zapier.com/hooks/catch/13436623/bc51p5f/",
     "deauthorise_endpoint": "https://rovetest-beea7-default-rtdb.firebaseio.com/deauthMessage.json",
     "authorise_endpoint": "https://rovetest-beea7-default-rtdb.firebaseio.com/authMessage.json",
     "callbackURL": "https://paulsTest.com/callbackURL"
