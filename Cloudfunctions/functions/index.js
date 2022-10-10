@@ -387,32 +387,40 @@ exports.AdminGarminActivityList = functions.https.onRequest(async (req, res) => 
   // get every user with AIDevelopment devId and Garmin connected and pull historic data from last year.
   const userDocs = await db.collection("users").where("devId", "==", "RoveAIDevelopment").where("garmin_connected", "==", true).get();
   const end = new Date("10-9-2022");
-  const start = new Date("10-09-2021");
-  userDocs.forEach(async (doc)=>{
+  const start = new Date("10-1-2022");
+  for (let i = 0; i < userDocs.docs.length; i++) {
     // for each user call the getGarminActivityList for the last year.
-    const payload = await getGarminActivityList(start, end, doc);
-    const dailies = await getGarminDailiesList(start, end, doc);
-    const sleeps = await getGarminSleepList(start, end, doc);
-    for (let i = 0; i < payload.length; i++) {
-      await saveAndSendActivity(doc,
-          payload[i].sanitised,
-          payload[i].raw,
-          true,
-          "activities");
-      await saveAndSendActivity(doc,
-          dailies[i].sanitised,
-          dailies[i].raw,
-          "dailies",
-          false,
-          "dailySummaries");
-      await saveAndSendActivity(doc,
-          sleeps[i].sanitised,
-          sleeps[i].raw,
-          "sleeps",
-          false,
-          "sleeps");
+    try {
+      const payload = await getGarminActivityList(start, end, userDocs.docs[i]);
+      const dailies = await getGarminDailiesList(start, end, userDocs.docs[i]);
+      const sleeps = await getGarminSleepList(start, end, userDocs.docs[i]);
+      const list = [payload, dailies, sleeps];
+      // write a quick test to see what gets returned?
+      await Promise.all(list);
+      for (let i = 0; i < payload.length; i++) {
+        await saveAndSendActivity(userDocs.docs[i],
+            payload[i].sanitised,
+            payload[i].raw,
+            true,
+            "activities");
+        await saveAndSendActivity(userDocs.docs[i],
+            dailies[i].sanitised,
+            dailies[i].raw,
+            "dailies",
+            false,
+            "dailySummaries");
+        await saveAndSendActivity(userDocs.docs[i],
+            sleeps[i].sanitised,
+            sleeps[i].raw,
+            "sleeps",
+            false,
+            "sleeps");
+      }
+    } catch (err) {
+      console.log(err);
+      res.send(err);
     }
-  });
+  }
   res.send("status: complete");
 });
 
