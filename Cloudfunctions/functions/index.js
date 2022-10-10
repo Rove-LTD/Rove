@@ -386,21 +386,107 @@ async function getPolarActivityList(start, end, userDoc, getAllFlag) {
 exports.AdminGarminActivityList = functions.https.onRequest(async (req, res) => {
   // get every user with AIDevelopment devId and Garmin connected and pull historic data from last year.
   const userDocs = await db.collection("users").where("devId", "==", "RoveAIDevelopment").where("garmin_connected", "==", true).get();
-  const end = new Date.UTC(2022, 10, 9);
-  const start = new Date.UTC(2021, 10, 9);
+  const end = new Date("10-9-2022");
+  const start = new Date("10-09-2021");
   userDocs.forEach(async (doc)=>{
     // for each user call the getGarminActivityList for the last year.
     const payload = await getGarminActivityList(start, end, doc);
+    const dailies = await getGarminDailiesList(start, end, doc);
+    const sleeps = await getGarminSleepList(start, end, doc);
     for (let i = 0; i < payload.length; i++) {
       await saveAndSendActivity(doc,
           payload[i].sanitised,
           payload[i].raw,
           true,
           "activities");
+      await saveAndSendActivity(doc,
+          dailies[i].sanitised,
+          dailies[i].raw,
+          "dailies",
+          false,
+          "dailySummaries");
+      await saveAndSendActivity(doc,
+          sleeps[i].sanitised,
+          sleeps[i].raw,
+          "sleeps",
+          false,
+          "sleeps");
     }
   });
   res.send("status: complete");
 });
+
+async function getGarminDailiesList(start, end, userDoc) {
+  const url = "https://apis.garmin.com/wellness-api/rest/dailies";
+  const userDocData = await userDoc.data();
+  const clientId = userDocData["garmin_client_id"];
+  const secrets = getSecrets.fromClientId("garmin", clientId);
+  const consumerSecret = secrets.secret;
+  const oAuthConsumerSecret = secrets.clientId;
+  let activityList = [];
+  let requestEndTime;
+  // we have to run the API call for each day in the call.
+  while (start.getTime() < end.getTime()) {
+    requestEndTime = new Date(start.getTime() + (24*60*60*1000));
+    const options = await encodeparams.garminCallOptions(
+        url,
+        "GET",
+        consumerSecret,
+        oAuthConsumerSecret,
+        userDocData["garmin_access_token"],
+        userDocData["garmin_access_token_secret"],
+        {
+          from: start.getTime()/1000,
+          to: requestEndTime.getTime()/1000,
+        });
+    let currentActivityList = await got.get(options);
+    currentActivityList = JSON.parse(currentActivityList.body);
+    activityList = activityList.concat(currentActivityList);
+    start = new Date(start.getTime() + (24*60*60*1000));
+  }
+  const listOfSanitisedActivities = filters.garminDailiesSanitise(activityList);
+  const listOfValidActivities = [];
+  for (let i=0; i< activityList.length; i++) {
+    listOfValidActivities.push({"raw": activityList[i], "sanitised": listOfSanitisedActivities[i]});
+  }
+  return listOfValidActivities;
+}
+
+async function getGarminSleepList(start, end, userDoc) {
+  const url = "https://apis.garmin.com/wellness-api/rest/sleeps";
+  const userDocData = await userDoc.data();
+  const clientId = userDocData["garmin_client_id"];
+  const secrets = getSecrets.fromClientId("garmin", clientId);
+  const consumerSecret = secrets.secret;
+  const oAuthConsumerSecret = secrets.clientId;
+  let activityList = [];
+  let requestEndTime;
+  // we have to run the API call for each day in the call.
+  while (start.getTime() < end.getTime()) {
+    requestEndTime = new Date(start.getTime() + (24*60*60*1000));
+    const options = await encodeparams.garminCallOptions(
+        url,
+        "GET",
+        consumerSecret,
+        oAuthConsumerSecret,
+        userDocData["garmin_access_token"],
+        userDocData["garmin_access_token_secret"],
+        {
+          from: start.getTime()/1000,
+          to: requestEndTime.getTime()/1000,
+        });
+    let currentActivityList = await got.get(options);
+    currentActivityList = JSON.parse(currentActivityList.body);
+    activityList = activityList.concat(currentActivityList);
+    start = new Date(start.getTime() + (24*60*60*1000));
+  }
+  const listOfSanitisedActivities = filters.garminSleepSanitise(activityList);
+  const listOfValidActivities = [];
+  for (let i=0; i< activityList.length; i++) {
+    listOfValidActivities.push({"raw": activityList[i], "sanitised": listOfSanitisedActivities[i]});
+  }
+  return listOfValidActivities;
+}
 
 async function getGarminActivityList(start, end, userDoc) {
   const url = "https://apis.garmin.com/wellness-api/rest/activityDetails";
