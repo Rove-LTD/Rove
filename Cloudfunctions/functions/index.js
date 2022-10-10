@@ -382,6 +382,26 @@ async function getPolarActivityList(start, end, userDoc, getAllFlag) {
     return 400;
   }
 }
+
+exports.AdminGarminActivityList = functions.https.onRequest(async (req, res) => {
+  // get every user with AIDevelopment devId and Garmin connected and pull historic data from last year.
+  const userDocs = await db.collection("users").where("devId", "==", "RoveAIDevelopment").where("garmin_connected", "==", true).get();
+  const end = new Date.UTC(2022, 10, 9);
+  const start = new Date.UTC(2021, 10, 9);
+  userDocs.forEach(async (doc)=>{
+    // for each user call the getGarminActivityList for the last year.
+    const payload = await getGarminActivityList(start, end, doc);
+    for (let i = 0; i < payload.length; i++) {
+      await saveAndSendActivity(doc,
+          payload[i].sanitised,
+          payload[i].raw,
+          true,
+          "activities");
+    }
+  });
+  res.send("status: complete");
+});
+
 async function getGarminActivityList(start, end, userDoc) {
   const url = "https://apis.garmin.com/wellness-api/rest/activityDetails";
   const userDocData = await userDoc.data();
