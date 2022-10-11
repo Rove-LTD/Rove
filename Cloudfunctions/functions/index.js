@@ -392,18 +392,18 @@ exports.AdminGarminActivityList = functions.https.onRequest(async (req, res) => 
     // for each user call the getGarminActivityList for the last year.
     try {
       const payload = await getGarminActivityList(start, end, userDocs.docs[i]);
-      const dailies = await getGarminDailiesList(start, end, userDocs.docs[i]);
-      const sleeps = await getGarminSleepList(start, end, userDocs.docs[i]);
-      const list = [payload, dailies, sleeps];
+      // const dailies = await getGarminDailiesList(start, end, userDocs.docs[i]);
+      // const sleeps = await getGarminSleepList(start, end, userDocs.docs[i]);
+      // const list = [payload, dailies, sleeps];
       // write a quick test to see what gets returned?
-      await Promise.all(list);
+      // await Promise.all(list);
       for (let i = 0; i < payload.length; i++) {
         await saveAndSendActivity(userDocs.docs[i],
             payload[i].sanitised,
             payload[i].raw,
             true,
             "activities");
-        await saveAndSendActivity(userDocs.docs[i],
+        /* await saveAndSendActivity(userDocs.docs[i],
             dailies[i].sanitised,
             dailies[i].raw,
             "dailies",
@@ -415,6 +415,7 @@ exports.AdminGarminActivityList = functions.https.onRequest(async (req, res) => 
             "sleeps",
             false,
             "sleeps");
+            */
       }
     } catch (err) {
       console.log(err);
