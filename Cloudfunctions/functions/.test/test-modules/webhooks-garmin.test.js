@@ -272,7 +272,7 @@ describe("Testing that the garmin Webhooks work: ", () => {
         assert.deepEqual(sanatisedActivity, expectedResults);
         sinon.restore();
       });
-    it('read webhookInBox daily event and process it successfully...', async () => {
+    it.only('read webhookInBox daily event and process it successfully...', async () => {
 
     //set up the stubbed response to mimic garmin's response when called with the
     const stubbedWebhookInBox = sinon.stub(webhookInBox, "delete");
@@ -328,7 +328,7 @@ describe("Testing that the garmin Webhooks work: ", () => {
     assert.deepEqual(sanatisedActivity.sanitised, expectedResults.sanitised);
     sinon.restore();
     });
-    it.only('read webhookInBox sleep event and process it successfully...', async () => {
+    it('read webhookInBox sleep event and process it successfully...', async () => {
 
         //set up the stubbed response to mimic garmin's response when called with the
         const stubbedWebhookInBox = sinon.stub(webhookInBox, "delete");
