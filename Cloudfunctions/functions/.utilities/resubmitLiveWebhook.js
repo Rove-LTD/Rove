@@ -7,6 +7,7 @@
  const contentsOfDotEnvFile = require("../config.json");
  const { cert } = require('firebase-admin/app');
  const admin = require('firebase-admin');
+ const fs = require("fs");
  
  const configurations = contentsOfDotEnvFile["config"];
  const serviceAccount =
@@ -19,9 +20,11 @@
  // find a way to decrypt and encrypt this information
 
 const args = process.argv
-let docId = args[2];
-
-resubmitWebhookInBox(docId);
+const fileData = fs.readFileSync(args[2].toString(), 'utf-8');
+const docs = fileData.split(/\r?\n/);
+for (docId of docs) {
+  resubmitWebhookInBox(docId);
+}
 
 async function resubmitWebhookInBox(docId) {
   try{
