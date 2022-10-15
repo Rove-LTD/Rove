@@ -31,6 +31,11 @@ async function resubmitWebhookInBox(docId) {
     console.log("please include a valid document Id as an argument to this comand");
     return;
   }
+  if (!webhookDoc.exists) {
+    console.log("couldn't read webhookInBox: "+docId);
+    console.log("document does not exist, please include a valid document Id as an argument to this comand");
+    return;
+  }
   try{
     docToReWrite = webhookDoc.data();
     docToReWrite.status = "retry";
