@@ -9,6 +9,7 @@
  * and webHook management
  */
 const functions = require("firebase-functions");
+const functionsV2 = require("firebase-functions/v2");
 // The Firebase Admin SDK to access Firestore.
 const admin = require("firebase-admin");
 const Url = require("url");
@@ -1217,6 +1218,37 @@ exports.garminSleeps = functions.https.onRequest(async (request, response) => {
 
 
 exports.garminWebhook = functions.https.onRequest(async (request, response) => {
+  if (!request.debug) {
+    functions.logger.info("----> garmin "+request.method+" webhook event received!", {
+      body: request.body,
+    });
+  }
+  if (request.method === "POST") {
+    // check the webhook token is correct
+    const secrets = configurations.providerConfigs.garmin[0];
+    if (secrets == undefined) { // TODO put in validation function
+      console.log("Garmin Webhook event recieved that did not have the correct validation");
+      response.status(401);
+      response.send("NOT AUTHORISED");
+      return;
+    }
+    // save the webhook message and asynchronously process
+    try {
+      const webhookDoc = await webhookInBox.push(request, "garmin", secrets.clientId);
+      response.sendStatus(200);
+      // now we have saved the request and returned ok to the provider
+      // the message will trigger an asynchronous process
+    } catch (err) {
+      response.sendStatus(400);
+      console.log("Error saving webhook message - "+err.message);
+    }
+  } else {
+    response.sendStatus(401);
+    console.log("unknown method from Garmin webhook");
+  }
+});
+
+exports.garminwebhookv2 = functionsV2.https.onRequest(async (request, response) => {
   if (!request.debug) {
     functions.logger.info("----> garmin "+request.method+" webhook event received!", {
       body: request.body,
