@@ -36,28 +36,30 @@ module.exports = {
             ],
           },
           "Distance (km)": {
-            "number": (sanitisedActivity.distance_in_meters/1000),
+            "number": (sanitisedActivity.distance / 1000),
           },
           "Average Pace (m/s)": {
-            "number": parseInt(sanitisedActivity.average_pace_in_meters_per_second),
+            "number": parseInt(sanitisedActivity.avg_speed),
           },
           "Calories": {
             "number": sanitisedActivity.active_calories,
           },
           "Duration (mins)": {
-            "number": parseInt((sanitisedActivity.activity_duration_in_seconds/60).toFixed(2)),
+            "number": parseInt((sanitisedActivity.activity_duration / 60).toFixed(2)),
           },
           "Average HR": {
-            "number": sanitisedActivity.average_heart_rate_bpm,
+            "number": sanitisedActivity.avg_heart_rate,
           },
           "Elevation Gain (m)": {
             "number": parseInt(sanitisedActivity.elevation_gain),
           },
           "Elevation Loss (m)": {
-            "number": parseInt(sanitisedActivity.elevation_loss),
+            "number": parseInt(sanitisedActivity.elevation_loss ?? 0),
           },
           "Date": {
-            "date": {start: sanitisedActivity.start_time},
+            "date": {
+              "start": sanitisedActivity.start_time,
+            },
           },
           "Data Source": {
             "rich_text": [
